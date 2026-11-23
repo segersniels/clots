@@ -11,6 +11,13 @@ export default defineConfig({
   plugins: [tanstackRouter({ target: "react", autoCodeSplitting: true }), react(), tailwindcss()],
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
   server: {
+    // The server gives this port to the sidecar, so it must not move to another one.
+    // `localhost` can mean IPv6 only. The sidecar and the server use the IPv4 loopback address.
+    host: "127.0.0.1",
+    port: 5173,
+    strictPort: true,
+    // The sidecar forwards requests for the tailnet address to Vite.
+    allowedHosts: [".ts.net"],
     proxy: {
       "/rpc": { target: SERVER, ws: true },
       "/browser": { target: SERVER, ws: true },

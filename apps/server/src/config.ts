@@ -13,6 +13,11 @@ export class ClotsConfig extends Context.Service<
     readonly claudePath: string;
     /** The built web client, or `undefined` when no build exists. */
     readonly webRoot: string | undefined;
+    /**
+     * The port of the Vite dev server, set only by `bun run dev` in the repository root, which also starts Vite. The sidecar then forwards to Vite,
+     * so a device on the tailnet gets the client with hot reload. Vite forwards the API to this server.
+     */
+    readonly webDevPort: number | undefined;
   }
 >()("clots/config/ClotsConfig") {
   static readonly layer = Layer.sync(ClotsConfig, () => {
@@ -28,6 +33,7 @@ export class ClotsConfig extends Context.Service<
       port: Number(process.env.CLOTS_PORT ?? 4587),
       claudePath,
       webRoot: existsSync(webRoot) ? webRoot : undefined,
+      webDevPort: process.env.CLOTS_WEB_DEV_PORT === undefined ? undefined : Number(process.env.CLOTS_WEB_DEV_PORT),
     });
   });
 }
