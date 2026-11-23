@@ -8,7 +8,7 @@ import { renderUnicodeCompact } from "uqr";
 
 import { makeClaudeEnvironment } from "./bots/ClaudeEnvironment.ts";
 import { ServerLayer } from "./server.ts";
-import { installService, serviceIsRunning } from "./service/Service.ts";
+import { installService, removeService, serviceIsRunning, stopService } from "./service/Service.ts";
 import { readSidecarStatus, sidecarIsBuilt } from "./sidecar/Sidecar.ts";
 
 const HOME = process.env.CLOTS_HOME ?? join(homedir(), ".clots");
@@ -126,15 +126,32 @@ const status = async () => {
   console.log(`Tailnet:       ${sidecar?.url ?? sidecar?.state ?? "sidecar has not started"}`);
 };
 
+const stop = (remove: boolean) => {
+  if (remove) {
+    removeService();
+  } else {
+    stopService();
+  }
+
+  if (serviceIsRunning()) {
+    console.log("✗ The background service still runs.");
+    process.exit(1);
+  }
+
+  console.log(`✓ Background service ${remove ? "removed" : "stopped"}. Run \`clots up\` to start it again.`);
+};
+
 const command = process.argv[2];
 
 if (command === "serve") {
   BunRuntime.runMain(Layer.launch(ServerLayer));
 } else if (command === "up") {
   await up();
+} else if (command === "stop") {
+  stop(process.argv.includes("--force"));
 } else if (command === "status") {
   await status();
 } else {
-  console.log("Usage: clots <command>\n\n  up      Check the Claude login, install the background service, join the tailnet\n  status  Show the state of the service and the tailnet\n  serve   Run the server in the foreground");
+  console.log("Usage: clots <command>\n\n  up      Check the Claude login, install the background service, join the tailnet\n  stop    Stop the background service. With --force, also remove it\n  status  Show the state of the service and the tailnet\n  serve   Run the server in the foreground");
   process.exit(command === undefined ? 0 : 1);
 }

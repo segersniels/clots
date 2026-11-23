@@ -67,6 +67,14 @@ bun apps/server/src/cli.ts status
 > [!NOTE]
 > The service install and the tailnet steps are not yet verified end to end. If `clots up` fails, run `bun run start` and open an issue with the output.
 
+Stop the service, for example to run the server in the foreground:
+
+```shell
+bun apps/server/src/cli.ts stop
+```
+
+The service stays installed. `clots up` starts it again, and so does the next boot or login.
+
 ## Update
 
 ```shell
@@ -78,18 +86,10 @@ bun apps/server/src/cli.ts up    # restarts the service
 
 ## Remove the service
 
-Linux:
-
 ```shell
-systemctl --user disable --now clots.service
-rm ~/.config/systemd/user/clots.service
+bun apps/server/src/cli.ts stop --force
 ```
 
-macOS:
-
-```shell
-launchctl bootout gui/$(id -u)/foo.clots.server
-rm ~/Library/LaunchAgents/foo.clots.server.plist
-```
+This stops the service and deletes its systemd unit or launchd agent, so that it does not start again at the next boot or login.
 
 Your bots and their files stay in `~/.clots`. Delete that directory to remove all data.

@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, userInfo } from "node:os";
 import { join } from "node:path";
 
@@ -82,6 +82,34 @@ export const installService = (): void => {
 
   // Without linger, systemd stops the service when the operator logs out.
   run(["loginctl", "enable-linger", userInfo().username]);
+};
+
+/**
+ * Stops the background service and keeps it installed. `clots up` starts it again, and so does
+ * the next boot or login.
+ */
+export const stopService = (): void => {
+  if (process.platform === "darwin") {
+    run(["launchctl", "bootout", `gui/${userInfo().uid}/${LAUNCHD_LABEL}`]);
+
+    return;
+  }
+
+  run(["systemctl", "--user", "stop", SYSTEMD_UNIT]);
+};
+
+/** Stops the background service and removes it, so that it does not start at the next boot or login. */
+export const removeService = (): void => {
+  if (process.platform === "darwin") {
+    stopService();
+    rmSync(join(homedir(), "Library/LaunchAgents", `${LAUNCHD_LABEL}.plist`), { force: true });
+
+    return;
+  }
+
+  run(["systemctl", "--user", "disable", "--now", SYSTEMD_UNIT]);
+  rmSync(join(homedir(), ".config/systemd/user", SYSTEMD_UNIT), { force: true });
+  run(["systemctl", "--user", "daemon-reload"]);
 };
 
 /** Checks whether the background service runs. */
