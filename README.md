@@ -1,6 +1,9 @@
 <p align="center"><strong>clots</strong> runs always-on Claude bots on your own machine. You talk to them from the web, your phone or a desktop app, over your Tailscale network.</p>
 <p align="center">
-  <img src="./docs/assets/clots.png" alt="The clots web client: the bots, a chat, and the bot's screen, model and routines" width="80%" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./docs/assets/clots-dark.png" />
+    <img src="./docs/assets/clots-light.png" alt="The clots web client: bots grouped by project in the sidebar, a chat with a morning briefing, and the bot's details with its screen, project, model and routines" width="90%" />
+  </picture>
 </p>
 </br>
 Each bot is <a href="https://code.claude.com/docs/en/overview">Claude Code</a>, run through the Claude Agent SDK with your Claude subscription login. clots has no hosted service, no accounts and no API key support.
@@ -36,7 +39,7 @@ bun apps/server/src/cli.ts up
 
 ### What a bot is
 
-A bot has a name, a picture, instructions, a model and its own working directory. It has one ongoing thread that never ends: clots resumes the same Claude Code session after each restart. A bot keeps its durable memory in files in its working directory.
+A bot has a name, a character, instructions, a model and its own working directory. Its character is a small clot with a face that shows what the bot does: it breathes when idle, rolls a droplet while it works, and hops when it needs you. It has one ongoing thread that never ends: clots resumes the same Claude Code session after each restart. A bot keeps its durable memory in files in its working directory.
 
 - **Routines** send a prompt on a schedule, such as "Morning briefing, every day at 8:00".
 - **Approvals** ask you before a bot runs a risky tool.

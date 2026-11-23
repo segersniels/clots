@@ -4,12 +4,16 @@ Open the web client: `http://127.0.0.1:4587` on the host, or your tailnet addres
 
 ## Create a bot
 
-<img src="./assets/new-bot.png" alt="The new bot form" width="70%" />
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/new-bot-dark.png" />
+  <img src="./assets/new-bot-light.png" alt="The new bot form: a character preview, the name field, the shape and color pickers, and the instructions" width="70%" />
+</picture>
 
-1. Click **+** in the sidebar.
-2. Pick a color and a shape for the picture.
-3. Enter a name and the instructions. The instructions say what the bot does and how it behaves. clots adds them to the system prompt of Claude Code.
-4. Click **Get started**.
+1. Click **+** in the sidebar, then **New bot**.
+2. Enter a name.
+3. Pick a shape and a color for the bot's character.
+4. Enter the instructions. The instructions say what the bot does and how it behaves. clots adds them to the system prompt of Claude Code.
+5. Click **Get started**.
 
 Each bot gets its own working directory under `~/.clots/bots/`. The bot keeps its notes there, for example in `CLAUDE.md`. That is its durable memory.
 
