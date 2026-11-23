@@ -1,0 +1,16 @@
+node_modules
+dist
+release
+.turbo
+*.tsbuildinfo
+
+# Spike outputs
+spikes/proof
+spikes/**/*.jpg
+spikes/**/node_modules
+spikes/**/profile
+spikes/**/cdp-profile
+spikes/**/state
+spikes/**/*.log
+spikes/tsnet/tsnet-spike
+apps/sidecar/clots-sidecar

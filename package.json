@@ -1,0 +1,36 @@
+{
+  "name": "clots",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.4.4",
+  "workspaces": {
+    "packages": [
+      "apps/*",
+      "packages/*",
+      "spikes/e2e"
+    ],
+    "catalog": {
+      "effect": "4.1.5",
+      "@effect/platform-bun": "4.1.5",
+      "@effect/sql-sqlite-bun": "4.1.5",
+      "typescript": "^7.0.2",
+      "@types/bun": "^1.4.5"
+    }
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "start": "bun run --cwd apps/server start"
+  },
+  "devDependencies": {
+    "oxlint": "^1.95.0",
+    "turbo": "^2.11.13",
+    "typescript": "catalog:"
+  },
+  "trustedDependencies": [
+    "electron"
+  ]
+}

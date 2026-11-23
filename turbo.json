@@ -1,0 +1,31 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "build": {
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        "dist/**",
+        "clots-sidecar"
+      ]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "lint": {},
+    "typecheck": {
+      "dependsOn": [
+        "^typecheck"
+      ]
+    },
+    "test": {}
+  },
+  "globalPassThroughEnv": [
+    "CLOTS_HOME",
+    "CLOTS_PORT",
+    "CLAUDE_CONFIG_DIR",
+    "AGENT_BROWSER_EXECUTABLE_PATH"
+  ]
+}
