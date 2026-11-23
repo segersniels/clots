@@ -43,7 +43,7 @@ Each bot has its own browser profile, so its logins stay.
 
 ## Model
 
-The details pane has four model buttons: **Haiku**, **Sonnet**, **Opus** and **Fable**. A click changes the model at once, also in the middle of a thread. clots stores only the class. Claude Code picks the newest model of that class that your account can use.
+The details pane has a model menu with four choices: **Haiku**, **Sonnet**, **Opus** and **Fable**. A choice changes the model at once, also in the middle of a thread. clots stores only the class. Claude Code picks the newest model of that class that your account can use.
 
 A new bot starts on Opus.
 
