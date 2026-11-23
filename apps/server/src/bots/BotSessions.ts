@@ -57,7 +57,6 @@ const INLINE_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "ima
 const IDLE: ThreadLiveState = {
   status: "idle",
   steps: [],
-  streamingText: "",
   approvals: [],
   handoff: null,
   tasks: [],
@@ -457,7 +456,7 @@ export class BotSessions extends Context.Service<
               yield* record(runtime, botId, "assistant", `The turn failed: ${message.subtype}.`);
             }
 
-            setLive(runtime, { status: "idle", steps: [], streamingText: "" });
+            setLive(runtime, { status: "idle", steps: [] });
 
             return;
           }
@@ -490,14 +489,6 @@ export class BotSessions extends Context.Service<
               setLive(runtime, { steps: [...runtime.live.steps, step] });
             }
 
-            if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-              runtime.live = {
-                ...runtime.live,
-                streamingText: runtime.live.streamingText + event.delta.text,
-              };
-              publish(runtime, { _tag: "Delta", text: event.delta.text });
-            }
-
             return;
           }
 
@@ -518,8 +509,6 @@ export class BotSessions extends Context.Service<
             yield* recordTrace(runtime, botId, false);
             yield* record(runtime, botId, "assistant", text);
           }
-
-          setLive(runtime, { streamingText: "" });
         });
 
       const startSession = (bot: StoredBot, runtime: BotRuntime) =>
@@ -542,6 +531,7 @@ export class BotSessions extends Context.Service<
               model: bot.model,
               settingSources: ["user", "project", "local"],
               systemPrompt: { type: "preset", preset: "claude_code", append: systemPromptFor(bot) },
+              // The thread shows whole replies, but a partial message tells it at once that a tool call starts.
               includePartialMessages: true,
               // A classifier allows or denies each tool call. It asks the operator through canUseTool
               // only when it cannot decide.

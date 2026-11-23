@@ -141,7 +141,6 @@ export const ThreadLiveState = Schema.Struct({
   status: BotStatus,
   /** The tool calls of the running turn. The list is empty between turns. */
   steps: Schema.Array(TraceStep),
-  streamingText: Schema.String,
   approvals: Schema.Array(PendingApproval),
   handoff: Schema.NullOr(Handoff),
   /** The work that runs in the background. It can outlive the turn that started it. */
@@ -151,7 +150,6 @@ export type ThreadLiveState = typeof ThreadLiveState.Type;
 
 export const ThreadEvent = Schema.Union([
   Schema.TaggedStruct("Message", { message: Message }),
-  Schema.TaggedStruct("Delta", { text: Schema.String }),
   Schema.TaggedStruct("Live", { state: ThreadLiveState }),
 ]);
 export type ThreadEvent = typeof ThreadEvent.Type;

@@ -54,13 +54,10 @@ function MarkdownCode({ node: _node, className, children, ...props }: ComponentP
 
 const components = { code: MarkdownCode };
 
-/**
- * Renders a bot reply as markdown. `streaming` tells Streamdown that more text follows, so it
- * closes open markdown, such as an unfinished code fence, while the reply arrives.
- */
-export function Markdown({ children, streaming = false }: { children: string; streaming?: boolean }) {
+/** Renders a finished bot reply as markdown. */
+export function Markdown({ children }: { children: string }) {
   return (
-    <Streamdown controls={false} components={components} isAnimating={streaming}>
+    <Streamdown controls={false} components={components}>
       {children}
     </Streamdown>
   );

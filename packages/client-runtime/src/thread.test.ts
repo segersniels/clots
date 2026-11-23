@@ -22,20 +22,6 @@ test("a replayed message that the client already has does not appear twice", () 
   expect(replayed.lastSequence).toBe(1);
 });
 
-test("the stored assistant message replaces the streamed text", () => {
-  const streaming = [
-    { _tag: "Delta", text: "Hel" } as const,
-    { _tag: "Delta", text: "lo" } as const,
-  ].reduce(applyThreadEvent, emptyThread);
-
-  expect(streaming.live.streamingText).toBe("Hello");
-
-  const stored = applyThreadEvent(streaming, { _tag: "Message", message: message(2, "assistant", "Hello") });
-
-  expect(stored.live.streamingText).toBe("");
-  expect(stored.messages.map((item) => item.text)).toEqual(["Hello"]);
-});
-
 test("the live state marks the thread as synced", () => {
   const synced = applyThreadEvent(emptyThread, { _tag: "Live", state: { ...emptyThread.live, status: "working" } });
 

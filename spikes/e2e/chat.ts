@@ -13,14 +13,12 @@ const botId =
 console.log(`[bot] ${botId}`);
 
 const thread = client.thread(botId);
-let deltas = 0;
 let printed = 0;
 let sent = false;
 
 await new Promise<void>((resolve) => {
   thread.subscribe(() => {
     const state = thread.get();
-    if (state.live.streamingText !== "") deltas++;
 
     for (const message of state.messages.slice(printed)) {
       console.log(`[${message.sequence} ${message.role}] ${message.text}`);
@@ -44,6 +42,6 @@ await new Promise<void>((resolve) => {
   });
 });
 
-console.log(`[done] connection=${client.connection.get()} streaming_updates=${deltas}`);
+console.log(`[done] connection=${client.connection.get()}`);
 await client.dispose();
 process.exit(0);

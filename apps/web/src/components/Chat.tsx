@@ -134,8 +134,6 @@ export function Chat({ botId, botName }: { botId: BotId; botName: string }) {
     bots.map((bot) => bot.name),
   );
   const runningStep = live.steps.findLast((step) => step.status === "running");
-  // The text that streams in sits under the live steps, as the stored reply later sits under its trace.
-  const followsTrace = live.steps.length > 0 || thread.messages.at(-1)?.role === "trace";
   // The line keeps the last tasks while it closes, so it does not go blank before it is gone.
   const shownTasks = useRef(live.tasks);
   if (live.tasks.length > 0) shownTasks.current = live.tasks;
@@ -216,14 +214,6 @@ export function Chat({ botId, botName }: { botId: BotId; botName: string }) {
                 </MessageScrollerItem>
               )}
 
-              {live.streamingText !== "" && (
-                <MessageScrollerItem messageId="streaming" className={`${followsTrace ? "" : "pt-3"} ${ENTER}`}>
-                  <FromBot>
-                    <Markdown streaming>{live.streamingText}</Markdown>
-                  </FromBot>
-                </MessageScrollerItem>
-              )}
-
               {live.approvals.map((approval) => (
                 <MessageScrollerItem key={approval.id} messageId={approval.id} className={`pt-3 ${ENTER}`}>
                   <Approval botId={botId} approval={approval} />
@@ -242,7 +232,7 @@ export function Chat({ botId, botName }: { botId: BotId; botName: string }) {
                 </MessageScrollerItem>
               )}
 
-              {live.status === "working" && live.streamingText === "" && runningStep === undefined && (
+              {live.status === "working" && runningStep === undefined && (
                 <p className={`animate-pulse px-1 pt-2 text-[0.8125rem] text-muted-foreground motion-reduce:animate-none ${ENTER}`}>
                   Thinking
                 </p>
