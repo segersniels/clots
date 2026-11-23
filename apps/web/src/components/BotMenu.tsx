@@ -109,7 +109,7 @@ export function BotMenu({
           </ContextMenuItem>
           <ContextMenuItem onClick={duplicate}>
             <CopyIcon className={ICON} />
-            Duplicate
+            Clone
           </ContextMenuItem>
 
           <ContextMenuSeparator />
