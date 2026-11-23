@@ -114,4 +114,4 @@ See [Architecture](./architecture.md) for how the parts fit.
 
 ## Copied code
 
-If you copy a function from another project nearly unchanged, add that project's license notice to `THIRD_PARTY_NOTICES`.
+If you copy code or a file from another project nearly unchanged, credit the project in a comment. When its license requires the notice to travel with the copy, put the license file next to the copy, as `apps/web/src/assets/fonts/OFL.txt` does for the Allo font.

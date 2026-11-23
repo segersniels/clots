@@ -62,5 +62,3 @@ These parts are written but not yet verified end to end:
 - The macOS service (launchd) and the packaged macOS desktop app.
 
 Not built yet: a packaged installer (`brew`, `curl | sh`) and the iOS and Android apps.
-
-clots includes small portions of other projects. See [THIRD_PARTY_NOTICES](./THIRD_PARTY_NOTICES).
