@@ -84,6 +84,9 @@ ipcMain.handle("connect", (_event, input: string) => {
 });
 
 void app.whenReady().then(() => {
+  // A packaged app takes its icon from the bundle. `electron .` would show the Electron icon instead.
+  if (!app.isPackaged) app.dock?.setIcon(appFile("resources/icon.png"));
+
   const defaultMenu = Menu.getApplicationMenu();
   const menu = Menu.buildFromTemplate([
     ...(defaultMenu?.items ?? []),

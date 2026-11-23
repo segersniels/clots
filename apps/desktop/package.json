@@ -24,6 +24,7 @@
     "directories": { "output": "release" },
     "mac": {
       "category": "public.app-category.productivity",
+      "icon": "resources/icon.png",
       "target": [{ "target": "dmg", "arch": ["arm64", "x64"] }]
     }
   }
