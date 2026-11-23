@@ -43,7 +43,7 @@ Paste a file or an image into the message field, drop it there, or click **+** n
 - For each file, the bot also gets the path of the stored copy, so it can read or use the file.
 - The server keeps the files in the bot's notes directory, under `attachments/`. A file can be 10 MB at most.
 
-While a bot works, the thread lists its tool calls as steps. The list goes away when the turn ends.
+While a bot works, a closed line in the thread shows its current tool call. Click it to see all steps. When the bot finishes, the steps stay in the thread as a closed "Worked for …" line.
 
 ## Approvals
 
