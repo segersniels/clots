@@ -241,20 +241,21 @@ export function Chat({ botId, botName }: { botId: BotId; botName: string }) {
           </MessageScrollerViewport>
           <MessageScrollerButton />
         </MessageScroller>
+
+        {/* Work in the background, such as a subagent, can outlive the turn. The line stays until the work ends. */}
+        <Collapse open={live.tasks.length > 0}>
+          <div className="px-5 pb-2">
+            <Steps
+              steps={shownTasks.current.map((task) => ({ id: task.id, title: task.description, status: "running" as const }))}
+              title={backgroundTitle}
+              running
+            />
+          </div>
+        </Collapse>
+
+        {/* The composer sits inside the provider, so that sending can make the thread follow its end again. */}
+        <Composer botId={botId} botName={botName} status={live.status} />
       </MessageScrollerProvider>
-
-      {/* Work in the background, such as a subagent, can outlive the turn. The line stays until the work ends. */}
-      <Collapse open={live.tasks.length > 0}>
-        <div className="px-5 pb-2">
-          <Steps
-            steps={shownTasks.current.map((task) => ({ id: task.id, title: task.description, status: "running" as const }))}
-            title={backgroundTitle}
-            running
-          />
-        </div>
-      </Collapse>
-
-      <Composer botId={botId} botName={botName} status={live.status} />
     </>
   );
 }

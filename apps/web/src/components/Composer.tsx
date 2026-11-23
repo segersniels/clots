@@ -13,6 +13,7 @@ import {
   AttachmentTitle,
 } from "@/components/ui/attachment";
 import { InputGroup, InputGroupAddon, InputGroupButton } from "@/components/ui/input-group";
+import { useMessageScroller } from "@/components/ui/message-scroller";
 
 import { client } from "../client.ts";
 import { drafts, saveDraft } from "../drafts.ts";
@@ -53,6 +54,7 @@ export function Composer({ botId, botName, status }: { botId: BotId; botName: st
   const [tooLarge, setTooLarge] = useState(false);
   const fileDialog = useRef<HTMLInputElement>(null);
   const field = useRef<ComposerFieldHandle>(null);
+  const { scrollToEnd } = useMessageScroller();
   const canSend = draft.trim() !== "" || files.length > 0;
 
   // The draft outlives the composer, so it is still there when the operator comes back to the bot.
@@ -82,6 +84,9 @@ export function Composer({ botId, botName, status }: { botId: BotId; botName: st
   const send = async (event?: FormEvent) => {
     event?.preventDefault();
     if (!canSend) return;
+
+    // A sent message wants its answer in view, so the thread follows its end again, as the arrow button does.
+    scrollToEnd({ behavior: "smooth" });
 
     const text = draft.trim();
     const sending = files;
