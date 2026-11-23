@@ -1,0 +1,30 @@
+{
+  "name": "@clots/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The clots desktop app",
+  "main": "dist/main.cjs",
+  "scripts": {
+    "build": "bun build src/main.ts src/preload.ts --target=node --format=cjs --external electron --outdir dist --entry-naming '[name].cjs'",
+    "start": "bun run build && electron .",
+    "package:mac": "bun run build && electron-builder --mac",
+    "lint": "oxlint src",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "electron": "45.4.1",
+    "electron-builder": "26.18.0",
+    "typescript": "catalog:"
+  },
+  "build": {
+    "appId": "foo.clots.desktop",
+    "productName": "clots",
+    "files": ["dist/**", "resources/**"],
+    "directories": { "output": "release" },
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [{ "target": "dmg", "arch": ["arm64", "x64"] }]
+    }
+  }
+}
