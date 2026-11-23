@@ -7,6 +7,6 @@
     "lint": "oxlint src",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": { "effect": "catalog:" },
+  "dependencies": { "@clots/character": "workspace:*", "effect": "catalog:" },
   "devDependencies": { "typescript": "catalog:" }
 }
