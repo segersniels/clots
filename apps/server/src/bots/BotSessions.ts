@@ -28,8 +28,8 @@ import { z } from "zod";
 
 import { ClotsConfig } from "../config.ts";
 import { BotRepository, type StoredBot } from "./BotRepository.ts";
-import { makeBrowserEnvironment } from "../browser/BrowserEnvironment.ts";
-import { makeClaudeEnvironment, transcriptPath } from "./ClaudeEnvironment.ts";
+import { closeBrowser, makeBrowserEnvironment } from "../browser/BrowserEnvironment.ts";
+import { makeClaudeEnvironment, removeClaudeTranscripts, transcriptPath } from "./ClaudeEnvironment.ts";
 
 const HANDOFF_TOOL = "request_handoff";
 
@@ -118,6 +118,11 @@ export class BotSessions extends Context.Service<
     loadSkills(bot: StoredBot): Effect.Effect<void>;
     /** Stops the session of a deleted bot and forgets its live state. */
     remove(botId: BotId): Effect.Effect<void>;
+    /**
+     * Deletes a bot and everything it owns: its session, its browser, its rows and notes, and its
+     * Claude transcripts. The session and the browser stop first, so neither writes to the files while they go.
+     */
+    deleteBot(bot: StoredBot): Effect.Effect<void>;
     /** Switches the model of a running session. A bot without a session reads its model at the next start. */
     setModel(botId: BotId, model: BotModel): Effect.Effect<void>;
     resolveApproval(botId: BotId, approvalId: string, decision: ApprovalDecision): Effect.Effect<void>;
@@ -628,6 +633,17 @@ export class BotSessions extends Context.Service<
             } as SDKUserMessage);
           });
 
+      const removeRuntime = (botId: BotId) => stop(botId).pipe(Effect.andThen(Effect.sync(() => runtimes.delete(botId))));
+
+      const deleteBot = (bot: StoredBot) =>
+        removeRuntime(bot.id).pipe(
+          Effect.andThen(closeBrowser(bot)),
+          Effect.andThen(repository.remove(bot)),
+          Effect.andThen(Effect.sync(() => removeClaudeTranscripts(bot))),
+          Effect.andThen(PubSub.publish(statusChanges, undefined)),
+          Effect.asVoid,
+        );
+
       return BotSessions.of({
         statusChanges,
         skillChanges,
@@ -650,7 +666,9 @@ export class BotSessions extends Context.Service<
 
         loadSkills,
 
-        remove: (botId) => stop(botId).pipe(Effect.andThen(Effect.sync(() => runtimes.delete(botId)))),
+        remove: removeRuntime,
+
+        deleteBot,
 
         resolveApproval: (botId, approvalId, decision) =>
           Effect.sync(() => runtimeFor(botId).approvals.get(approvalId)?.(decision)),

@@ -13,7 +13,6 @@ import { resolve } from "node:path";
 
 import { BotRepository, type StoredBot } from "../bots/BotRepository.ts";
 import { BotSessions } from "../bots/BotSessions.ts";
-import { removeClaudeTranscripts } from "../bots/ClaudeEnvironment.ts";
 import { closeBrowser } from "../browser/BrowserEnvironment.ts";
 import { ProjectRepository } from "../projects/ProjectRepository.ts";
 import { nextRunAt, ScheduleRepository } from "../schedules/ScheduleRepository.ts";
@@ -145,16 +144,7 @@ export const HandlersLayer = ClotsRpcs.toLayer(
           Effect.tap(() => PubSub.publish(sessions.statusChanges, undefined)),
         ),
 
-      DeleteBot: ({ botId }) =>
-        requireBot(botId).pipe(
-          // The session and the browser stop first, so neither writes to the bot's files while they go.
-          Effect.tap(() => sessions.remove(botId)),
-          Effect.tap((bot) => closeBrowser(bot)),
-          Effect.tap((bot) => bots.remove(bot)),
-          Effect.tap((bot) => Effect.sync(() => removeClaudeTranscripts(bot))),
-          Effect.andThen(PubSub.publish(sessions.statusChanges, undefined)),
-          Effect.asVoid,
-        ),
+      DeleteBot: ({ botId }) => requireBot(botId).pipe(Effect.flatMap((bot) => sessions.deleteBot(bot))),
 
       SetBotModel: ({ botId, model }) =>
         requireBot(botId).pipe(
