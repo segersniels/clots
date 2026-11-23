@@ -1,0 +1,1 @@
+{ "name": "@clots/spike-e2e", "private": true, "type": "module", "dependencies": { "@clots/client-runtime": "workspace:*", "@clots/contracts": "workspace:*" } }
