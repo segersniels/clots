@@ -1,6 +1,6 @@
 import type { BotSummary } from "@clots/contracts";
 import { useNavigate, useParams } from "@tanstack/react-router";
-import { BellDotIcon, BellIcon, CopyIcon, FolderInputIcon, PencilIcon, Trash2Icon } from "lucide-react";
+import { BellDotIcon, BellIcon, FolderInputIcon, PencilIcon, UserRoundPlusIcon, UserRoundXIcon } from "lucide-react";
 import { useState, type ReactNode, type RefObject } from "react";
 
 import {
@@ -108,14 +108,14 @@ export function BotMenu({
             Rename
           </ContextMenuItem>
           <ContextMenuItem onClick={duplicate}>
-            <CopyIcon className={ICON} />
+            <UserRoundPlusIcon className={ICON} />
             Clone
           </ContextMenuItem>
 
           <ContextMenuSeparator />
 
           <ContextMenuItem variant="destructive" onClick={() => setConfirmingDelete(true)}>
-            <Trash2Icon />
+            <UserRoundXIcon />
             Delete
           </ContextMenuItem>
         </ContextMenuContent>

@@ -1,5 +1,5 @@
 import type { Project } from "@clots/contracts";
-import { PencilIcon, Trash2Icon } from "lucide-react";
+import { FolderXIcon, PencilIcon } from "lucide-react";
 import { useState, type ReactNode, type RefObject } from "react";
 
 import {
@@ -70,7 +70,7 @@ export function ProjectMenu({
           <ContextMenuSeparator />
 
           <ContextMenuItem variant="destructive" onClick={() => setConfirmingDelete(true)}>
-            <Trash2Icon />
+            <FolderXIcon />
             Delete
           </ContextMenuItem>
         </ContextMenuContent>
