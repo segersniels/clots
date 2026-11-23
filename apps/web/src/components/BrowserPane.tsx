@@ -28,6 +28,8 @@ const RECONNECT_DELAY_MS = 3000;
  */
 export function BrowserPane({ botId, botName }: { botId: BotId; botName: string }) {
   const [frame, setFrame] = useState<string | null>(null);
+  // The page that the bot's browser shows, so a sign-in on this machine can start there.
+  const [pageUrl, setPageUrl] = useState<string | null>(null);
   const [pageWidth, setPageWidth] = useState(1280);
   // The frame metadata can state a wrong page height, so the page's shape comes from the frame itself.
   const [frameRatio, setFrameRatio] = useState(16 / 9);
@@ -56,6 +58,10 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
 
       opened.addEventListener("message", (event) => {
         const message = JSON.parse(String(event.data));
+
+        // The stream names the page on connect, in the tab list, and again after each navigation.
+        if (message.type === "url") setPageUrl(message.url);
+        if (message.type === "tabs") setPageUrl(message.tabs.find((tab: { active: boolean }) => tab.active)?.url ?? null);
         if (message.type !== "frame") return;
 
         setFrame(`data:image/jpeg;base64,${message.data}`);
@@ -67,6 +73,7 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
 
       opened.addEventListener("close", () => {
         setFrame(null);
+        setPageUrl(null);
         setStopping(false);
         if (!closed) retry = setTimeout(connect, RECONNECT_DELAY_MS);
       });
@@ -188,7 +195,7 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
           )}
         </Collapse>
 
-        <SignInOnThisMachine botId={botId} />
+        <SignInOnThisMachine botId={botId} botName={botName} pageUrl={pageUrl} />
 
         <Dialog open={takeOver && frame !== null} onOpenChange={setTakeOver}>
           <DialogContent

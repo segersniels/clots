@@ -80,6 +80,11 @@ const signIn = (url: string) =>
       height: 760,
       webPreferences: { session: signInSession },
     });
+    // The window has no controls of its own, so its title tells the operator how to finish.
+    signInWindow.on("page-title-updated", (event, title) => {
+      event.preventDefault();
+      signInWindow.setTitle(`${title} — close this window when you are signed in`);
+    });
     signInWindow.on("closed", () => {
       void signInSession.cookies.get({}).then(async (cookies) => {
         await signInSession.clearStorageData();
