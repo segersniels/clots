@@ -184,7 +184,7 @@ function BotRow({ bot }: { bot: BotSummary }) {
           event.dataTransfer.setData(BOT_DRAG_TYPE, bot.id);
           event.dataTransfer.effectAllowed = "move";
         }}
-        className={`flex items-center gap-2.5 rounded-xl px-2.5 py-2 transition-[color,background-color,opacity,translate] duration-200 ease-out ${
+        className={`flex items-center gap-2.5 rounded-xl px-2.5 py-2 transition-[color,opacity,translate] duration-200 ease-out ${
           entersLate ? "starting:translate-y-1 starting:opacity-0 motion-reduce:starting:translate-y-0" : ""
         }`}
         activeProps={{ className: "bg-sidebar-accent" }}
