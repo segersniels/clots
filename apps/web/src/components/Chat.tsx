@@ -176,7 +176,8 @@ export function Chat({ botId, botName }: { botId: BotId; botName: string }) {
     <>
       {/* No item is a scroll anchor: the thread follows its end, so a request from the bot is always in view. */}
       <MessageScrollerProvider autoScroll defaultScrollPosition="end">
-        <MessageScroller className="flex-1">
+        {/* A quick fade in, so that switching bots does not cut hard from one thread to the next. */}
+        <MessageScroller className="flex-1 transition-opacity duration-150 ease-out starting:opacity-0">
           <OlderMessagesLoader hasOlder={firstShown > 0} onLoad={showOlder} />
           {/* The thread runs under the floating header and fades out there. The top padding clears the header. */}
           <MessageScrollerViewport preserveScrollOnPrepend className="[mask-image:linear-gradient(to_bottom,transparent,black_4rem)]">
