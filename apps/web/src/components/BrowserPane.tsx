@@ -8,6 +8,7 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } fr
 
 import { client } from "../client.ts";
 import { Collapse } from "./Collapse.tsx";
+import { SignInOnThisMachine } from "./SignInOnThisMachine.tsx";
 
 /** Is `true` when the operator uses a Mac, where the Command key does what Control does on Linux. */
 const OPERATOR_ON_MAC = navigator.userAgent.includes("Mac");
@@ -186,6 +187,8 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
             </div>
           )}
         </Collapse>
+
+        <SignInOnThisMachine botId={botId} />
 
         <Dialog open={takeOver && frame !== null} onOpenChange={setTakeOver}>
           <DialogContent

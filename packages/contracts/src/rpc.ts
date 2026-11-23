@@ -9,6 +9,7 @@ import {
   BotShape,
   BotModel,
   BotSummary,
+  BrowserCookie,
   Project,
   Schedule,
   Skill,
@@ -61,6 +62,12 @@ export class ClotsRpcs extends RpcGroup.make(
 
   /** Closes the bot's browser. Its logins stay in the profile, and the bot opens the browser again when it needs it. */
   Rpc.make("StopBrowser", { payload: { botId: BotId }, error: BotNotFound }),
+
+  /** Loads the cookies of a site that the operator signed in to on their machine into the bot's browser, then opens `url` there. */
+  Rpc.make("ImportBrowserLogin", {
+    payload: { botId: BotId, url: Schema.String, cookies: Schema.Array(BrowserCookie) },
+    error: BotNotFound,
+  }),
 
   Rpc.make("SetBotUnread", {
     payload: { botId: BotId, unread: Schema.Boolean },

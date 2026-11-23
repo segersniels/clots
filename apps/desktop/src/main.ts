@@ -1,4 +1,5 @@
-import { app, BrowserWindow, ipcMain, Menu, shell } from "electron";
+import { app, BrowserWindow, ipcMain, Menu, session, shell, type Cookie } from "electron";
+import { randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
@@ -22,6 +23,71 @@ const writeServerUrl = (serverUrl: string) => {
   mkdirSync(dirname(configPath()), { recursive: true });
   writeFileSync(configPath(), JSON.stringify({ serverUrl }));
 };
+
+/** Tells whether a page belongs to the clots server that the operator chose. */
+const isServerPage = (url: string | undefined) => {
+  const serverUrl = readServerUrl();
+
+  return url !== undefined && serverUrl !== undefined && new URL(url).origin === new URL(serverUrl).origin;
+};
+
+/** A cookie in the form that the clots server loads into a bot's browser. */
+interface BrowserCookie {
+  name: string;
+  value: string;
+  domain: string;
+  path: string;
+  expires: number;
+  httpOnly: boolean;
+  secure: boolean;
+  sameSite?: "Strict" | "Lax" | "None";
+}
+
+const SAME_SITE = { strict: "Strict", lax: "Lax", no_restriction: "None" } as const;
+
+const toBrowserCookie = (cookie: Cookie): BrowserCookie => {
+  const sameSite = SAME_SITE[cookie.sameSite as keyof typeof SAME_SITE];
+
+  return {
+    name: cookie.name,
+    value: cookie.value,
+    domain: cookie.domain ?? "",
+    path: cookie.path ?? "/",
+    // A cookie without an expiry ends with the browser session.
+    expires: cookie.expirationDate ?? -1,
+    httpOnly: cookie.httpOnly ?? false,
+    secure: cookie.secure ?? false,
+    ...(sameSite === undefined ? {} : { sameSite }),
+  };
+};
+
+/**
+ * Opens a site in its own window with a new, empty session, so the operator signs in as in any
+ * browser. When the operator closes the window, returns the cookies of that session and wipes them
+ * from this machine.
+ */
+const signIn = (url: string) =>
+  new Promise<BrowserCookie[]>((resolve) => {
+    const signInSession = session.fromPartition(`clots-sign-in-${randomUUID()}`);
+    // Sign-in pages such as Google's refuse a browser that names itself Electron or an app, so the window names itself as the Chrome it is.
+    signInSession.setUserAgent(
+      app.userAgentFallback.replace(` ${app.getName()}/${app.getVersion()}`, "").replace(/ Electron\/\S+/, ""),
+    );
+
+    const signInWindow = new BrowserWindow({
+      ...(window === undefined ? {} : { parent: window }),
+      width: 520,
+      height: 760,
+      webPreferences: { session: signInSession },
+    });
+    signInWindow.on("closed", () => {
+      void signInSession.cookies.get({}).then(async (cookies) => {
+        await signInSession.clearStorageData();
+        resolve(cookies.map(toBrowserCookie));
+      });
+    });
+    void signInWindow.loadURL(url);
+  });
 
 let window: BrowserWindow | undefined;
 
@@ -53,11 +119,7 @@ const createWindow = () => {
   });
 
   // Only the clots server and the connect page show in the app. Other links open in the browser.
-  const isInApp = (url: string) => {
-    const serverUrl = readServerUrl();
-
-    return url.startsWith("file:") || (serverUrl !== undefined && new URL(url).origin === new URL(serverUrl).origin);
-  };
+  const isInApp = (url: string) => url.startsWith("file:") || isServerPage(url);
 
   webContents.on("will-navigate", (event, url) => {
     if (isInApp(url)) return;
@@ -81,6 +143,14 @@ ipcMain.handle("connect", (_event, input: string) => {
   const serverUrl = new URL(/^https?:\/\//.test(input) ? input : `https://${input}`).origin;
   writeServerUrl(serverUrl);
   void showServer(serverUrl);
+});
+
+ipcMain.handle("sign-in", (event, input: string) => {
+  // Only the clots web client may open a sign-in window, because it receives the cookies.
+  if (event.sender !== window?.webContents || !isServerPage(event.senderFrame?.url)) throw new Error("Only the clots client can sign in.");
+
+  // A bare host name such as `x.com` means HTTPS.
+  return signIn(new URL(/^https?:\/\//.test(input) ? input : `https://${input}`).href);
 });
 
 void app.whenReady().then(() => {

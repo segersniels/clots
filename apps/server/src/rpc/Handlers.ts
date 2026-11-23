@@ -13,7 +13,7 @@ import { resolve } from "node:path";
 
 import { BotRepository, type StoredBot } from "../bots/BotRepository.ts";
 import { BotSessions } from "../bots/BotSessions.ts";
-import { closeBrowser } from "../browser/BrowserEnvironment.ts";
+import { closeBrowser, importLogin } from "../browser/BrowserEnvironment.ts";
 import { ProjectRepository } from "../projects/ProjectRepository.ts";
 import { nextRunAt, ScheduleRepository } from "../schedules/ScheduleRepository.ts";
 
@@ -129,6 +129,9 @@ export const HandlersLayer = ClotsRpcs.toLayer(
         ),
 
       StopBrowser: ({ botId }) => requireBot(botId).pipe(Effect.flatMap(closeBrowser)),
+
+      ImportBrowserLogin: ({ botId, url, cookies }) =>
+        requireBot(botId).pipe(Effect.flatMap((bot) => importLogin(bot, url, cookies))),
 
       SetBotUnread: ({ botId, unread }) =>
         requireBot(botId).pipe(
