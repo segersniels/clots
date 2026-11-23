@@ -1,0 +1,8 @@
+{
+  "name": "@clots/sidecar",
+  "private": true,
+  "scripts": {
+    "build": "go build -o clots-sidecar .",
+    "lint": "go vet ./..."
+  }
+}
