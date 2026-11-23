@@ -1,0 +1,13 @@
+{
+  "name": "@clots/client-runtime",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "lint": "oxlint src",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": { "@clots/contracts": "workspace:*", "effect": "catalog:" },
+  "devDependencies": { "@types/bun": "catalog:", "typescript": "catalog:" }
+}
