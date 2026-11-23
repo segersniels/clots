@@ -34,7 +34,8 @@ export function CharacterPicker({
         ))}
       </div>
 
-      <div className="flex justify-between" role="radiogroup" aria-label="Color">
+      {/* The circles wrap onto centered rows, with room between them for the ring around the chosen color. */}
+      <div className="flex flex-wrap justify-center gap-x-4 gap-y-3" role="radiogroup" aria-label="Color">
         {BotColor.literals.map((option) => (
           <button
             key={option}
@@ -43,11 +44,12 @@ export function CharacterPicker({
             aria-checked={option === color}
             aria-label={option}
             onClick={() => onColorChange(option)}
-            className="size-7 rounded-full outline-2 outline-offset-2 transition-[outline-color,scale] duration-150 ease-out active:scale-90 motion-reduce:active:scale-100"
+            className="size-7 rounded-full outline-[1.5px] outline-offset-[3px] transition-[outline-color,scale] duration-150 ease-out active:scale-90 motion-reduce:active:scale-100"
             style={{
               background: COLOR_HEX[option],
               outlineStyle: "solid",
-              outlineColor: option === color ? "var(--foreground)" : "transparent",
+              // A soft ring marks the chosen color without competing with it.
+              outlineColor: option === color ? "color-mix(in oklab, var(--foreground) 40%, transparent)" : "transparent",
             }}
           />
         ))}
