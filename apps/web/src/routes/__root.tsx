@@ -1,14 +1,23 @@
-import { createRootRoute, Outlet } from "@tanstack/react-router";
+import { createRootRoute, Outlet, redirect } from "@tanstack/react-router";
 import { useState } from "react";
 import { usePanelRef } from "react-resizable-panels";
 
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { takeStartupBot } from "@/lib/last-bot";
 import { readPaneWidth, savePaneWidth } from "@/lib/pane-width";
 
 import { BotList } from "../components/BotList.tsx";
 
-export const Route = createRootRoute({ component: Layout });
+export const Route = createRootRoute({
+  component: Layout,
+  // The app opens where the operator left off. Only its first page does this, so the + menu still opens the new bot page.
+  beforeLoad: ({ location }) => {
+    const lastBot = takeStartupBot();
+
+    if (location.pathname === "/" && lastBot !== null) throw redirect({ to: "/bots/$botId", params: { botId: lastBot }, replace: true });
+  },
+});
 
 /** The width of the sidebar in pixels until the operator drags the divider. */
 const DEFAULT_SIDEBAR_WIDTH = 240;

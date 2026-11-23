@@ -1,6 +1,6 @@
 import { Character } from "@clots/character";
 import type { BotId } from "@clots/contracts";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeftIcon, XIcon } from "lucide-react";
 import { useEffect, useRef, useState, type TransitionEvent } from "react";
 import { usePanelRef, type PanelSize } from "react-resizable-panels";
@@ -8,6 +8,7 @@ import { usePanelRef, type PanelSize } from "react-resizable-panels";
 import { Button } from "@/components/ui/button";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { saveLastBot } from "@/lib/last-bot";
 import { readPaneWidth, savePaneWidth } from "@/lib/pane-width";
 
 import { client, useStore } from "../client.ts";
@@ -34,7 +35,9 @@ const SLIDE_TRANSITIONS = ["translate", "opacity"];
 
 function BotPage() {
   const botId = Route.useParams().botId as BotId;
-  const bot = useStore(client.bots).find((candidate) => candidate.id === botId);
+  const navigate = useNavigate();
+  const bots = useStore(client.bots);
+  const bot = bots.find((candidate) => candidate.id === botId);
   const wide = useMediaQuery(WIDE_WINDOW);
   const reduceMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
   const details = usePanelRef();
@@ -49,7 +52,17 @@ function BotPage() {
   // To open a bot is to read it. A bot that the operator marks as unread while it is open keeps the mark.
   useEffect(() => {
     void client.setBotUnread(botId, false);
+    saveLastBot(botId);
   }, [botId]);
+
+  // The bot is gone, for example deleted on another device, so the app forgets it and opens the new bot page.
+  const missing = bots.length > 0 && bot === undefined;
+  useEffect(() => {
+    if (!missing) return;
+
+    saveLastBot(null);
+    void navigate({ to: "/", replace: true });
+  }, [missing, navigate]);
 
   // The bot list arrives a moment after the page opens.
   if (bot === undefined) return null;
