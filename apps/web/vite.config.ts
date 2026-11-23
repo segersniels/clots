@@ -21,6 +21,7 @@ export default defineConfig({
     proxy: {
       "/rpc": { target: SERVER, ws: true },
       "/browser": { target: SERVER, ws: true },
+      "/attachments": { target: SERVER },
     },
   },
 });

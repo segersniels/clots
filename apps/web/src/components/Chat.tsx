@@ -1,10 +1,9 @@
-import type { ApprovalDecision, BotId, PendingApproval } from "@clots/contracts";
-import { ArrowUpIcon, SquareIcon } from "lucide-react";
-import { useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
+import type { ApprovalDecision, BotId, MessageRole, PendingApproval, TraceStep } from "@clots/contracts";
+import { CircleCheckIcon, LoaderCircleIcon } from "lucide-react";
+import { useRef, type ReactNode } from "react";
 
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Button } from "@/components/ui/button";
-import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from "@/components/ui/input-group";
 import { Message, MessageContent, MessageHeader } from "@/components/ui/message";
 import {
   MessageScroller,
@@ -14,15 +13,43 @@ import {
   MessageScrollerProvider,
   MessageScrollerViewport,
 } from "@/components/ui/message-scroller";
+import {
+  Trace,
+  TraceCollapsible,
+  TraceCollapsibleContent,
+  TraceCollapsibleTrigger,
+  TraceIcon,
+  TraceLine,
+  TraceTitle,
+} from "@/components/ui/trace";
 
 import { client, useStore } from "../client.ts";
-import { formatClock } from "../time.ts";
+import { formatClock, formatDuration } from "../time.ts";
+import { Collapse } from "./Collapse.tsx";
+import { Composer } from "./Composer.tsx";
+import { Markdown } from "./Markdown.tsx";
+import { MessageAttachments } from "./MessageAttachments.tsx";
+import { knownNames } from "../references.ts";
+import { ReferenceText } from "./ReferenceText.tsx";
 
 /** A new time label shows when this much time passed since the previous message. */
 const TIME_LABEL_GAP_MS = 30 * 60 * 1000;
 
 /** The bubble shape of the thread: larger text and rounder corners than the shadcn default. */
-const BUBBLE_TEXT = "rounded-[1.15rem] px-4 py-2.5 text-base leading-[1.45] whitespace-pre-wrap";
+const BUBBLE = "rounded-[1.1rem] px-3.5 py-2 text-sm leading-normal";
+
+/**
+ * Eases a new thread item in, so that the thread does not jump when it arrives. The transition
+ * runs once, when the item first renders.
+ */
+const ENTER =
+  "transition-[opacity,translate] duration-200 ease-out starting:translate-y-2 starting:opacity-0 motion-reduce:starting:translate-y-0";
+
+/** The label above a message on the operator's side that the operator did not type. */
+const SENDER_LABELS: Partial<Record<MessageRole, string>> = { routine: "Routine", bot: "Bot message" };
+
+/** What the operator typed shows as typed, with its line breaks. A bot reply is markdown. */
+const BUBBLE_TEXT = `${BUBBLE} whitespace-pre-wrap`;
 
 /** Shows something that the bot says or asks, on the bot's side of the thread. */
 function FromBot({ children }: { children: ReactNode }) {
@@ -30,10 +57,44 @@ function FromBot({ children }: { children: ReactNode }) {
     <Message>
       <MessageContent>
         <Bubble variant="muted">
-          <BubbleContent className={BUBBLE_TEXT}>{children}</BubbleContent>
+          <BubbleContent className={BUBBLE}>{children}</BubbleContent>
         </Bubble>
       </MessageContent>
     </Message>
+  );
+}
+
+/**
+ * Shows the tool calls of the bot as one closed summary line, which opens into the steps. The line
+ * shimmers while a step runs.
+ */
+function Steps({ steps, title, running }: { steps: ReadonlyArray<TraceStep>; title: string; running: boolean }) {
+  return (
+    <Trace>
+      <TraceCollapsible>
+        <TraceCollapsibleTrigger>
+          <TraceLine {...(running ? { status: "running" as const } : {})}>
+            <TraceTitle>{title}</TraceTitle>
+          </TraceLine>
+        </TraceCollapsibleTrigger>
+        <TraceCollapsibleContent keepMounted>
+          <Trace>
+            {steps.map((step) => (
+              <TraceLine key={step.id} {...(step.status === "running" ? { status: "running" as const } : {})} className={ENTER}>
+                <TraceIcon>
+                  {step.status === "running" ? (
+                    <LoaderCircleIcon className="animate-spin motion-reduce:animate-none" />
+                  ) : (
+                    <CircleCheckIcon />
+                  )}
+                </TraceIcon>
+                <TraceTitle>{step.title}</TraceTitle>
+              </TraceLine>
+            ))}
+          </Trace>
+        </TraceCollapsibleContent>
+      </TraceCollapsible>
+    </Trace>
   );
 }
 
@@ -43,7 +104,7 @@ function Approval({ botId, approval }: { botId: BotId; approval: PendingApproval
   return (
     <FromBot>
       <p className="font-medium">Allow {approval.toolName}?</p>
-      <pre className="mt-3 max-h-48 overflow-auto rounded-lg bg-background p-3 text-xs text-muted-foreground">
+      <pre className="mt-3 max-h-48 overflow-auto rounded-lg bg-background p-3 text-xs break-all whitespace-pre-wrap text-muted-foreground">
         {approval.input}
       </pre>
       <div className="mt-4 flex flex-wrap gap-2">
@@ -63,58 +124,84 @@ function Approval({ botId, approval }: { botId: BotId; approval: PendingApproval
 
 export function Chat({ botId, botName }: { botId: BotId; botName: string }) {
   const thread = useStore(client.thread(botId));
-  const [draft, setDraft] = useState("");
+  // Only items that arrive while the thread is open ease in. The stored history shows at once.
+  const openedAt = useRef(Date.now());
   const { live } = thread;
-
-  const send = (event?: FormEvent) => {
-    event?.preventDefault();
-    const text = draft.trim();
-    if (text === "") return;
-
-    setDraft("");
-    void client.sendMessage(botId, text);
-  };
-
-  const sendOnEnter = (event: KeyboardEvent) => {
-    if (event.key !== "Enter" || event.shiftKey) return;
-
-    event.preventDefault();
-    send();
-  };
+  const skills = useStore(client.skills(botId));
+  const bots = useStore(client.bots);
+  const known = knownNames(
+    skills.map((skill) => skill.name),
+    bots.map((bot) => bot.name),
+  );
+  const runningStep = live.steps.findLast((step) => step.status === "running");
+  // The text that streams in sits under the live steps, as the stored reply later sits under its trace.
+  const followsTrace = live.steps.length > 0 || thread.messages.at(-1)?.role === "trace";
+  // The line keeps the last tasks while it closes, so it does not go blank before it is gone.
+  const shownTasks = useRef(live.tasks);
+  if (live.tasks.length > 0) shownTasks.current = live.tasks;
+  const backgroundTitle =
+    shownTasks.current.length === 1
+      ? `In the background: ${shownTasks.current[0]!.description}`
+      : `${shownTasks.current.length} tasks in the background`;
 
   return (
     <>
+      {/* No item is a scroll anchor: the thread follows its end, so a request from the bot is always in view. */}
       <MessageScrollerProvider autoScroll defaultScrollPosition="end">
         <MessageScroller className="flex-1">
-          <MessageScrollerViewport>
-            <MessageScrollerContent className="gap-1.5 px-6 py-4">
+          {/* The thread runs under the floating header and fades out there. The top padding clears the header. */}
+          <MessageScrollerViewport className="[mask-image:linear-gradient(to_bottom,transparent,black_4rem)]">
+            <MessageScrollerContent className="gap-1.5 px-4 pt-16 pb-3">
               {thread.messages.map((message, index) => {
                 const previous = thread.messages[index - 1];
                 const showsTime = previous === undefined || message.createdAt - previous.createdAt > TIME_LABEL_GAP_MS;
-                const fromBot = message.role === "assistant";
+                const fromBot = message.role === "assistant" || message.role === "trace";
                 // Messages from the same side sit close together. A change of side gets more room.
-                const changesSide = previous !== undefined && (previous.role === "assistant") !== fromBot;
+                const changesSide = previous !== undefined && (previous.role === "assistant" || previous.role === "trace") !== fromBot;
+
+                // A trace takes the place of the live steps, so it sits where they sat and does not ease in.
+                if (message.role === "trace") {
+                  return (
+                    <MessageScrollerItem key={message.id} messageId={message.id} className="px-1 pt-2">
+                      <Steps
+                        steps={message.steps}
+                        title={`Worked for ${formatDuration(message.createdAt - (previous?.createdAt ?? message.createdAt))}`}
+                        running={false}
+                      />
+                    </MessageScrollerItem>
+                  );
+                }
 
                 return (
                   <MessageScrollerItem
                     key={message.id}
                     messageId={message.id}
-                    scrollAnchor={!fromBot}
-                    className={changesSide && !showsTime ? "pt-3" : ""}
+                    // A bot reply takes the place of its streamed text, so it must not ease in a second time.
+                    className={`${changesSide && !showsTime ? "pt-3" : ""} ${!fromBot && message.createdAt >= openedAt.current ? ENTER : ""}`}
                   >
                     {showsTime && (
-                      <p className="py-3 text-center text-xs text-muted-foreground">{formatClock(message.createdAt)}</p>
+                      <p className="py-3 text-center text-[0.6875rem] text-muted-foreground">{formatClock(message.createdAt)}</p>
                     )}
 
                     {fromBot ? (
-                      <FromBot>{message.text}</FromBot>
+                      <FromBot>
+                        <Markdown>{message.text}</Markdown>
+                      </FromBot>
                     ) : (
                       <Message align="end">
                         <MessageContent>
-                          {message.role === "routine" && <MessageHeader className="justify-end">Routine</MessageHeader>}
-                          <Bubble align="end" variant={message.role === "routine" ? "outline" : "default"}>
-                            <BubbleContent className={BUBBLE_TEXT}>{message.text}</BubbleContent>
-                          </Bubble>
+                          {SENDER_LABELS[message.role] !== undefined && (
+                            <MessageHeader className="justify-end">{SENDER_LABELS[message.role]}</MessageHeader>
+                          )}
+                          <MessageAttachments message={message} />
+                          {/* A message can be files only. */}
+                          {message.text !== "" && (
+                            <Bubble align="end" variant={SENDER_LABELS[message.role] === undefined ? "default" : "outline"}>
+                              <BubbleContent className={BUBBLE_TEXT}>
+                                <ReferenceText text={message.text} known={known} bots={bots} />
+                              </BubbleContent>
+                            </Bubble>
+                          )}
                         </MessageContent>
                       </Message>
                     )}
@@ -122,20 +209,29 @@ export function Chat({ botId, botName }: { botId: BotId; botName: string }) {
                 );
               })}
 
+              {/* The tool calls of the running turn. The finished ones move into the thread as a trace. */}
+              {live.steps.length > 0 && (
+                <MessageScrollerItem messageId="steps" className={`px-1 pt-2 ${ENTER}`}>
+                  <Steps steps={live.steps} title={(runningStep ?? live.steps.at(-1)!).title} running={runningStep !== undefined} />
+                </MessageScrollerItem>
+              )}
+
               {live.streamingText !== "" && (
-                <MessageScrollerItem messageId="streaming" className="pt-3">
-                  <FromBot>{live.streamingText}</FromBot>
+                <MessageScrollerItem messageId="streaming" className={`${followsTrace ? "" : "pt-3"} ${ENTER}`}>
+                  <FromBot>
+                    <Markdown streaming>{live.streamingText}</Markdown>
+                  </FromBot>
                 </MessageScrollerItem>
               )}
 
               {live.approvals.map((approval) => (
-                <MessageScrollerItem key={approval.id} messageId={approval.id} className="pt-3">
+                <MessageScrollerItem key={approval.id} messageId={approval.id} className={`pt-3 ${ENTER}`}>
                   <Approval botId={botId} approval={approval} />
                 </MessageScrollerItem>
               ))}
 
               {live.handoff !== null && (
-                <MessageScrollerItem messageId={live.handoff.id} className="pt-3">
+                <MessageScrollerItem messageId={live.handoff.id} className={`pt-3 ${ENTER}`}>
                   <FromBot>
                     <p className="font-medium">Take over {botName}'s screen</p>
                     <p className="mt-1 text-sm text-muted-foreground">{live.handoff.reason}</p>
@@ -146,8 +242,10 @@ export function Chat({ botId, botName }: { botId: BotId; botName: string }) {
                 </MessageScrollerItem>
               )}
 
-              {live.status === "working" && live.streamingText === "" && (
-                <p className="animate-pulse motion-reduce:animate-none px-1 pt-2 text-sm text-muted-foreground">{live.activity ?? "Thinking"}</p>
+              {live.status === "working" && live.streamingText === "" && runningStep === undefined && (
+                <p className={`animate-pulse px-1 pt-2 text-[0.8125rem] text-muted-foreground motion-reduce:animate-none ${ENTER}`}>
+                  Thinking
+                </p>
               )}
             </MessageScrollerContent>
           </MessageScrollerViewport>
@@ -155,43 +253,18 @@ export function Chat({ botId, botName }: { botId: BotId; botName: string }) {
         </MessageScroller>
       </MessageScrollerProvider>
 
-      <form onSubmit={send} className="px-6 pb-4">
-        {/* An empty draft disables the send button. That must not gray out the whole composer. */}
-        <InputGroup className="items-end rounded-[1.6rem] bg-background py-1 pl-2 pr-1.5 shadow-sm has-disabled:bg-background has-disabled:opacity-100">
-          <InputGroupTextarea
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={sendOnEnter}
-            rows={1}
-            placeholder={`Message ${botName}`}
-            className="max-h-40 min-h-9 text-base md:text-base"
+      {/* Work in the background, such as a subagent, can outlive the turn. The line stays until the work ends. */}
+      <Collapse open={live.tasks.length > 0}>
+        <div className="px-5 pb-2">
+          <Steps
+            steps={shownTasks.current.map((task) => ({ id: task.id, title: task.description, status: "running" as const }))}
+            title={backgroundTitle}
+            running
           />
-          <InputGroupAddon align="inline-end" className="pb-1">
-            {live.status === "idle" ? (
-              <InputGroupButton
-                type="submit"
-                variant="default"
-                size="icon-sm"
-                aria-label="Send"
-                disabled={draft.trim() === ""}
-                className="rounded-full"
-              >
-                <ArrowUpIcon />
-              </InputGroupButton>
-            ) : (
-              <InputGroupButton
-                variant="default"
-                size="icon-sm"
-                aria-label="Stop"
-                className="rounded-full"
-                onClick={() => client.interruptBot(botId)}
-              >
-                <SquareIcon className="size-3 fill-current" />
-              </InputGroupButton>
-            )}
-          </InputGroupAddon>
-        </InputGroup>
-      </form>
+        </div>
+      </Collapse>
+
+      <Composer botId={botId} botName={botName} status={live.status} />
     </>
   );
 }

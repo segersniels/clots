@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 
 import { client, useStore } from "../client.ts";
+import { Collapse } from "./Collapse.tsx";
 
 const CUSTOM = "custom";
 
@@ -49,7 +50,7 @@ export function Routines({ botId }: { botId: BotId }) {
   return (
     <section className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm text-muted-foreground">Routines</h2>
+        <h2 className="px-1 text-[0.8125rem] text-muted-foreground">Routines</h2>
         <Button
           variant="ghost"
           size="icon-sm"
@@ -61,7 +62,7 @@ export function Routines({ botId }: { botId: BotId }) {
         </Button>
       </div>
 
-      {schedules.length === 0 && !adding && <p className="text-sm text-muted-foreground">No routines yet.</p>}
+      {schedules.length === 0 && !adding && <p className="px-1 text-muted-foreground">No routines yet.</p>}
 
       {schedules.map((schedule) => (
         <div key={schedule.id} className="group flex items-center gap-2 py-1">
@@ -77,7 +78,7 @@ export function Routines({ botId }: { botId: BotId }) {
 
           <div className="min-w-0 flex-1">
             <p className="truncate">{schedule.prompt}</p>
-            <p className="truncate text-sm text-muted-foreground">
+            <p className="truncate text-[0.8125rem] text-muted-foreground">
               {schedule.paused ? "Paused" : describe(schedule.cron)}
             </p>
           </div>
@@ -94,14 +95,13 @@ export function Routines({ botId }: { botId: BotId }) {
         </div>
       ))}
 
-      {adding && (
+      <Collapse open={adding}>
         <form onSubmit={create} className="flex flex-col gap-2">
           <Textarea
             value={prompt}
             onChange={(event) => setPrompt(event.target.value)}
             rows={2}
             required
-            autoFocus
             placeholder="Morning briefing"
             className="resize-none"
           />
@@ -117,23 +117,23 @@ export function Routines({ botId }: { botId: BotId }) {
               ))}
             </SelectContent>
           </Select>
-          {preset === CUSTOM && (
+          <Collapse open={preset === CUSTOM}>
             <Input
               value={customCron}
               onChange={(event) => setCustomCron(event.target.value)}
-              required
+              required={preset === CUSTOM}
               placeholder="0 8 * * *"
               aria-label="Cron expression"
               aria-invalid={error}
               className="font-mono"
             />
-          )}
+          </Collapse>
           {error && <p className="text-xs text-destructive">This cron expression is not valid.</p>}
           <Button type="submit" className="self-start">
             Add routine
           </Button>
         </form>
-      )}
+      </Collapse>
     </section>
   );
 }

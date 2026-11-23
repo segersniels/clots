@@ -1,7 +1,66 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/geist";
+
+/*
+ * Allo by Josh Puckett, SIL Open Font License. The upright font is variable in weight, optical size
+ * and roundness. The obliques are drawn per weight, so the browser does not slant the upright font.
+ */
+@font-face {
+  font-family: "Allo";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("./assets/fonts/AlloVariable.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Allo";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./assets/fonts/Allo-Oblique.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Allo";
+  font-style: italic;
+  font-weight: 500;
+  font-display: swap;
+  src: url("./assets/fonts/Allo-MediumOblique.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Allo";
+  font-style: italic;
+  font-weight: 600;
+  font-display: swap;
+  src: url("./assets/fonts/Allo-SemiBoldOblique.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Allo";
+  font-style: italic;
+  font-weight: 700;
+  font-display: swap;
+  src: url("./assets/fonts/Allo-BoldOblique.woff2") format("woff2");
+}
+
+/*
+ * Scales Arial to the size of Allo, so text does not move when Allo loads and replaces it. The
+ * values come from the mejl project, which measured them from the Allo font files.
+ */
+@font-face {
+  font-family: "Allo Fallback";
+  src: local("Arial");
+  size-adjust: 105.15%;
+  ascent-override: 92.13%;
+  descent-override: 22.94%;
+  line-gap-override: 0%;
+}
+
+/* Streamdown ships Tailwind class names in its build. Tailwind must scan them. */
+@source "../node_modules/streamdown/dist/*.js";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -31,6 +90,8 @@
   --sidebar-accent-foreground: #111111;
   --sidebar-border: #e4e4e4;
   --attention: #2f7cf6;
+  --skill: #7c3aed;
+  --draft: #c2410c;
 }
 
 html,
@@ -57,14 +118,18 @@ body,
   /* Strong curves: the built-in CSS easings are too weak for UI. They replace `ease-out` and `ease-in-out`. */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  /* The iOS-like curve for panels that slide in from an edge. */
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
   --font-heading: var(--font-sans);
-  --font-sans: 'Geist Variable', sans-serif;
+  --font-sans: "Allo", "Allo Fallback", ui-sans-serif, system-ui, sans-serif;
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-accent: var(--sidebar-accent);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
   --color-attention: var(--attention);
+  --color-skill: var(--skill);
+  --color-draft: var(--draft);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -108,15 +173,17 @@ body,
   --accent: #262628;
   --accent-foreground: #f4f4f5;
   --destructive: oklch(0.704 0.191 22.216);
-  --border: #2c2c2f;
+  --border: #232325;
   --input: #38383b;
   --ring: #6b6b70;
-  --sidebar: #18181a;
+  --sidebar: #0f0f10;
   --sidebar-foreground: #f4f4f5;
   --sidebar-accent: #262628;
   --sidebar-accent-foreground: #f4f4f5;
-  --sidebar-border: #2c2c2f;
+  --sidebar-border: #232325;
   --attention: #5b9bff;
+  --skill: #b69cff;
+  --draft: #fb923c;
 }
 
 @layer base {
@@ -124,9 +191,25 @@ body,
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    /* Without this, macOS draws light text on a dark background too heavy. */
+    @apply bg-background text-foreground antialiased;
   }
   html {
     @apply font-sans;
+    /* Allo's roundness axis runs from 0 (sharp) to 100 (round). Its default of 50 looks square at text sizes. */
+    font-variation-settings: "ROND" 100;
   }
+}
+
+/*
+ * Tailwind 4 gives buttons the default cursor. This brings the pointer back, as the shadcn docs
+ * describe. The rule sits outside the layers, because shadcn sets `cursor-default` on menu items
+ * and select options with a utility class, and a utility beats a rule in the base layer.
+ */
+button:not(:disabled),
+[role="button"]:not(:disabled),
+[role="menuitem"]:not([data-disabled]),
+[role="option"]:not([data-disabled]),
+[role="combobox"]:not(:disabled) {
+  cursor: pointer;
 }
