@@ -1,5 +1,5 @@
 import { BROWSER_STREAM_PATH, type BotId } from "@clots/contracts";
-import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
+import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type MouseEvent } from "react";
 
 import { EyeOffIcon, SquareIcon } from "lucide-react";
 
@@ -117,11 +117,14 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
   const sendKey = (eventType: string) => (event: KeyboardEvent) => {
     if (!takeOver) return;
 
-    event.preventDefault();
-
     // The bot's browser runs on Linux, so a Mac shortcut such as Command+A must arrive as Control+A.
     const control = event.ctrlKey || (OPERATOR_ON_MAC && event.metaKey);
     const meta = event.metaKey && !OPERATOR_ON_MAC;
+
+    // The page's own clipboard is on the server. The paste shortcut stays here, so `pasteText` gets this clipboard.
+    if (control && event.key.toLowerCase() === "v") return;
+
+    event.preventDefault();
     send({
       type: "input_keyboard",
       eventType,
@@ -133,6 +136,18 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
       // Only a printable key inserts text, and not as part of a shortcut.
       ...(eventType === "keyDown" && event.key.length === 1 && !control && !meta ? { text: event.key } : {}),
     });
+  };
+
+  /** Types the operator's clipboard text into the page, one key at a time, because the stream has no paste message. */
+  const pasteText = (event: ClipboardEvent) => {
+    event.preventDefault();
+
+    for (const character of event.clipboardData.getData("text/plain").replaceAll("\r\n", "\n")) {
+      // A line break is an Enter press. Every other character arrives as typed text.
+      const key = character === "\n" ? { key: "Enter", code: "Enter", windowsVirtualKeyCode: 13, text: "\r" } : { key: character, text: character };
+      send({ type: "input_keyboard", eventType: "keyDown", modifiers: 0, ...key });
+      send({ type: "input_keyboard", eventType: "keyUp", modifiers: 0, key: key.key });
+    }
   };
 
   return (
@@ -200,6 +215,7 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
                 onMouseMove={sendMouse("mouseMoved")}
                 onKeyDown={sendKey("keyDown")}
                 onKeyUp={sendKey("keyUp")}
+                onPaste={pasteText}
                 className="w-full cursor-default rounded-lg outline-none"
               />
             )}
