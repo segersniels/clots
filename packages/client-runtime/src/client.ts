@@ -31,6 +31,8 @@ export interface ClotsClient {
   updateBot(botId: BotId, changes: Partial<Pick<Bot, "name" | "instructions" | "color" | "shape">>): Promise<void>;
   setBotModel(botId: BotId, model: BotModel): Promise<void>;
   setBotUnread(botId: BotId, unread: boolean): Promise<void>;
+  /** Closes the bot's browser. The bot opens it again when it needs it. */
+  stopBrowser(botId: BotId): Promise<void>;
   duplicateBot(botId: BotId): Promise<Bot>;
   deleteBot(botId: BotId): Promise<void>;
   /** Creates a project. `directory` is an optional path on the host. */
@@ -183,6 +185,7 @@ export const makeClotsClient = (origin: string): ClotsClient => {
     setBotProject: (botId, projectId) => call((rpc) => rpc.SetBotProject({ botId, projectId })),
     setBotModel: (botId, model) => call((rpc) => rpc.SetBotModel({ botId, model })),
     setBotUnread: (botId, unread) => call((rpc) => rpc.SetBotUnread({ botId, unread })),
+    stopBrowser: (botId) => call((rpc) => rpc.StopBrowser({ botId })),
     duplicateBot: (botId) => call((rpc) => rpc.DuplicateBot({ botId })),
     deleteBot: (botId) => call((rpc) => rpc.DeleteBot({ botId })),
     sendMessage: (botId, text, attachments = []) => call((rpc) => rpc.SendMessage({ botId, text, attachments })),

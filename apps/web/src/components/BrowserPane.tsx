@@ -1,11 +1,12 @@
 import { BROWSER_STREAM_PATH, type BotId } from "@clots/contracts";
 import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 
-import { EyeOffIcon } from "lucide-react";
+import { EyeOffIcon, SquareIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 
+import { client } from "../client.ts";
 import { Collapse } from "./Collapse.tsx";
 
 /** Is `true` when the operator uses a Mac, where the Command key does what Control does on Linux. */
@@ -30,6 +31,8 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
   // The frame metadata can state a wrong page height, so the page's shape comes from the frame itself.
   const [frameRatio, setFrameRatio] = useState(16 / 9);
   const [takeOver, setTakeOver] = useState(false);
+  // The browser takes a moment to close. The button stays disabled until the stream ends.
+  const [stopping, setStopping] = useState(false);
   const socket = useRef<WebSocket | null>(null);
   // The socket opens again after a drop, and the new one must ask for the same frame rate.
   const takeOverNow = useRef(takeOver);
@@ -63,6 +66,7 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
 
       opened.addEventListener("close", () => {
         setFrame(null);
+        setStopping(false);
         if (!closed) retry = setTimeout(connect, RECONNECT_DELAY_MS);
       });
     };
@@ -81,6 +85,17 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
 
     sendFrameRate(opened);
   }, [takeOver]);
+
+  /** Closes the browser to free its memory. The bot opens it again with its logins when it needs it. */
+  const stopBrowser = async () => {
+    setStopping(true);
+
+    try {
+      await client.stopBrowser(botId);
+    } catch {
+      setStopping(false);
+    }
+  };
 
   const send = (message: object) => {
     if (takeOver && socket.current?.readyState === WebSocket.OPEN) socket.current.send(JSON.stringify(message));
@@ -129,7 +144,14 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
             <p>{botName}'s screen</p>
             <p className="text-[0.8125rem] text-muted-foreground">{frame === null ? "Offline" : "Live. Click to take over."}</p>
           </div>
-          {frame === null && <EyeOffIcon className="mr-1.5 size-4 text-muted-foreground" />}
+          {frame === null ? (
+            <EyeOffIcon className="mr-1.5 size-4 text-muted-foreground" />
+          ) : (
+            <Button variant="secondary" size="sm" disabled={stopping} onClick={stopBrowser} className="rounded-full">
+              <SquareIcon />
+              {stopping ? "Stopping…" : "Stop"}
+            </Button>
+          )}
         </div>
 
         {/* The screen opens under the card when the bot starts its browser. */}

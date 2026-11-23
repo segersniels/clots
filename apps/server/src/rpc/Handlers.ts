@@ -128,6 +128,8 @@ export const HandlersLayer = ClotsRpcs.toLayer(
           Effect.asVoid,
         ),
 
+      StopBrowser: ({ botId }) => requireBot(botId).pipe(Effect.flatMap(closeBrowser)),
+
       SetBotUnread: ({ botId, unread }) =>
         requireBot(botId).pipe(
           Effect.andThen(bots.setUnread(botId, unread)),
