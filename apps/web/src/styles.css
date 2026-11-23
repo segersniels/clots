@@ -1,0 +1,132 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/geist";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --background: #fbfbfb;
+  --foreground: #111111;
+  --card: #fbfbfb;
+  --card-foreground: #111111;
+  --popover: #ffffff;
+  --popover-foreground: #111111;
+  --primary: #111111;
+  --primary-foreground: #fbfbfb;
+  --secondary: #ebebeb;
+  --secondary-foreground: #111111;
+  --muted: #ebebeb;
+  --muted-foreground: #7c7c80;
+  --accent: #ebebeb;
+  --accent-foreground: #111111;
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: #e4e4e4;
+  --input: #dcdcdc;
+  --ring: #a3a3a8;
+  --radius: 0.625rem;
+  --sidebar: #f4f4f4;
+  --sidebar-foreground: #111111;
+  --sidebar-accent: #e6e6e6;
+  --sidebar-accent-foreground: #111111;
+  --sidebar-border: #e4e4e4;
+  --attention: #2f7cf6;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+/* The desktop app has no title bar, so the headers move the window. Controls stay clickable. */
+.desktop .window-drag {
+  -webkit-app-region: drag;
+}
+
+.desktop .window-drag :is(a, button, input, textarea) {
+  -webkit-app-region: no-drag;
+}
+
+/* Leaves room for the macOS window buttons, which sit over the sidebar. */
+.desktop-mac .window-buttons-inset {
+  padding-left: 4.75rem;
+}
+
+@theme inline {
+  /* Strong curves: the built-in CSS easings are too weak for UI. They replace `ease-out` and `ease-in-out`. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --font-heading: var(--font-sans);
+  --font-sans: 'Geist Variable', sans-serif;
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-attention: var(--attention);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+.dark {
+  --background: #111112;
+  --foreground: #f4f4f5;
+  --card: #111112;
+  --card-foreground: #f4f4f5;
+  --popover: #1c1c1e;
+  --popover-foreground: #f4f4f5;
+  --primary: #f4f4f5;
+  --primary-foreground: #111112;
+  --secondary: #262628;
+  --secondary-foreground: #f4f4f5;
+  --muted: #262628;
+  --muted-foreground: #8e8e94;
+  --accent: #262628;
+  --accent-foreground: #f4f4f5;
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: #2c2c2f;
+  --input: #38383b;
+  --ring: #6b6b70;
+  --sidebar: #18181a;
+  --sidebar-foreground: #f4f4f5;
+  --sidebar-accent: #262628;
+  --sidebar-accent-foreground: #f4f4f5;
+  --sidebar-border: #2c2c2f;
+  --attention: #5b9bff;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
