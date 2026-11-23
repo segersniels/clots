@@ -2,7 +2,7 @@ import { Character } from "@clots/character";
 import type { BotId, BotSummary, Project } from "@clots/contracts";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { ChevronDownIcon, FolderPlusIcon, PencilLineIcon, PlusIcon, SearchIcon, UserRoundPlusIcon } from "lucide-react";
-import { useEffect, useRef, useState, type DragEvent, type ReactNode, type RefObject } from "react";
+import { Fragment, useEffect, useRef, useState, type DragEvent, type ReactNode, type RefObject } from "react";
 
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -241,6 +241,58 @@ function BotRow({ bot }: { bot: BotSummary }) {
   );
 }
 
+/** Shows the clones of an orchestrating bot as one closed line, which opens into their rows. */
+function CloneGroup({ clones }: { clones: ReadonlyArray<BotSummary> }) {
+  const openBotId = useParams({ strict: false }).botId;
+  const [open, setOpen] = useState(false);
+  // The open bot stays in view, also when it is a clone in a closed group.
+  const expanded = open || clones.some((clone) => clone.id === openBotId);
+  const working = clones.filter((clone) => clone.status !== "idle").length;
+
+  return (
+    <div>
+      <button
+        type="button"
+        aria-expanded={expanded}
+        onClick={() => setOpen(!expanded)}
+        className="flex w-full items-center gap-1.5 rounded-lg py-1 pr-2.5 pl-[3.25rem] text-[0.8125rem] text-muted-foreground transition-colors duration-150 hover:bg-sidebar-accent"
+      >
+        <ChevronDownIcon
+          className={`size-3.5 transition-[rotate] duration-200 ease-out motion-reduce:transition-none ${expanded ? "" : "-rotate-90"}`}
+        />
+        {clones.length === 1 ? "1 clone" : `${clones.length} clones`}
+        {working > 0 && <span className="text-foreground/70">· {working} working</span>}
+      </button>
+      <Collapse open={expanded}>
+        <div className={`${BOT_ROWS} pl-4`}>
+          {clones.map((clone) => (
+            <BotRow key={clone.id} bot={clone} />
+          ))}
+        </div>
+      </Collapse>
+    </div>
+  );
+}
+
+/** Lists bots with the clones of each orchestrator grouped under it. A clone whose orchestrator is not in the list stays a plain row. */
+function BotRows({ bots }: { bots: ReadonlyArray<BotSummary> }) {
+  const listed = new Set(bots.map((bot) => bot.id));
+  const grouped = (bot: BotSummary) => bot.clonedFrom !== null && listed.has(bot.clonedFrom);
+
+  return bots
+    .filter((bot) => !grouped(bot))
+    .map((bot) => {
+      const clones = bots.filter((candidate) => candidate.clonedFrom === bot.id);
+
+      return (
+        <Fragment key={bot.id}>
+          <BotRow bot={bot} />
+          {clones.length > 0 && <CloneGroup clones={clones} />}
+        </Fragment>
+      );
+    });
+}
+
 /** Shows one project as a header that opens and closes the list of its bots. */
 function ProjectSection({ project, bots, botCount }: { project: Project; bots: ReadonlyArray<BotSummary>; botCount: number }) {
   const [open, setOpen] = useState(true);
@@ -278,9 +330,7 @@ function ProjectSection({ project, bots, botCount }: { project: Project; bots: R
 
       <Collapse open={open}>
         <div className={BOT_ROWS}>
-          {bots.map((bot) => (
-            <BotRow key={bot.id} bot={bot} />
-          ))}
+          <BotRows bots={bots} />
           {bots.length === 0 && <p className={EMPTY_HINT}>Drag Bots here</p>}
         </div>
       </Collapse>
@@ -369,9 +419,7 @@ export function BotList() {
           {/* Without a project there is one plain list, so the heading would only add noise. */}
           {projects.length > 0 && <h2 className="px-2.5 py-1.5 text-[0.8125rem] text-muted-foreground">Personal</h2>}
           <div className={BOT_ROWS}>
-            {personal.map((bot) => (
-              <BotRow key={bot.id} bot={bot} />
-            ))}
+            <BotRows bots={personal} />
             {projects.length > 0 && personal.length === 0 && search === "" && <p className={EMPTY_HINT}>Drag Bots here</p>}
           </div>
         </BotDropZone>
