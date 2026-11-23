@@ -39,4 +39,4 @@ clots starts Claude Code with the setting sources `user`, `project` and `local`.
 
 ## Permissions
 
-Bots run in the permission mode `acceptEdits`. File edits pass without a question. Each other tool call that Claude Code would ask about goes to you as an approval in the thread. The `AskUserQuestion` tool is off, so a bot asks its questions in plain chat.
+Bots run in the permission mode `auto`. A classifier in Claude Code allows or denies each tool call. Only when it cannot decide, the call goes to you as an approval in the thread. The `AskUserQuestion` tool is off, so a bot asks its questions in plain chat.

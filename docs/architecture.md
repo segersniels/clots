@@ -11,6 +11,7 @@ apps/
 packages/
   contracts/       Effect Schema types and the RPC group
   client-runtime/  connection, stream resume and client state
+  character/       the clot characters that bots wear, and their shapes and colors
 spikes/        throwaway scripts and end-to-end scripts
 ```
 
@@ -28,9 +29,9 @@ phone  ──HTTPS on the tailnet──▶ sidecar ──▶ server on 127.0.0.1
 
 ## Server
 
-- **Persistence** (`persistence/`, `bots/BotRepository.ts`, `schedules/ScheduleRepository.ts`): SQLite through `@effect/sql-sqlite-bun`, with the Effect migrator. The tables are `bots`, `threads`, `messages` and `schedules`.
+- **Persistence** (`persistence/`, `bots/BotRepository.ts`, `schedules/ScheduleRepository.ts`): SQLite through `@effect/sql-sqlite-bun`, with the Effect migrator. The tables are `bots`, `threads`, `messages`, `schedules` and `projects`.
 - **Bot sessions** (`bots/BotSessions.ts`): one long-lived `query()` per active bot. A queue feeds the prompts as streaming input, so a new message steers the running session. The session id goes to the `threads` table, and the next start resumes it. A session starts with the first message, not with the server.
-- **Approvals**: the SDK's `canUseTool` callback puts a request in the live state of the thread and waits for the operator's decision.
+- **Approvals**: sessions run in the `auto` permission mode. When its classifier cannot decide, the SDK's `canUseTool` callback puts a request in the live state of the thread and waits for the operator's decision.
 - **Handoff**: an in-process MCP tool, `request_handoff`, pauses the bot until the operator is done in the browser.
 - **Scheduler** (`schedules/Scheduler.ts`): checks each 15 seconds for due routines and sends their prompts.
 - **Browser** (`browser/`): each bot gets its own agent-browser session, profile and stream port through environment variables. `BrowserProxy.ts` relays the stream WebSocket, because agent-browser accepts loopback clients only.

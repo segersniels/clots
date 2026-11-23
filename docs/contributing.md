@@ -21,7 +21,13 @@ bun run dev
 This starts two processes:
 
 - The server with reload on `http://127.0.0.1:4587`.
-- Vite with hot reload on `http://localhost:5173`. Open this one. It forwards `/rpc` and `/browser` to the server.
+- Vite with hot reload on `http://127.0.0.1:5173`. Open this one. It forwards `/rpc`, `/browser` and `/attachments` to the server.
+
+In this mode the sidecar forwards to Vite, not to the server. Your tailnet address (`https://clots.<your-tailnet>.ts.net`) and a desktop app that points at it therefore also get hot reload. The address `http://127.0.0.1:4587` keeps serving the last build from `apps/web/dist`, so do not use it while you develop.
+
+Run `bun run dev` in the repository root. The `dev` script of `apps/server` alone starts no Vite, and then serves the last build.
+
+A change in the server code restarts the server and the sidecar. The bots' sessions stop and resume with the next message.
 
 Use a separate data directory while you develop, so that your test bots stay away from your real ones:
 
@@ -102,7 +108,7 @@ See [Architecture](./architecture.md) for how the parts fit.
 
 ## Commits and pull requests
 
-- Use [Conventional Commits](https://www.conventionalcommits.org): `type(scope): description`, in lowercase imperative mood. The scopes are the package names: `server`, `web`, `desktop`, `sidecar`, `contracts`, `client-runtime`.
+- Use [Conventional Commits](https://www.conventionalcommits.org): `type(scope): description`, in lowercase imperative mood. The scopes are the package names: `server`, `web`, `desktop`, `sidecar`, `contracts`, `client-runtime`, `character`.
 - Keep one change per commit, so that a reviewer can read and revert it alone.
 - In the pull request, say what changed and why. Keep the change small and complete.
 

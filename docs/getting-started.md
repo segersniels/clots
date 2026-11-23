@@ -13,6 +13,20 @@ Open the web client: `http://127.0.0.1:4587` on the host, or your tailnet addres
 
 Each bot gets its own working directory under `~/.clots/bots/`. The bot keeps its notes there, for example in `CLAUDE.md`. That is its durable memory.
 
+## Projects
+
+A project groups bots, and it can point at a folder on the server, for example a repository.
+
+1. Click **+** in the sidebar and choose **New project**.
+2. Enter a name. Optionally enter the directory, for example `~/code/mejl`.
+3. Open a bot's details (click its name at the top of the chat) and pick the project under **Project**.
+
+A bot of a project with a directory works in that directory. It then also gets the `CLAUDE.md`, the skills and the settings of that folder. Its own notes stay in its notes directory under `~/.clots/bots/`.
+
+When you move a bot to another project, it starts a new Claude Code session, because a session belongs to one directory. The chat history stays, but the bot does not remember it.
+
+The sidebar shows each project as a section that you can collapse. Bots without a project are under **Personal**.
+
 ## Chat
 
 A bot has one ongoing thread. Write a message and press Enter. Shift+Enter adds a line.
@@ -21,9 +35,19 @@ A bot has one ongoing thread. Write a message and press Enter. Shift+Enter adds 
 - The square button stops the current turn.
 - After a server restart, the history is there and the bot continues the same session.
 
+## Files and images
+
+Paste a file or an image into the message field, drop it there, or click **+** next to the field. The files show above the field until you send. A message can be files only.
+
+- The bot sees an image at once (PNG, JPEG, GIF, WebP).
+- For each file, the bot also gets the path of the stored copy, so it can read or use the file.
+- The server keeps the files in the bot's notes directory, under `attachments/`. A file can be 10 MB at most.
+
+While a bot works, the thread lists its tool calls as steps. The list goes away when the turn ends.
+
 ## Approvals
 
-A bot can edit files in its own working directory without a question. For other risky tools, such as a shell command, it asks you first. The request shows in the thread:
+A bot runs in the auto permission mode of Claude Code: a classifier allows safe tool calls and denies dangerous ones. When the classifier cannot decide, the bot asks you. The request shows in the thread:
 
 - **Allow once** runs this one call.
 - **Always allow** also saves a permission rule, so the bot does not ask again for the same kind of call.
