@@ -114,6 +114,13 @@ const skills = Effect.gen(function* () {
   yield* sql`ALTER TABLE threads ADD COLUMN skills TEXT NOT NULL DEFAULT '[]'`;
 });
 
+const clones = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient;
+
+  // The bot that cloned this bot. No foreign key: deleting an orchestrator must not fail because of its clones.
+  yield* sql`ALTER TABLE bots ADD COLUMN cloned_from TEXT`;
+});
+
 /** Runs the pending migrations when the server starts. */
 export const MigrationsLayer = SqliteMigrator.layer({
   loader: SqliteMigrator.fromRecord({
@@ -124,5 +131,6 @@ export const MigrationsLayer = SqliteMigrator.layer({
     "0005_characters": characters,
     "0006_unread": unread,
     "0007_skills": skills,
+    "0008_clones": clones,
   }),
 });

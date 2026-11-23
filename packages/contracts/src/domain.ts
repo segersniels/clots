@@ -42,6 +42,8 @@ export const Bot = Schema.Struct({
   shape: BotShape,
   model: BotModel,
   projectId: Schema.NullOr(Schema.String),
+  /** The bot that made this bot as a clone, or `null` for a bot that the operator made. Only a clone can be deleted by a bot. */
+  clonedFrom: Schema.NullOr(BotId),
   createdAt: Schema.Number,
 });
 export type Bot = typeof Bot.Type;

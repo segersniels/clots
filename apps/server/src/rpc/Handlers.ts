@@ -61,6 +61,7 @@ export const HandlersLayer = ClotsRpcs.toLayer(
         shape: bot.shape,
         model: bot.model,
         projectId: bot.projectId,
+        clonedFrom: bot.clonedFrom,
         lastMessageAt: bot.lastMessageAt,
         unread: bot.unread,
         createdAt: bot.createdAt,

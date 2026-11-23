@@ -48,6 +48,23 @@ const mentions = (text: string, name: string) => {
   return false;
 };
 
+/** The most clones that one orchestrating bot can have at a time. */
+const MAX_CLONES = 10;
+
+/** The wait before a clone that deletes itself goes, so that its tool call can end first. */
+const SELF_DELETE_DELAY_MS = 1000;
+
+/** Gives a clone a name that no other bot has, so that `@Name` finds exactly one bot. */
+const uniqueName = (wanted: string, bots: ReadonlyArray<StoredBot>) => {
+  const taken = new Set(bots.map((bot) => bot.name.toLowerCase()));
+
+  for (let number = 1; ; number += 1) {
+    const candidate = number === 1 ? wanted : `${wanted} ${number}`;
+
+    if (!taken.has(candidate.toLowerCase())) return candidate;
+  }
+};
+
 /** Builds the text that a tool returns. */
 const toolText = (text: string) => ({ content: [{ type: "text" as const, text }] });
 
@@ -266,6 +283,74 @@ export class BotSessions extends Context.Service<
         createSdkMcpServer({
           name: "clots",
           tools: [
+            tool(
+              "clone_bot",
+              "Make a clone of a clots bot and give it a task. The clone works in its own thread and reports back to you with send_bot_message. Use it to split work, for example one clone per pull request.",
+              {
+                task: z
+                  .string()
+                  .describe("The clone's first message: what to do and what to report. It can contain a skill, such as /review <url>."),
+                bot: z.string().optional().describe("The bot to clone, by id or name such as @Engineer. The default is you."),
+                name: z.string().optional().describe("A short name for the clone, such as Review #12."),
+              },
+              async ({ task, bot: reference, name }) => {
+                if (self.clonedFrom !== null) return toolText("A clone cannot make clones. Ask your orchestrator instead.");
+
+                const bots = await Effect.runPromise(repository.list);
+                if (bots.filter((bot) => bot.clonedFrom === self.id).length >= MAX_CLONES) {
+                  return toolText(`You have ${MAX_CLONES} clones already. Delete finished ones with delete_bot first.`);
+                }
+
+                const source = reference === undefined ? self : await Effect.runPromise(findBot(reference));
+                if (source === undefined) return toolText(`No bot is called ${reference}. list_bots shows the bots.`);
+
+                const clone = await Effect.runPromise(
+                  repository.create({
+                    name: uniqueName(name ?? `${source.name} clone`, bots),
+                    instructions: source.instructions,
+                    color: source.color,
+                    shape: source.shape,
+                    model: source.model,
+                    projectId: source.projectId,
+                    clonedFrom: self.id,
+                  }),
+                );
+                // The bot list shows the new clone.
+                PubSub.publishUnsafe(statusChanges, undefined);
+
+                await Effect.runPromise(
+                  send(clone, "bot", `@${self.name}: ${task}\n\nWhen you are done, report the result to @${self.name} with send_bot_message. Then stay: delete yourself only when the operator or @${self.name} asks you to.`),
+                );
+
+                return toolText(
+                  `Started @${clone.name} (id ${clone.id}). It reports back with send_bot_message. Delete it with delete_bot when you no longer need it.`,
+                );
+              },
+            ),
+            tool(
+              "delete_bot",
+              "Delete a clone: a clone that you made, or yourself when you are a clone. Do it only when the operator or your orchestrator asks for it, never on your own after a task. It deletes the clone's thread, notes and browser. A bot that the operator made cannot be deleted this way.",
+              { bot: z.string().describe("The clone's id or name, or your own.") },
+              async ({ bot: reference }) => {
+                const target = await Effect.runPromise(findBot(reference));
+                if (target === undefined) return toolText(`No bot is called ${reference}. list_bots shows the bots.`);
+
+                // Only clones can go this way: the clone itself, or its orchestrator. The operator's own bots stay.
+                const mayDelete = target.clonedFrom !== null && (target.id === self.id || target.clonedFrom === self.id);
+                if (!mayDelete) return toolText(`@${target.name} is not a clone of yours, so only the operator can delete it.`);
+
+                // A bot that deletes itself stops its own session, so the delete starts after this call has answered.
+                if (target.id === self.id) {
+                  setTimeout(() => void Effect.runPromise(deleteBot(target)), SELF_DELETE_DELAY_MS);
+
+                  return toolText("Deleting this thread now.");
+                }
+
+                await Effect.runPromise(deleteBot(target));
+
+                return toolText(`Deleted @${target.name}.`);
+              },
+            ),
             tool("list_bots", "List the other clots bots with their id, status, project and Claude Code session.", {}, async () => {
               const bots = await Effect.runPromise(repository.list);
               const lines = bots

@@ -56,7 +56,7 @@ export class BotRepository extends Context.Service<
     readonly list: Effect.Effect<ReadonlyArray<StoredBot>>;
     find(botId: BotId): Effect.Effect<StoredBot | undefined>;
     /** Creates a bot with the default model and no project, unless a copy brings its own. */
-    create(bot: NewBot & Partial<Pick<Bot, "model" | "projectId">>): Effect.Effect<StoredBot>;
+    create(bot: NewBot & Partial<Pick<Bot, "model" | "projectId" | "clonedFrom">>): Effect.Effect<StoredBot>;
     /** Deletes the bot, its thread, its routines and its notes directory. */
     remove(bot: StoredBot): Effect.Effect<void>;
     setUnread(botId: BotId, unread: boolean): Effect.Effect<void>;
@@ -94,6 +94,7 @@ export class BotRepository extends Context.Service<
           bots.shape,
           bots.model,
           bots.project_id AS projectId,
+          bots.cloned_from AS clonedFrom,
           projects.name AS projectName,
           projects.directory AS projectDirectory,
           bots.created_at AS createdAt,
@@ -130,7 +131,8 @@ export class BotRepository extends Context.Service<
         shape,
         model = DEFAULT_MODEL,
         projectId = null,
-      }: NewBot & Partial<Pick<Bot, "model" | "projectId">>) =>
+        clonedFrom = null,
+      }: NewBot & Partial<Pick<Bot, "model" | "projectId" | "clonedFrom">>) =>
         Effect.gen(function* () {
           const id = crypto.randomUUID() as BotId;
           const workingDirectory = join(config.home, "bots", id);
@@ -138,9 +140,9 @@ export class BotRepository extends Context.Service<
           mkdirSync(workingDirectory, { recursive: true });
 
           yield* sql`
-            INSERT INTO bots (id, name, instructions, color, shape, model, project_id, working_directory, browser_stream_port, created_at)
+            INSERT INTO bots (id, name, instructions, color, shape, model, project_id, cloned_from, working_directory, browser_stream_port, created_at)
             SELECT
-              ${id}, ${name}, ${instructions}, ${color}, ${shape}, ${model}, ${projectId}, ${workingDirectory},
+              ${id}, ${name}, ${instructions}, ${color}, ${shape}, ${model}, ${projectId}, ${clonedFrom}, ${workingDirectory},
               COALESCE(MAX(browser_stream_port) + 1, ${FIRST_BROWSER_STREAM_PORT}),
               ${createdAt}
             FROM bots
