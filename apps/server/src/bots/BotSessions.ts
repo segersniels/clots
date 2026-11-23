@@ -91,6 +91,8 @@ interface BotRuntime {
   } | null;
   readonly approvals: Map<string, (decision: ApprovalDecision) => void>;
   finishHandoff: (() => void) | null;
+  /** Who sent the latest prompt: the operator, a routine or another bot. A clone may delete itself only after the operator's. */
+  lastPromptFrom: MessageRole | null;
 }
 
 const systemPromptFor = (bot: StoredBot) =>
@@ -177,6 +179,7 @@ export class BotSessions extends Context.Service<
           session: null,
           approvals: new Map(),
           finishHandoff: null,
+          lastPromptFrom: null,
         };
         runtimes.set(botId, runtime);
 
@@ -319,7 +322,7 @@ export class BotSessions extends Context.Service<
                 PubSub.publishUnsafe(statusChanges, undefined);
 
                 await Effect.runPromise(
-                  send(clone, "bot", `@${self.name}: ${task}\n\nWhen you are done, report the result to @${self.name} with send_bot_message. Then stay: delete yourself only when the operator or @${self.name} asks you to.`),
+                  send(clone, "bot", `@${self.name}: ${task}\n\nWhen you are done, report the result to @${self.name} with send_bot_message. Then stay: @${self.name} or the operator deletes you when you are no longer needed.`),
                 );
 
                 return toolText(
@@ -329,7 +332,7 @@ export class BotSessions extends Context.Service<
             ),
             tool(
               "delete_bot",
-              "Delete a clone: a clone that you made, or yourself when you are a clone. Do it only when the operator or your orchestrator asks for it, never on your own after a task. It deletes the clone's thread, notes and browser. A bot that the operator made cannot be deleted this way.",
+              "Delete a clone: a clone that you made, or yourself when you are a clone and the operator asked you to in their message. Never do it on your own after a task. It deletes the clone's thread, notes and browser. A bot that the operator made cannot be deleted this way.",
               { bot: z.string().describe("The clone's id or name, or your own.") },
               async ({ bot: reference }) => {
                 const target = await Effect.runPromise(findBot(reference));
@@ -341,6 +344,13 @@ export class BotSessions extends Context.Service<
 
                 // A bot that deletes itself stops its own session, so the delete starts after this call has answered.
                 if (target.id === self.id) {
+                  // A clone goes on its own only when the operator asks for it. Its orchestrator deletes it directly instead.
+                  if (runtime.lastPromptFrom !== "user") {
+                    return toolText(
+                      "You can delete yourself only when the operator asks you to in their own message. Your orchestrator can delete you with delete_bot.",
+                    );
+                  }
+
                   setTimeout(() => void Effect.runPromise(deleteBot(target)), SELF_DELETE_DELAY_MS);
 
                   return toolText("Deleting this thread now.");
@@ -694,6 +704,7 @@ export class BotSessions extends Context.Service<
       const send = (bot: StoredBot, role: Exclude<MessageRole, "assistant">, text: string, uploads: ReadonlyArray<Upload> = []) =>
           Effect.gen(function* () {
             const runtime = runtimeFor(bot.id);
+            runtime.lastPromptFrom = role;
             const saved = saveUploads(bot, uploads);
             yield* record(runtime, bot.id, role, text, saved.map((file) => file.attachment));
             setLive(runtime, { status: statusWhileRunning(runtime) });
