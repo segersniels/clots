@@ -1,6 +1,6 @@
 import type { ApprovalDecision, BotId, MessageRole, PendingApproval, TraceStep } from "@clots/contracts";
 import { CircleCheckIcon, LoaderCircleIcon } from "lucide-react";
-import { useRef, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import {
   MessageScrollerItem,
   MessageScrollerProvider,
   MessageScrollerViewport,
+  useMessageScrollerScrollable,
 } from "@/components/ui/message-scroller";
 import {
   Trace,
@@ -122,11 +123,40 @@ function Approval({ botId, approval }: { botId: BotId; approval: PendingApproval
   );
 }
 
+/**
+ * How many of the latest messages a thread shows when it opens, and how many more it adds at the
+ * top. A long history would otherwise render at once and block the page for a moment.
+ */
+const MESSAGES_PER_PAGE = 50;
+
+/** Shows older messages when the operator scrolls to the top of the thread. */
+function OlderMessagesLoader({ hasOlder, onLoad }: { hasOlder: boolean; onLoad: () => void }) {
+  const { start: canScrollUp } = useMessageScrollerScrollable();
+  // A thread opens at its end, but reads as being at the top until it gets there. That moment must not load anything.
+  const leftTheTop = useRef(false);
+
+  useEffect(() => {
+    if (canScrollUp) {
+      leftTheTop.current = true;
+
+      return;
+    }
+
+    if (hasOlder && leftTheTop.current) onLoad();
+  }, [hasOlder, canScrollUp, onLoad]);
+
+  return null;
+}
+
 export function Chat({ botId, botName }: { botId: BotId; botName: string }) {
   const thread = useStore(client.thread(botId));
   // Only items that arrive while the thread is open ease in. The stored history shows at once.
   const openedAt = useRef(Date.now());
   const { live } = thread;
+  const [shownCount, setShownCount] = useState(MESSAGES_PER_PAGE);
+  const firstShown = Math.max(0, thread.messages.length - shownCount);
+  // A stable callback, so that one visit to the top loads one page and not one per render.
+  const showOlder = useCallback(() => setShownCount((count) => count + MESSAGES_PER_PAGE), []);
   const skills = useStore(client.skills(botId));
   const bots = useStore(client.bots);
   const known = knownNames(
@@ -147,10 +177,13 @@ export function Chat({ botId, botName }: { botId: BotId; botName: string }) {
       {/* No item is a scroll anchor: the thread follows its end, so a request from the bot is always in view. */}
       <MessageScrollerProvider autoScroll defaultScrollPosition="end">
         <MessageScroller className="flex-1">
+          <OlderMessagesLoader hasOlder={firstShown > 0} onLoad={showOlder} />
           {/* The thread runs under the floating header and fades out there. The top padding clears the header. */}
-          <MessageScrollerViewport className="[mask-image:linear-gradient(to_bottom,transparent,black_4rem)]">
+          <MessageScrollerViewport preserveScrollOnPrepend className="[mask-image:linear-gradient(to_bottom,transparent,black_4rem)]">
             <MessageScrollerContent className="gap-1.5 px-4 pt-16 pb-3">
-              {thread.messages.map((message, index) => {
+              {thread.messages.slice(firstShown).map((message, offset) => {
+                // The full history still decides the time labels and the spacing at the first shown message.
+                const index = firstShown + offset;
                 const previous = thread.messages[index - 1];
                 const showsTime = previous === undefined || message.createdAt - previous.createdAt > TIME_LABEL_GAP_MS;
                 const fromBot = message.role === "assistant" || message.role === "trace";
