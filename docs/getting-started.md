@@ -35,7 +35,7 @@ The sidebar shows each project as a section that you can collapse. Bots without 
 
 A bot has one ongoing thread. Write a message and press Enter. Shift+Enter adds a line.
 
-- The reply streams in while the bot writes it.
+- The reply shows when the bot finishes it. While the bot works, the thread shows its tool calls.
 - The square button stops the current turn.
 - After a server restart, the history is there and the bot continues the same session.
 

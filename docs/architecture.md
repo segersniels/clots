@@ -43,8 +43,8 @@ A client subscribes with `SubscribeThread({ botId, afterSequence })`. The server
 
 1. Subscribes to the live events of the bot.
 2. Replays the stored messages with a sequence after `afterSequence`.
-3. Sends the live state (status, streaming text, approvals, handoff).
-4. Sends live events: `Message` (stored, with a sequence), `Delta` (streamed text) and `Live` (a new live state).
+3. Sends the live state (status, running tool calls, approvals, handoff).
+4. Sends live events: `Message` (stored, with a sequence) and `Live` (a new live state). A reply arrives whole, as a `Message`, when the bot finishes it.
 
 Stored messages are the durable log. The live state is in memory only. After a dropped connection, the client subscribes again with its last sequence and gets only what it missed.
 
