@@ -62,8 +62,19 @@ const toBrowserCookie = (cookie: Cookie): BrowserCookie => {
 };
 
 /**
+ * Tells whether a cookie belongs to the site that the operator signs in to: the site itself, one of
+ * its subdomains, or a parent domain such as `example.com` for `accounts.example.com`.
+ */
+const belongsToSite = (cookie: Cookie, siteHost: string) => {
+  const domain = (cookie.domain ?? "").replace(/^\./, "");
+
+  // A parent domain needs two parts at least, so a bare suffix such as `com` never counts.
+  return domain === siteHost || domain.endsWith(`.${siteHost}`) || (domain.includes(".") && siteHost.endsWith(`.${domain}`));
+};
+
+/**
  * Opens a site in its own window with a new, empty session, so the operator signs in as in any
- * browser. When the operator closes the window, returns the cookies of that session and wipes them
+ * browser. When the operator closes the window, returns the site's cookies and wipes the session
  * from this machine.
  */
 const signIn = (url: string) =>
@@ -88,7 +99,9 @@ const signIn = (url: string) =>
     signInWindow.on("closed", () => {
       void signInSession.cookies.get({}).then(async (cookies) => {
         await signInSession.clearStorageData();
-        resolve(cookies.map(toBrowserCookie));
+        // A sign-in through another service, such as Google, leaves that service's login here too. Only the site's own login goes to the bot.
+        const siteHost = new URL(url).hostname.replace(/^www\./, "");
+        resolve(cookies.filter((cookie) => belongsToSite(cookie, siteHost)).map(toBrowserCookie));
       });
     });
     void signInWindow.loadURL(url);
