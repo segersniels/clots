@@ -9,6 +9,8 @@ const message = (sequence: number, role: Message["role"], text: string): Message
   sequence,
   role,
   text,
+  attachments: [],
+  steps: [],
   createdAt: sequence,
 });
 

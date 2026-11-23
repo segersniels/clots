@@ -7,39 +7,72 @@ import {
   type Query,
   type SDKMessage,
   type SDKUserMessage,
+  type SlashCommand,
 } from "@anthropic-ai/claude-agent-sdk";
 import type {
   ApprovalDecision,
+  Attachment,
   BotId,
   BotModel,
   BotStatus,
   MessageRole,
   ThreadEvent,
   ThreadLiveState,
+  TraceStep,
+  Upload,
 } from "@clots/contracts";
-import { Cause, Context, Effect, Layer, PubSub, Queue, Stream } from "effect";
+import { Cause, Context, Deferred, Effect, Layer, PubSub, Queue, Stream } from "effect";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { basename, join } from "node:path";
 import { z } from "zod";
 
 import { ClotsConfig } from "../config.ts";
 import { BotRepository, type StoredBot } from "./BotRepository.ts";
 import { makeBrowserEnvironment } from "../browser/BrowserEnvironment.ts";
-import { makeClaudeEnvironment } from "./ClaudeEnvironment.ts";
+import { makeClaudeEnvironment, transcriptPath } from "./ClaudeEnvironment.ts";
 
 const HANDOFF_TOOL = "request_handoff";
 
+/** The most characters of one message that `read_bot_thread` returns, so a long reply does not flood the reader. */
+const MAX_READ_MESSAGE_LENGTH = 1500;
+
+/** Checks whether a message mentions a bot: `@Name` at the start of a word, not followed by more of a word. */
+const mentions = (text: string, name: string) => {
+  for (let index = text.indexOf(`@${name}`); index !== -1; index = text.indexOf(`@${name}`, index + 1)) {
+    const startsWord = index === 0 || /\s/.test(text[index - 1]!);
+    const endsWord = !/\w/.test(text[index + name.length + 1] ?? "");
+
+    if (startsWord && endsWord) return true;
+  }
+
+  return false;
+};
+
+/** Builds the text that a tool returns. */
+const toolText = (text: string) => ({ content: [{ type: "text" as const, text }] });
+
+/** The image types that Claude takes as an image block. Other files reach the bot as a path only. */
+const INLINE_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
+
 const IDLE: ThreadLiveState = {
   status: "idle",
-  activity: null,
+  steps: [],
   streamingText: "",
   approvals: [],
   handoff: null,
+  tasks: [],
 };
 
 /** The in-memory state of one bot. The session exists only while a `claude` process runs. */
 interface BotRuntime {
   live: ThreadLiveState;
   readonly events: PubSub.PubSub<ThreadEvent>;
-  session: { readonly prompts: Queue.Queue<SDKUserMessage>; readonly query: Query } | null;
+  session: {
+    readonly prompts: Queue.Queue<SDKUserMessage>;
+    readonly query: Query;
+    /** Completes when the session has stopped and wrote its last message. */
+    readonly ended: Deferred.Deferred<void>;
+  } | null;
   readonly approvals: Map<string, (decision: ApprovalDecision) => void>;
   finishHandoff: (() => void) | null;
 }
@@ -47,7 +80,12 @@ interface BotRuntime {
 const systemPromptFor = (bot: StoredBot) =>
   [
     `You are ${bot.name}, an always-on bot that the operator talks to through clots.`,
-    "You have one ongoing thread. Your working directory is your durable memory: keep notes in CLAUDE.md and other files there.",
+    `You have one ongoing thread. Your notes directory is your durable memory: keep notes in ${bot.workingDirectory}/CLAUDE.md and other files there.`,
+    bot.projectDirectory === null
+      ? "Your notes directory is also your current directory."
+      : `You work on the project "${bot.projectName}". Its directory, ${bot.projectDirectory}, is your current directory.`,
+    // Without this, a bot inspects its directories before it answers a plain greeting.
+    "Answer a message directly. Read files or run commands only when the task needs them.",
     "You have a browser: use the `agent-browser` CLI through Bash. Run `agent-browser skills get core` before the first use.",
     "Your browser session and profile are already set in the environment. Do not pass `--session` or `--profile`, or the operator cannot see your browser.",
     `When a page needs the operator (a login, a captcha, a payment), call the ${HANDOFF_TOOL} tool and wait.`,
@@ -65,8 +103,22 @@ export class BotSessions extends Context.Service<
   BotSessions,
   {
     /** Stores a prompt and gives it to the bot. Starts or resumes the bot's session when none runs. */
-    send(bot: StoredBot, role: Exclude<MessageRole, "assistant">, text: string): Effect.Effect<void>;
+    send(
+      bot: StoredBot,
+      role: Exclude<MessageRole, "assistant">,
+      text: string,
+      uploads?: ReadonlyArray<Upload>,
+    ): Effect.Effect<void>;
     interrupt(botId: BotId): Effect.Effect<void>;
+    /** Stops the session of a bot. The next message starts a new one with the bot's current settings. */
+    stop(botId: BotId): Effect.Effect<void>;
+    /**
+     * Lists the skills of a bot that has none stored yet, such as a new bot. A short `claude`
+     * process with the bot's settings answers without a prompt, so it costs no tokens.
+     */
+    loadSkills(bot: StoredBot): Effect.Effect<void>;
+    /** Stops the session of a deleted bot and forgets its live state. */
+    remove(botId: BotId): Effect.Effect<void>;
     /** Switches the model of a running session. A bot without a session reads its model at the next start. */
     setModel(botId: BotId, model: BotModel): Effect.Effect<void>;
     resolveApproval(botId: BotId, approvalId: string, decision: ApprovalDecision): Effect.Effect<void>;
@@ -75,6 +127,8 @@ export class BotSessions extends Context.Service<
     events(botId: BotId): PubSub.PubSub<ThreadEvent>;
     /** Fires when the status of a bot changes. */
     readonly statusChanges: PubSub.PubSub<void>;
+    /** Fires when the skills of a bot change. */
+    readonly skillChanges: PubSub.PubSub<void>;
   }
 >()("clots/bots/BotSessions") {
   static readonly layer = Layer.effect(
@@ -84,6 +138,7 @@ export class BotSessions extends Context.Service<
       const repository = yield* BotRepository;
       const scope = yield* Effect.scope;
       const statusChanges = yield* PubSub.unbounded<void>();
+      const skillChanges = yield* PubSub.unbounded<void>();
       const runtimes = new Map<BotId, BotRuntime>();
 
       const claudeOptions = {
@@ -123,8 +178,15 @@ export class BotSessions extends Context.Service<
       const statusWhileRunning = (runtime: BotRuntime): BotStatus =>
         runtime.live.approvals.length > 0 || runtime.live.handoff !== null ? "waiting" : "working";
 
-      const record = (runtime: BotRuntime, botId: BotId, role: MessageRole, text: string) =>
-        repository.appendMessage(botId, role, text).pipe(
+      const record = (
+        runtime: BotRuntime,
+        botId: BotId,
+        role: MessageRole,
+        text: string,
+        attachments: ReadonlyArray<Attachment> = [],
+        steps: ReadonlyArray<TraceStep> = [],
+      ) =>
+        repository.appendMessage(botId, role, text, attachments, steps).pipe(
           Effect.map((message) => {
             publish(runtime, { _tag: "Message", message });
             // The bot list shows the last message.
@@ -184,10 +246,82 @@ export class BotSessions extends Context.Service<
             setLive(runtime, { approvals: [...runtime.live.approvals, approval], status: "waiting" });
           });
 
-      const handoffServerFor = (runtime: BotRuntime) =>
+      /** Finds a bot by its id or by its name, which the operator writes as `@Name`. */
+      const findBot = (reference: string) =>
+        repository.list.pipe(
+          Effect.map((bots) =>
+            bots.find((bot) => bot.id === reference || bot.name.toLowerCase() === reference.replace(/^@/, "").toLowerCase()),
+          ),
+        );
+
+      /**
+       * The tools of the clots server that each bot gets: the handoff of the browser, and the tools
+       * that let a bot see what other bots do and message them.
+       */
+      const clotsServerFor = (runtime: BotRuntime, self: StoredBot) =>
         createSdkMcpServer({
           name: "clots",
           tools: [
+            tool("list_bots", "List the other clots bots with their id, status, project and Claude Code session.", {}, async () => {
+              const bots = await Effect.runPromise(repository.list);
+              const lines = bots
+                .filter((bot) => bot.id !== self.id)
+                .map((bot) =>
+                  [
+                    `@${bot.name}`,
+                    `id ${bot.id}`,
+                    runtimes.get(bot.id)?.live.status ?? "idle",
+                    bot.projectName === null ? "no project" : `project ${bot.projectName}`,
+                    bot.sdkSessionId === null ? "no session yet" : `session ${bot.sdkSessionId}`,
+                  ].join(" | "),
+                );
+
+              return toolText(lines.join("\n") || "There are no other bots.");
+            }),
+            tool(
+              "read_bot_thread",
+              "Read the recent messages and the live status of another clots bot, to see what it works on.",
+              {
+                bot: z.string().describe("The bot's id, or its name such as @Engineer."),
+                count: z.number().int().min(1).max(50).optional().describe("How many recent messages. The default is 20."),
+              },
+              async ({ bot: reference, count = 20 }) => {
+                const bot = await Effect.runPromise(findBot(reference));
+                if (bot === undefined) return toolText(`No bot is called ${reference}. list_bots shows the bots.`);
+
+                const messages = (await Effect.runPromise(repository.messagesAfter(bot.id, 0))).slice(-count);
+                const live = runtimes.get(bot.id)?.live ?? IDLE;
+                const lines = messages.map((message) =>
+                  message.role === "trace"
+                    ? `[worked: ${message.steps.map((step) => step.title).join("; ")}]`
+                    : `${message.role}: ${message.text.slice(0, MAX_READ_MESSAGE_LENGTH)}`,
+                );
+                const now = [
+                  `Status: ${live.status}.`,
+                  ...live.steps.filter((step) => step.status === "running").map((step) => `Running: ${step.title}`),
+                  ...live.tasks.map((task) => `In the background: ${task.description}`),
+                ];
+
+                return toolText([`@${bot.name} (id ${bot.id})`, ...now, "", ...lines].join("\n"));
+              },
+            ),
+            tool(
+              "send_bot_message",
+              "Send a message to another clots bot. It arrives in that bot's thread and starts its turn. Its answer stays in its own thread: read it later with read_bot_thread.",
+              {
+                bot: z.string().describe("The bot's id, or its name such as @Engineer."),
+                text: z.string().describe("The message. Say what you need and why, so the bot can act without asking."),
+              },
+              async ({ bot: reference, text }) => {
+                const bot = await Effect.runPromise(findBot(reference));
+                if (bot === undefined) return toolText(`No bot is called ${reference}. list_bots shows the bots.`);
+                if (bot.id === self.id) return toolText("That is you. Pick another bot.");
+
+                await Effect.runPromise(send(bot, "bot", `@${self.name}: ${text}`));
+
+                return toolText(`Sent to @${bot.name}. Read its answer later with read_bot_thread.`);
+              },
+            ),
             tool(
               HANDOFF_TOOL,
               "Ask the operator to take over your browser, for example for a login or a captcha. Returns when the operator is done.",
@@ -206,27 +340,144 @@ export class BotSessions extends Context.Service<
           ],
         });
 
+      const setStepStatus = (runtime: BotRuntime, finished: ReadonlySet<string>) => {
+        const steps = runtime.live.steps.map((step) => (finished.has(step.id) ? { ...step, status: "done" as const } : step));
+        setLive(runtime, { steps });
+      };
+
+      /**
+       * Moves the finished steps from the live state into the thread as one trace, so that the
+       * thread keeps them. A step that still runs stays live, unless the turn ended.
+       */
+      const recordTrace = (runtime: BotRuntime, botId: BotId, turnEnded: boolean) =>
+        Effect.gen(function* () {
+          const finished = runtime.live.steps.filter((step) => turnEnded || step.status === "done");
+          if (finished.length === 0) return;
+
+          const steps = finished.map((step) => ({ ...step, status: "done" as const }));
+          yield* record(runtime, botId, "trace", "", [], steps);
+          setLive(runtime, { steps: runtime.live.steps.filter((step) => !finished.includes(step)) });
+        });
+
+      /** Keeps the files of a message in the bot's notes directory, where the bot can also read them. */
+      const saveUploads = (bot: StoredBot, uploads: ReadonlyArray<Upload>) => {
+        const directory = join(bot.workingDirectory, "attachments");
+        if (uploads.length > 0) mkdirSync(directory, { recursive: true });
+
+        return uploads.map((upload) => {
+          const id = crypto.randomUUID();
+          const bytes = Buffer.from(upload.data, "base64");
+          // The name comes from the client, so only its last part without odd characters is used.
+          const path = join(directory, `${id}-${basename(upload.name).replaceAll(/[^\w.-]+/g, "_")}`);
+          writeFileSync(path, bytes);
+
+          return { upload, path, attachment: { id, name: upload.name, mediaType: upload.mediaType, size: bytes.length } };
+        });
+      };
+
+      /** Stores what the operator can start with `/name`. Claude Code's own commands stay out. */
+      const saveSkills = (botId: BotId, commands: ReadonlyArray<SlashCommand>) =>
+        repository
+          .setSkills(
+            botId,
+            commands.filter((command) => command.builtin !== true).map(({ name, description }) => ({ name, description })),
+          )
+          .pipe(Effect.andThen(PubSub.publish(skillChanges, undefined)));
+
+      /** The bots that a short session listed since the server started, so a bot without skills is not asked again and again. */
+      const skillsListed = new Set<BotId>();
+
+      const loadSkills = (bot: StoredBot) =>
+        Effect.gen(function* () {
+          if (skillsListed.has(bot.id)) return;
+
+          skillsListed.add(bot.id);
+
+          const lister = query({
+            // The prompt never comes: the process only answers the request for its skills.
+            prompt: Stream.toAsyncIterable(Stream.never),
+            options: {
+              ...claudeOptions,
+              cwd: bot.projectDirectory ?? bot.workingDirectory,
+              ...(bot.projectDirectory === null ? {} : { additionalDirectories: [bot.workingDirectory] }),
+              env: { ...claudeOptions.env, CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD: "1" },
+              settingSources: ["user", "project", "local"],
+              persistSession: false,
+            },
+          });
+
+          yield* Effect.tryPromise(() => lister.supportedCommands()).pipe(
+            Effect.flatMap((commands) => saveSkills(bot.id, commands)),
+            Effect.timeout("30 seconds"),
+            Effect.ignore,
+            Effect.ensuring(Effect.sync(() => lister.close())),
+          );
+        });
+
       const handle = (runtime: BotRuntime, botId: BotId, message: SDKMessage) =>
         Effect.gen(function* () {
           if (message.type === "system" && message.subtype === "init") {
             yield* repository.setSdkSessionId(botId, message.session_id);
 
+            // The list of skills is not part of the init message, so the session is asked for it.
+            const session = runtime.session;
+            if (session !== null) {
+              yield* Effect.tryPromise(() => session.query.supportedCommands()).pipe(
+                Effect.flatMap((commands) => saveSkills(botId, commands)),
+                Effect.ignore,
+              );
+            }
+
+            return;
+          }
+
+          // The session found more skills, for example in a project directory.
+          if (message.type === "system" && message.subtype === "commands_changed") {
+            yield* saveSkills(botId, message.commands);
+
+            return;
+          }
+
+          // Work in the background, such as a subagent, can outlive the turn that started it. Housekeeping tasks stay out.
+          if (message.type === "system" && message.subtype === "background_tasks_changed") {
+            const tasks = message.tasks.flatMap((task) =>
+              task.ambient === true ? [] : [{ id: task.task_id, description: task.description }],
+            );
+            setLive(runtime, { tasks });
+            // The bot list shows the running tasks.
+            PubSub.publishUnsafe(statusChanges, undefined);
+
             return;
           }
 
           if (message.type === "result") {
+            yield* recordTrace(runtime, botId, true);
+
             if (message.subtype !== "success") {
               yield* record(runtime, botId, "assistant", `The turn failed: ${message.subtype}.`);
             }
 
-            setLive(runtime, { status: "idle", activity: null, streamingText: "" });
+            setLive(runtime, { status: "idle", steps: [], streamingText: "" });
 
             return;
           }
 
           // Subagent output stays out of the thread. Only the bot's own messages show.
-          if (message.type !== "stream_event" && message.type !== "assistant") return;
+          if (message.type !== "stream_event" && message.type !== "assistant" && message.type !== "user") return;
           if (message.parent_tool_use_id !== null) return;
+
+          // A user message from the SDK carries the results of tool calls. Each result ends its step.
+          if (message.type === "user") {
+            const content = message.message.content;
+            const finished = new Set(
+              typeof content === "string"
+                ? []
+                : content.flatMap((block) => (block.type === "tool_result" ? [block.tool_use_id] : [])),
+            );
+            if (finished.size > 0) setStepStatus(runtime, finished);
+
+            return;
+          }
 
           // A queued prompt can start a new turn after the previous result.
           if (runtime.live.status === "idle") setLive(runtime, { status: "working" });
@@ -235,13 +486,13 @@ export class BotSessions extends Context.Service<
             const event = message.event;
 
             if (event.type === "content_block_start" && event.content_block.type === "tool_use") {
-              setLive(runtime, { activity: `Using ${event.content_block.name}` });
+              const step = { id: event.content_block.id, title: `Using ${event.content_block.name}`, status: "running" as const };
+              setLive(runtime, { steps: [...runtime.live.steps, step] });
             }
 
             if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
               runtime.live = {
                 ...runtime.live,
-                activity: null,
                 streamingText: runtime.live.streamingText + event.delta.text,
               };
               publish(runtime, { _tag: "Delta", text: event.delta.text });
@@ -250,8 +501,23 @@ export class BotSessions extends Context.Service<
             return;
           }
 
+          // The finished tool call carries a short description of what the bot does.
+          for (const block of message.message.content) {
+            if (block.type !== "tool_use") continue;
+
+            const description = (block.input as { description?: unknown }).description;
+            if (typeof description !== "string") continue;
+
+            const steps = runtime.live.steps.map((step) => (step.id === block.id ? { ...step, title: description } : step));
+            setLive(runtime, { steps });
+          }
+
           const text = textOf(message.message.content);
-          if (text !== "") yield* record(runtime, botId, "assistant", text);
+          if (text !== "") {
+            // The steps before this message stay above it in the thread.
+            yield* recordTrace(runtime, botId, false);
+            yield* record(runtime, botId, "assistant", text);
+          }
 
           setLive(runtime, { streamingText: "" });
         });
@@ -259,26 +525,35 @@ export class BotSessions extends Context.Service<
       const startSession = (bot: StoredBot, runtime: BotRuntime) =>
         Effect.gen(function* () {
           const prompts = yield* Queue.unbounded<SDKUserMessage>();
+          const ended = yield* Deferred.make<void>();
           const session = query({
             prompt: Stream.toAsyncIterable(Stream.fromQueue(prompts)),
             options: {
               ...claudeOptions,
-              cwd: bot.workingDirectory,
-              env: { ...claudeOptions.env, ...makeBrowserEnvironment(bot) },
+              cwd: bot.projectDirectory ?? bot.workingDirectory,
+              // In a project, the bot still reads and writes its notes directory.
+              ...(bot.projectDirectory === null ? {} : { additionalDirectories: [bot.workingDirectory] }),
+              env: {
+                ...claudeOptions.env,
+                ...makeBrowserEnvironment(bot),
+                // Claude Code loads CLAUDE.md from an additional directory only with this variable.
+                CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD: "1",
+              },
               model: bot.model,
               settingSources: ["user", "project", "local"],
               systemPrompt: { type: "preset", preset: "claude_code", append: systemPromptFor(bot) },
               includePartialMessages: true,
-              // The bot can edit its own files. Other risky tools go to the operator through canUseTool.
-              permissionMode: "acceptEdits",
+              // A classifier allows or denies each tool call. It asks the operator through canUseTool
+              // only when it cannot decide.
+              permissionMode: "auto",
               canUseTool: canUseToolFor(runtime),
-              mcpServers: { clots: handoffServerFor(runtime) },
+              mcpServers: { clots: clotsServerFor(runtime, bot) },
               // The thread has no question dialog. The bot asks in plain text.
               disallowedTools: ["AskUserQuestion"],
               ...(bot.sdkSessionId === null ? {} : { resume: bot.sdkSessionId }),
             },
           });
-          runtime.session = { prompts, query: session };
+          runtime.session = { prompts, query: session, ended };
 
           // Iterate the Query itself: `return()` on the raw generator waits behind a pending read.
           const messages: AsyncIterable<SDKMessage> = { [Symbol.asyncIterator]: () => session };
@@ -299,30 +574,77 @@ export class BotSessions extends Context.Service<
                 setLive(runtime, IDLE);
               }),
             ),
+            Effect.ensuring(Deferred.succeed(ended, undefined)),
             Effect.forkIn(scope),
           );
 
           return runtime.session;
         });
 
-      return BotSessions.of({
-        statusChanges,
-        live: (botId) => runtimeFor(botId).live,
-        events: (botId) => runtimeFor(botId).events,
+      const stop = (botId: BotId) =>
+        Effect.gen(function* () {
+          const session = runtimes.get(botId)?.session;
+          if (session === undefined || session === null) return;
 
-        send: (bot, role, text) =>
+          session.query.close();
+          // A new session or a delete must not overlap with the last writes of this one.
+          yield* Deferred.await(session.ended).pipe(Effect.timeout("10 seconds"), Effect.ignore);
+        });
+
+      /**
+       * Describes each other bot that a message mentions, so the bot can look at its work or message
+       * it. Only the prompt gets this. The thread keeps the message as the operator wrote it.
+       */
+      const mentionNote = (text: string, sender: StoredBot) =>
+        repository.list.pipe(
+          Effect.map((bots) => {
+            const mentioned = bots.filter((bot) => bot.id !== sender.id && mentions(text, bot.name));
+            if (mentioned.length === 0) return "";
+
+            const lines = mentioned.map((bot) =>
+              bot.sdkSessionId === null
+                ? `- @${bot.name}: bot id ${bot.id}, no Claude Code session yet.`
+                : `- @${bot.name}: bot id ${bot.id}, Claude Code session ${bot.sdkSessionId}, transcript ${transcriptPath(bot, bot.sdkSessionId)}`,
+            );
+
+            return `\n\nMentioned clots bots. Use the clots tools read_bot_thread and send_bot_message to see what a bot does or to message it.\n${lines.join("\n")}`;
+          }),
+        );
+
+      const send = (bot: StoredBot, role: Exclude<MessageRole, "assistant">, text: string, uploads: ReadonlyArray<Upload> = []) =>
           Effect.gen(function* () {
             const runtime = runtimeFor(bot.id);
-            yield* record(runtime, bot.id, role, text);
+            const saved = saveUploads(bot, uploads);
+            yield* record(runtime, bot.id, role, text, saved.map((file) => file.attachment));
             setLive(runtime, { status: statusWhileRunning(runtime) });
+
+            // The bot sees an image at once. For each file it also gets the path, so it can read or use the file.
+            const images = saved
+              .filter((file) => INLINE_IMAGE_TYPES.has(file.upload.mediaType))
+              .map((file) => ({
+                type: "image",
+                source: { type: "base64", media_type: file.upload.mediaType, data: file.upload.data },
+              }));
+            const paths = saved.length === 0 ? "" : `\n\nAttached files:\n${saved.map((file) => file.path).join("\n")}`;
+            const note = yield* mentionNote(text, bot);
+            const origin =
+              role === "bot" ? "\n\n(This came from another clots bot. Answer with send_bot_message only when it needs an answer.)" : "";
 
             const session = runtime.session ?? (yield* startSession(bot, runtime));
             Queue.offerUnsafe(session.prompts, {
               type: "user",
-              message: { role: "user", content: text },
+              message: { role: "user", content: [...images, { type: "text", text: `${text}${paths}${note}${origin}`.trim() }] },
               parent_tool_use_id: null,
             } as SDKUserMessage);
-          }),
+          });
+
+      return BotSessions.of({
+        statusChanges,
+        skillChanges,
+        live: (botId) => runtimeFor(botId).live,
+        events: (botId) => runtimeFor(botId).events,
+
+        send,
 
         interrupt: (botId) =>
           Effect.promise(async () => {
@@ -333,6 +655,12 @@ export class BotSessions extends Context.Service<
           Effect.promise(async () => {
             await runtimeFor(botId).session?.query.setModel(model);
           }),
+
+        stop,
+
+        loadSkills,
+
+        remove: (botId) => stop(botId).pipe(Effect.andThen(Effect.sync(() => runtimes.delete(botId)))),
 
         resolveApproval: (botId, approvalId, decision) =>
           Effect.sync(() => runtimeFor(botId).approvals.get(approvalId)?.(decision)),

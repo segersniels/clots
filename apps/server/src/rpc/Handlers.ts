@@ -1,17 +1,36 @@
-import { BotNotFound, ClotsRpcs, InvalidCron, type BotId, type BotSummary } from "@clots/contracts";
+import {
+  BotNotFound,
+  ClotsRpcs,
+  InvalidCron,
+  ProjectDirectoryNotFound,
+  type BotId,
+  type BotSummary,
+} from "@clots/contracts";
 import { Effect, PubSub, Stream } from "effect";
+import { existsSync, statSync } from "node:fs";
+import { homedir } from "node:os";
+import { resolve } from "node:path";
 
 import { BotRepository, type StoredBot } from "../bots/BotRepository.ts";
 import { BotSessions } from "../bots/BotSessions.ts";
+import { removeClaudeTranscripts } from "../bots/ClaudeEnvironment.ts";
+import { closeBrowser } from "../browser/BrowserEnvironment.ts";
+import { ProjectRepository } from "../projects/ProjectRepository.ts";
 import { nextRunAt, ScheduleRepository } from "../schedules/ScheduleRepository.ts";
 
-const STATUS_LINE_LENGTH = 80;
+/** The longest status line. The sidebar and the bot picker truncate it to their width, so this only caps what goes over the wire. */
+const STATUS_LINE_LENGTH = 300;
+
+/** Cuts a status line to its length. A cut line ends in an ellipsis, so it never stops mid-word without a sign. */
+const shorten = (line: string) =>
+  line.length <= STATUS_LINE_LENGTH ? line : `${line.slice(0, STATUS_LINE_LENGTH - 1).trimEnd()}…`;
 
 export const HandlersLayer = ClotsRpcs.toLayer(
   Effect.gen(function* () {
     const bots = yield* BotRepository;
     const sessions = yield* BotSessions;
     const schedules = yield* ScheduleRepository;
+    const projects = yield* ProjectRepository;
 
     const requireBot = (botId: BotId) =>
       bots
@@ -21,9 +40,17 @@ export const HandlersLayer = ClotsRpcs.toLayer(
     const summarize = (bot: StoredBot): BotSummary => {
       const live = sessions.live(bot.id);
       const idleLine = bot.lastMessageText ?? "No messages yet";
+      const backgroundLine =
+        live.tasks.length === 1 ? `In the background: ${live.tasks[0]!.description}` : `${live.tasks.length} tasks in the background`;
       const statusLine = {
-        idle: idleLine.replaceAll(/\s+/g, " ").slice(0, STATUS_LINE_LENGTH),
-        working: live.activity ?? "Working…",
+        // The list shows plain text, so the markdown marks of a reply go away. Work in the background comes first.
+        idle: shorten(
+          (live.tasks.length > 0 ? backgroundLine : idleLine)
+            .replaceAll(/[#*_`>]+/g, "")
+            .replaceAll(/\s+/g, " ")
+            .trim(),
+        ),
+        working: live.steps.at(-1)?.title ?? "Working…",
         waiting: "Needs you",
       }[live.status];
 
@@ -34,7 +61,9 @@ export const HandlersLayer = ClotsRpcs.toLayer(
         color: bot.color,
         shape: bot.shape,
         model: bot.model,
+        projectId: bot.projectId,
         lastMessageAt: bot.lastMessageAt,
+        unread: bot.unread,
         createdAt: bot.createdAt,
         status: live.status,
         statusLine,
@@ -54,6 +83,76 @@ export const HandlersLayer = ClotsRpcs.toLayer(
 
       CreateBot: (newBot) =>
         bots.create(newBot).pipe(Effect.tap(() => PubSub.publish(sessions.statusChanges, undefined))),
+
+      WatchProjects: () => watch(projects.list, Stream.fromPubSub(projects.changes)),
+
+      CreateProject: ({ name, directory }) =>
+        Effect.gen(function* () {
+          if (directory === null || directory.trim() === "") return yield* projects.create(name, null);
+
+          // The operator types the path, often with `~` for the home directory.
+          const absolute = resolve(directory.trim().replace(/^~(?=$|\/)/, homedir()));
+
+          if (!existsSync(absolute) || !statSync(absolute).isDirectory()) {
+            return yield* new ProjectDirectoryNotFound({ directory: absolute });
+          }
+
+          return yield* projects.create(name, absolute);
+        }),
+
+      RenameProject: ({ projectId, name }) => projects.rename(projectId, name),
+
+      DeleteProject: ({ projectId }) =>
+        Effect.gen(function* () {
+          const moved = (yield* bots.list).filter((bot) => bot.projectId === projectId);
+          yield* projects.remove(projectId);
+
+          // A running session belongs to the old directory.
+          yield* Effect.forEach(moved, (bot) => sessions.stop(bot.id));
+          yield* PubSub.publish(sessions.statusChanges, undefined);
+        }),
+
+      SetBotProject: ({ botId, projectId }) =>
+        requireBot(botId).pipe(
+          Effect.andThen(bots.setProject(botId, projectId)),
+          // The running session belongs to the old directory.
+          Effect.andThen(sessions.stop(botId)),
+          Effect.andThen(PubSub.publish(sessions.statusChanges, undefined)),
+          Effect.asVoid,
+        ),
+
+      UpdateBot: ({ botId, ...changes }) =>
+        requireBot(botId).pipe(
+          Effect.andThen(bots.update(botId, changes)),
+          Effect.andThen(PubSub.publish(sessions.statusChanges, undefined)),
+          Effect.asVoid,
+        ),
+
+      SetBotUnread: ({ botId, unread }) =>
+        requireBot(botId).pipe(
+          Effect.andThen(bots.setUnread(botId, unread)),
+          Effect.andThen(PubSub.publish(sessions.statusChanges, undefined)),
+          Effect.asVoid,
+        ),
+
+      DuplicateBot: ({ botId }) =>
+        requireBot(botId).pipe(
+          Effect.flatMap(({ name, instructions, color, shape, model, projectId }) =>
+            bots.create({ name: `${name} copy`, instructions, color, shape, model, projectId }),
+          ),
+          Effect.tap(() => PubSub.publish(sessions.statusChanges, undefined)),
+        ),
+
+      DeleteBot: ({ botId }) =>
+        requireBot(botId).pipe(
+          // The session and the browser stop first, so neither writes to the bot's files while they go.
+          Effect.tap(() => sessions.remove(botId)),
+          Effect.tap((bot) => closeBrowser(bot)),
+          Effect.tap((bot) => bots.remove(bot)),
+          Effect.tap((bot) => Effect.sync(() => removeClaudeTranscripts(bot))),
+          Effect.andThen(PubSub.publish(sessions.statusChanges, undefined)),
+          Effect.asVoid,
+        ),
 
       SetBotModel: ({ botId, model }) =>
         requireBot(botId).pipe(
@@ -84,8 +183,8 @@ export const HandlersLayer = ClotsRpcs.toLayer(
           }),
         ),
 
-      SendMessage: ({ botId, text }) =>
-        requireBot(botId).pipe(Effect.flatMap((bot) => sessions.send(bot, "user", text))),
+      SendMessage: ({ botId, text, attachments }) =>
+        requireBot(botId).pipe(Effect.flatMap((bot) => sessions.send(bot, "user", text, attachments))),
 
       InterruptBot: ({ botId }) => requireBot(botId).pipe(Effect.andThen(sessions.interrupt(botId))),
 
@@ -94,6 +193,20 @@ export const HandlersLayer = ClotsRpcs.toLayer(
 
       ResolveHandoff: ({ botId, handoffId }) =>
         requireBot(botId).pipe(Effect.andThen(sessions.resolveHandoff(botId, handoffId))),
+
+      WatchSkills: ({ botId }) =>
+        watch(bots.skills(botId), Stream.fromPubSub(sessions.skillChanges)).pipe(
+          // A bot that never ran has no list yet. A short session lists its skills in the background.
+          Stream.tap((list) =>
+            list.length > 0
+              ? Effect.void
+              : bots.find(botId).pipe(
+                  Effect.flatMap((bot) => (bot === undefined ? Effect.void : sessions.loadSkills(bot))),
+                  Effect.forkDetach,
+                  Effect.asVoid,
+                ),
+          ),
+        ),
 
       WatchSchedules: ({ botId }) => watch(schedules.list(botId), Stream.fromPubSub(schedules.changes)),
 

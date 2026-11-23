@@ -1,10 +1,13 @@
-import type { Bot, BotId, BotModel, Message, MessageRole } from "@clots/contracts";
+import type { Attachment, Bot, BotId, BotModel, Message, MessageRole, Skill, TraceStep } from "@clots/contracts";
 
 /** The fields that the operator chooses for a new bot. */
 export type NewBot = Pick<Bot, "name" | "instructions" | "color" | "shape">;
+
+/** The fields of a bot that an update can change. A field that is absent keeps its value. */
+export type BotChanges = { readonly [Field in keyof NewBot]?: NewBot[Field] | undefined };
 import { Context, Effect, Layer } from "effect";
 import { SqlClient, type Statement } from "effect/sql";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
 import { ClotsConfig } from "../config.ts";
@@ -20,20 +23,60 @@ export interface StoredBot extends Bot {
   readonly workingDirectory: string;
   readonly browserStreamPort: number;
   readonly sdkSessionId: string | null;
+  readonly projectName: string | null;
+  /** The directory of the bot's project. The bot works there when it is set. */
+  readonly projectDirectory: string | null;
   readonly lastMessageText: string | null;
   readonly lastMessageAt: number | null;
+  readonly unread: boolean;
 }
+
+/** A bot as SQLite returns it: the unread flag is an integer. */
+interface BotRow extends Omit<StoredBot, "unread"> {
+  readonly unread: number;
+}
+
+const toStoredBot = (row: BotRow): StoredBot => ({ ...row, unread: row.unread === 1 });
+
+/** A message as SQLite returns it: the attachment list is JSON text. */
+interface MessageRow extends Omit<Message, "attachments" | "steps"> {
+  readonly attachments: string;
+  readonly steps: string;
+}
+
+const toMessage = (row: MessageRow): Message => ({
+  ...row,
+  attachments: JSON.parse(row.attachments),
+  steps: JSON.parse(row.steps),
+});
 
 export class BotRepository extends Context.Service<
   BotRepository,
   {
     readonly list: Effect.Effect<ReadonlyArray<StoredBot>>;
     find(botId: BotId): Effect.Effect<StoredBot | undefined>;
-    create(bot: NewBot): Effect.Effect<StoredBot>;
+    /** Creates a bot with the default model and no project, unless a copy brings its own. */
+    create(bot: NewBot & Partial<Pick<Bot, "model" | "projectId">>): Effect.Effect<StoredBot>;
+    /** Deletes the bot, its thread, its routines and its notes directory. */
+    remove(bot: StoredBot): Effect.Effect<void>;
+    setUnread(botId: BotId, unread: boolean): Effect.Effect<void>;
     setSdkSessionId(botId: BotId, sdkSessionId: string): Effect.Effect<void>;
+    /** Changes only the given fields, so that two quick edits do not undo each other. */
+    update(botId: BotId, changes: BotChanges): Effect.Effect<void>;
     setModel(botId: BotId, model: BotModel): Effect.Effect<void>;
-    appendMessage(botId: BotId, role: MessageRole, text: string): Effect.Effect<Message>;
+    /** Moves the bot to a project. A move to another directory also forgets the session, which belongs to the old one. */
+    setProject(botId: BotId, projectId: string | null): Effect.Effect<void>;
+    appendMessage(
+      botId: BotId,
+      role: MessageRole,
+      text: string,
+      attachments?: ReadonlyArray<Attachment>,
+      steps?: ReadonlyArray<TraceStep>,
+    ): Effect.Effect<Message>;
     messagesAfter(botId: BotId, afterSequence: number): Effect.Effect<ReadonlyArray<Message>>;
+    skills(botId: BotId): Effect.Effect<ReadonlyArray<Skill>>;
+    /** Keeps the skills that the bot's session reported, so the composer can offer them while no session runs. */
+    setSkills(botId: BotId, skills: ReadonlyArray<Skill>): Effect.Effect<void>;
   }
 >()("clots/bots/BotRepository") {
   static readonly layer = Layer.effect(
@@ -42,7 +85,7 @@ export class BotRepository extends Context.Service<
       const sql = yield* SqlClient.SqlClient;
       const config = yield* ClotsConfig;
 
-      const select = (where: Statement.Fragment) => sql<StoredBot>`
+      const select = (where: Statement.Fragment) => sql<BotRow>`
         SELECT
           bots.id,
           bots.name,
@@ -50,21 +93,27 @@ export class BotRepository extends Context.Service<
           bots.color,
           bots.shape,
           bots.model,
+          bots.project_id AS projectId,
+          projects.name AS projectName,
+          projects.directory AS projectDirectory,
           bots.created_at AS createdAt,
           bots.working_directory AS workingDirectory,
           bots.browser_stream_port AS browserStreamPort,
           threads.sdk_session_id AS sdkSessionId,
+          threads.unread,
           (
             SELECT text FROM messages
-            WHERE thread_id = threads.id
+            -- A trace has no text, so the bot list skips it.
+            WHERE thread_id = threads.id AND role != 'trace'
             ORDER BY sequence DESC LIMIT 1
           ) AS lastMessageText,
           (SELECT MAX(created_at) FROM messages WHERE thread_id = threads.id) AS lastMessageAt
         FROM bots
         JOIN threads ON threads.bot_id = bots.id
+        LEFT JOIN projects ON projects.id = bots.project_id
         ${where}
         ORDER BY bots.created_at
-      `;
+      `.pipe(Effect.map((rows) => rows.map(toStoredBot)));
 
       const list = select(sql``).pipe(Effect.orDie);
 
@@ -74,7 +123,14 @@ export class BotRepository extends Context.Service<
           Effect.orDie,
         );
 
-      const create = ({ name, instructions, color, shape }: NewBot) =>
+      const create = ({
+        name,
+        instructions,
+        color,
+        shape,
+        model = DEFAULT_MODEL,
+        projectId = null,
+      }: NewBot & Partial<Pick<Bot, "model" | "projectId">>) =>
         Effect.gen(function* () {
           const id = crypto.randomUUID() as BotId;
           const workingDirectory = join(config.home, "bots", id);
@@ -82,9 +138,9 @@ export class BotRepository extends Context.Service<
           mkdirSync(workingDirectory, { recursive: true });
 
           yield* sql`
-            INSERT INTO bots (id, name, instructions, color, shape, model, working_directory, browser_stream_port, created_at)
+            INSERT INTO bots (id, name, instructions, color, shape, model, project_id, working_directory, browser_stream_port, created_at)
             SELECT
-              ${id}, ${name}, ${instructions}, ${color}, ${shape}, ${DEFAULT_MODEL}, ${workingDirectory},
+              ${id}, ${name}, ${instructions}, ${color}, ${shape}, ${model}, ${projectId}, ${workingDirectory},
               COALESCE(MAX(browser_stream_port) + 1, ${FIRST_BROWSER_STREAM_PORT}),
               ${createdAt}
             FROM bots
@@ -97,42 +153,116 @@ export class BotRepository extends Context.Service<
           return (yield* find(id))!;
         }).pipe(sql.withTransaction, Effect.orDie);
 
+      const remove = (bot: StoredBot) =>
+        Effect.gen(function* () {
+          yield* sql`DELETE FROM messages WHERE thread_id IN (SELECT id FROM threads WHERE bot_id = ${bot.id})`;
+          yield* sql`DELETE FROM threads WHERE bot_id = ${bot.id}`;
+          yield* sql`DELETE FROM schedules WHERE bot_id = ${bot.id}`;
+          yield* sql`DELETE FROM bots WHERE id = ${bot.id}`;
+        }).pipe(
+          sql.withTransaction,
+          // The rows go first, so a failed delete never leaves a bot without its notes.
+          Effect.andThen(Effect.sync(() => rmSync(bot.workingDirectory, { recursive: true, force: true }))),
+          Effect.orDie,
+        );
+
+      const setUnread = (botId: BotId, unread: boolean) =>
+        sql`UPDATE threads SET unread = ${unread ? 1 : 0} WHERE bot_id = ${botId}`.pipe(Effect.asVoid, Effect.orDie);
+
       const setSdkSessionId = (botId: BotId, sdkSessionId: string) =>
         sql`UPDATE threads SET sdk_session_id = ${sdkSessionId} WHERE bot_id = ${botId}`.pipe(
           Effect.asVoid,
           Effect.orDie,
         );
 
+      const update = (botId: BotId, { name, instructions, color, shape }: BotChanges) =>
+        sql`
+          UPDATE bots
+          SET
+            name = COALESCE(${name ?? null}, name),
+            instructions = COALESCE(${instructions ?? null}, instructions),
+            color = COALESCE(${color ?? null}, color),
+            shape = COALESCE(${shape ?? null}, shape)
+          WHERE id = ${botId}
+        `.pipe(Effect.asVoid, Effect.orDie);
+
       const setModel = (botId: BotId, model: BotModel) =>
         sql`UPDATE bots SET model = ${model} WHERE id = ${botId}`.pipe(Effect.asVoid, Effect.orDie);
 
-      const appendMessage = (botId: BotId, role: MessageRole, text: string) =>
-        sql<Message>`
-          INSERT INTO messages (id, thread_id, sequence, role, text, created_at)
+      const setProject = (botId: BotId, projectId: string | null) =>
+        Effect.gen(function* () {
+          // Claude Code stores a session under its directory, so the old session cannot resume in a new one.
+          // A move between projects with the same directory, or with none, keeps the session.
+          yield* sql`
+            UPDATE threads SET sdk_session_id = NULL
+            WHERE bot_id = ${botId}
+              AND COALESCE((SELECT directory FROM projects WHERE id = ${projectId}), '') != COALESCE(
+                (SELECT projects.directory FROM bots JOIN projects ON projects.id = bots.project_id WHERE bots.id = ${botId}),
+                ''
+              )
+          `;
+          yield* sql`UPDATE bots SET project_id = ${projectId} WHERE id = ${botId}`;
+        }).pipe(sql.withTransaction, Effect.orDie);
+
+      const appendMessage = (
+        botId: BotId,
+        role: MessageRole,
+        text: string,
+        attachments: ReadonlyArray<Attachment> = [],
+        steps: ReadonlyArray<TraceStep> = [],
+      ) =>
+        sql<MessageRow>`
+          INSERT INTO messages (id, thread_id, sequence, role, text, attachments, steps, created_at)
           SELECT
             ${crypto.randomUUID()}, threads.id,
             COALESCE((SELECT MAX(sequence) FROM messages WHERE thread_id = threads.id), 0) + 1,
-            ${role}, ${text}, ${Date.now()}
+            ${role}, ${text}, ${JSON.stringify(attachments)}, ${JSON.stringify(steps)}, ${Date.now()}
           FROM threads
           WHERE threads.bot_id = ${botId}
-          RETURNING id, ${botId} AS botId, sequence, role, text, created_at AS createdAt
+          RETURNING id, ${botId} AS botId, sequence, role, text, attachments, steps, created_at AS createdAt
         `.pipe(
-          Effect.map((rows) => rows[0]!),
+          Effect.map((rows) => toMessage(rows[0]!)),
           Effect.orDie,
         );
 
       const messagesAfter = (botId: BotId, afterSequence: number) =>
-        sql<Message>`
+        sql<MessageRow>`
           SELECT
             messages.id, ${botId} AS botId, messages.sequence, messages.role, messages.text,
-            messages.created_at AS createdAt
+            messages.attachments, messages.steps, messages.created_at AS createdAt
           FROM messages
           JOIN threads ON threads.id = messages.thread_id
           WHERE threads.bot_id = ${botId} AND messages.sequence > ${afterSequence}
           ORDER BY messages.sequence
-        `.pipe(Effect.orDie);
+        `.pipe(
+          Effect.map((rows) => rows.map(toMessage)),
+          Effect.orDie,
+        );
 
-      return BotRepository.of({ list, find, create, setSdkSessionId, setModel, appendMessage, messagesAfter });
+      const skills = (botId: BotId) =>
+        sql<{ readonly skills: string }>`SELECT skills FROM threads WHERE bot_id = ${botId}`.pipe(
+          Effect.map((rows): ReadonlyArray<Skill> => (rows[0] === undefined ? [] : JSON.parse(rows[0].skills))),
+          Effect.orDie,
+        );
+
+      const setSkills = (botId: BotId, list: ReadonlyArray<Skill>) =>
+        sql`UPDATE threads SET skills = ${JSON.stringify(list)} WHERE bot_id = ${botId}`.pipe(Effect.asVoid, Effect.orDie);
+
+      return BotRepository.of({
+        list,
+        find,
+        create,
+        remove,
+        setUnread,
+        update,
+        setSdkSessionId,
+        setModel,
+        setProject,
+        appendMessage,
+        messagesAfter,
+        skills,
+        setSkills,
+      });
     }),
   );
 }

@@ -6,7 +6,10 @@ import {
   type BotId,
   type BotModel,
   type BotSummary,
+  type Project,
+  type Upload,
   type Schedule,
+  type Skill,
 } from "@clots/contracts";
 import { Context, Effect, Fiber, Layer, ManagedRuntime, Schedule as RetrySchedule, Stream } from "effect";
 import { RpcClient, RpcClientError, RpcSerialization } from "effect/rpc";
@@ -20,11 +23,23 @@ export type ConnectionState = "connecting" | "connected" | "disconnected";
 export interface ClotsClient {
   readonly connection: Store<ConnectionState>;
   readonly bots: Store<ReadonlyArray<BotSummary>>;
+  readonly projects: Store<ReadonlyArray<Project>>;
   thread(botId: BotId): Store<ThreadState>;
   schedules(botId: BotId): Store<ReadonlyArray<Schedule>>;
+  skills(botId: BotId): Store<ReadonlyArray<Skill>>;
   createBot(bot: Pick<Bot, "name" | "instructions" | "color" | "shape">): Promise<Bot>;
+  updateBot(botId: BotId, changes: Partial<Pick<Bot, "name" | "instructions" | "color" | "shape">>): Promise<void>;
   setBotModel(botId: BotId, model: BotModel): Promise<void>;
-  sendMessage(botId: BotId, text: string): Promise<void>;
+  setBotUnread(botId: BotId, unread: boolean): Promise<void>;
+  duplicateBot(botId: BotId): Promise<Bot>;
+  deleteBot(botId: BotId): Promise<void>;
+  /** Creates a project. `directory` is an optional path on the host. */
+  createProject(name: string, directory: string | null): Promise<Project>;
+  renameProject(projectId: string, name: string): Promise<void>;
+  /** Deletes a project. Its bots move to no project. */
+  deleteProject(projectId: string): Promise<void>;
+  setBotProject(botId: BotId, projectId: string | null): Promise<void>;
+  sendMessage(botId: BotId, text: string, attachments?: ReadonlyArray<Upload>): Promise<void>;
   interruptBot(botId: BotId): Promise<void>;
   resolveApproval(botId: BotId, approvalId: string, decision: ApprovalDecision): Promise<void>;
   resolveHandoff(botId: BotId, handoffId: string): Promise<void>;
@@ -103,12 +118,20 @@ export const makeClotsClient = (origin: string): ClotsClient => {
     (_, list) => list,
   );
 
+  const projects = makeStreamStore<ReadonlyArray<Project>, ReadonlyArray<Project>>(
+    [],
+    (rpc) => rpc.WatchProjects(),
+    (_, list) => list,
+  );
+
   const threads = new Map<BotId, Store<ThreadState>>();
   const schedules = new Map<BotId, Store<ReadonlyArray<Schedule>>>();
+  const skills = new Map<BotId, Store<ReadonlyArray<Skill>>>();
 
   return {
     connection,
     bots,
+    projects,
 
     thread: (botId) => {
       const existing = threads.get(botId);
@@ -138,9 +161,31 @@ export const makeClotsClient = (origin: string): ClotsClient => {
       return store;
     },
 
+    skills: (botId) => {
+      const existing = skills.get(botId);
+      if (existing !== undefined) return existing;
+
+      const store = makeStreamStore<ReadonlyArray<Skill>, ReadonlyArray<Skill>>(
+        [],
+        (rpc) => rpc.WatchSkills({ botId }),
+        (_, list) => list,
+      );
+      skills.set(botId, store);
+
+      return store;
+    },
+
     createBot: (bot) => call((rpc) => rpc.CreateBot(bot)),
+    updateBot: (botId, changes) => call((rpc) => rpc.UpdateBot({ botId, ...changes })),
+    createProject: (name, directory) => call((rpc) => rpc.CreateProject({ name, directory })),
+    renameProject: (projectId, name) => call((rpc) => rpc.RenameProject({ projectId, name })),
+    deleteProject: (projectId) => call((rpc) => rpc.DeleteProject({ projectId })),
+    setBotProject: (botId, projectId) => call((rpc) => rpc.SetBotProject({ botId, projectId })),
     setBotModel: (botId, model) => call((rpc) => rpc.SetBotModel({ botId, model })),
-    sendMessage: (botId, text) => call((rpc) => rpc.SendMessage({ botId, text })),
+    setBotUnread: (botId, unread) => call((rpc) => rpc.SetBotUnread({ botId, unread })),
+    duplicateBot: (botId) => call((rpc) => rpc.DuplicateBot({ botId })),
+    deleteBot: (botId) => call((rpc) => rpc.DeleteBot({ botId })),
+    sendMessage: (botId, text, attachments = []) => call((rpc) => rpc.SendMessage({ botId, text, attachments })),
     interruptBot: (botId) => call((rpc) => rpc.InterruptBot({ botId })),
     resolveApproval: (botId, approvalId, decision) =>
       call((rpc) => rpc.ResolveApproval({ botId, approvalId, decision })),

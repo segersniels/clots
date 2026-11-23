@@ -7,11 +7,13 @@ import { RpcSerialization, RpcServer } from "effect/rpc";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 
+import { AttachmentRouteLayer } from "./bots/AttachmentRoute.ts";
 import { BotRepository } from "./bots/BotRepository.ts";
 import { BotSessions } from "./bots/BotSessions.ts";
 import { BrowserProxyLayer } from "./browser/BrowserProxy.ts";
 import { ClotsConfig } from "./config.ts";
 import { MigrationsLayer } from "./persistence/Migrations.ts";
+import { ProjectRepository } from "./projects/ProjectRepository.ts";
 import { HandlersLayer } from "./rpc/Handlers.ts";
 import { ScheduleRepository } from "./schedules/ScheduleRepository.ts";
 import { SchedulerLayer } from "./schedules/Scheduler.ts";
@@ -30,7 +32,7 @@ const SqlLayer = Layer.unwrap(
 
 const ServicesLayer = Layer.mergeAll(SchedulerLayer, SidecarLayer, HandlersLayer).pipe(
   Layer.provideMerge(BotSessions.layer),
-  Layer.provideMerge(Layer.mergeAll(BotRepository.layer, ScheduleRepository.layer)),
+  Layer.provideMerge(Layer.mergeAll(BotRepository.layer, ScheduleRepository.layer, ProjectRepository.layer)),
   Layer.provide(SqlLayer),
 );
 
@@ -54,7 +56,7 @@ export const ServerLayer = Layer.unwrap(
   Effect.gen(function* () {
     const config = yield* ClotsConfig;
 
-    return HttpRouter.serve(Layer.mergeAll(RpcLayer, BrowserProxyLayer, WebLayer), { disableLogger: true }).pipe(
+    return HttpRouter.serve(Layer.mergeAll(RpcLayer, BrowserProxyLayer, AttachmentRouteLayer, WebLayer), { disableLogger: true }).pipe(
       Layer.provide(ServicesLayer),
       Layer.provide(BunHttpServer.layer({ hostname: "127.0.0.1", port: config.port })),
     );
