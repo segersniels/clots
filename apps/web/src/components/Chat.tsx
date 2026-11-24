@@ -162,7 +162,7 @@ function OlderMessagesLoader({ hasOlder, onLoad }: { hasOlder: boolean; onLoad: 
   return null;
 }
 
-/** How long a message that the search opened stays highlighted. */
+/** How long a message that the search opened keeps the mark that tints its bubble. It matches the fade in the styles. */
 const JUMP_HIGHLIGHT_MS = 1200;
 
 /** Scrolls the thread to a message as soon as the scroller has it, then reports that it did. */
@@ -336,7 +336,8 @@ export function Chat({
                   <MessageScrollerItem
                     key={message.id}
                     messageId={message.id}
-                    className={`rounded-2xl transition-[background-color] duration-700 ease-out ${highlightedId === message.id ? "bg-attention/10" : ""} ${changesSide && !showsTime ? "pt-3" : ""} ${enter?.className ?? ""}`}
+                    data-jumped={highlightedId === message.id || undefined}
+                    className={`${changesSide && !showsTime ? "pt-3" : ""} ${enter?.className ?? ""}`}
                     style={enter?.style}
                   >
                     {showsTime && (

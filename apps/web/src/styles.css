@@ -213,3 +213,48 @@ button:not(:disabled),
 [role="combobox"]:not(:disabled) {
   cursor: pointer;
 }
+
+/*
+ * A message that the search opened tints its own bubble with the attention blue, which then fades
+ * back. A black bubble of the operator would not show a tint, so it gets a ring instead. Nothing
+ * outside the bubble changes color.
+ */
+[data-jumped] [data-slot="bubble"][data-variant="muted"] > [data-slot="bubble-content"] {
+  --jump-base: var(--muted);
+  animation: jump-tint 1.2s var(--ease-in-out);
+}
+
+[data-jumped] [data-slot="bubble"][data-variant="outline"] > [data-slot="bubble-content"] {
+  --jump-base: var(--background);
+  animation: jump-tint 1.2s var(--ease-in-out);
+}
+
+[data-jumped] [data-slot="bubble"][data-variant="default"] > [data-slot="bubble-content"] {
+  animation: jump-ring 1.2s var(--ease-in-out);
+}
+
+@keyframes jump-tint {
+  from {
+    background-color: color-mix(in srgb, var(--attention) 16%, var(--jump-base));
+  }
+}
+
+.dark [data-jumped] [data-slot="bubble"] > [data-slot="bubble-content"] {
+  animation-name: jump-tint-dark;
+}
+
+.dark [data-jumped] [data-slot="bubble"][data-variant="default"] > [data-slot="bubble-content"] {
+  animation-name: jump-ring;
+}
+
+@keyframes jump-tint-dark {
+  from {
+    background-color: color-mix(in srgb, var(--attention) 24%, var(--jump-base));
+  }
+}
+
+@keyframes jump-ring {
+  from {
+    box-shadow: 0 0 0 2px var(--attention);
+  }
+}
