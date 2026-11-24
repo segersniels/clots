@@ -20,11 +20,10 @@ import {
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Link, useParams } from "@tanstack/react-router";
-import { ChevronDownIcon, FolderPlusIcon, PencilLineIcon, PlusIcon, SearchIcon, UserRoundPlusIcon } from "lucide-react";
+import { ChevronDownIcon, PencilLineIcon, PlusIcon, SearchIcon } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -40,7 +39,7 @@ import { NewBotDialog, NewProjectDialog, NoBots } from "./CreateDialog.tsx";
 import { AccountMenu } from "./AccountMenu.tsx";
 import { UpdatePill, useUpdates } from "./UpdateControl.tsx";
 import { ProjectMenu } from "./ProjectMenu.tsx";
-import { SearchDialog, useSearchShortcuts, type SearchCommands } from "./SearchDialog.tsx";
+import { NewDialog, SearchDialog, useSearchShortcuts, type SearchCommands } from "./SearchDialog.tsx";
 
 const EMPTY_HINT = "px-2.5 py-1.5 text-[0.8125rem] text-muted-foreground/70";
 
@@ -529,6 +528,7 @@ export function BotList() {
   const bots = useStore(client.bots);
   const openBotId = useParams({ strict: false }).botId;
   const [creating, setCreating] = useState<"bot" | "project" | null>(null);
+  const [newOpen, setNewOpen] = useState(false);
   const [newBotName, setNewBotName] = useState("");
   /** Closes the create dialog when it reports that it closed. */
   const closeCreate = (open: boolean) => open || setCreating(null);
@@ -589,6 +589,7 @@ export function BotList() {
   // A shortcut opens the search without motion. The button opens it with motion.
   useSearchShortcuts({
     onToggle: () => setSearch((current) => ({ open: !current.open, instant: true })),
+    onNew: () => setNewOpen(true),
     onBotOpened: () => setSearch((current) => ({ ...current, open: false })),
   });
 
@@ -611,21 +612,10 @@ export function BotList() {
           commands={searchCommands}
         />
 
-        <DropdownMenu>
-          <DropdownMenuTrigger render={<Button variant="secondary" size="icon" aria-label="New" className="rounded-full" />}>
-            <PlusIcon />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-40">
-            <DropdownMenuItem onClick={() => searchCommands.newBot()}>
-              <UserRoundPlusIcon className="text-muted-foreground" />
-              New bot
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setCreating("project")}>
-              <FolderPlusIcon className="text-muted-foreground" />
-              New project
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <Button variant="secondary" size="icon" aria-label="New" className="rounded-full" onClick={() => setNewOpen(true)}>
+          <PlusIcon />
+        </Button>
+        <NewDialog open={newOpen} onOpenChange={setNewOpen} commands={searchCommands} />
 
         {/* A new bot joins the project of the bot that is open, unless the operator picks another. */}
         <NewBotDialog

@@ -4,7 +4,7 @@ import { Character, type Gaze } from "@clots/character";
 import type { BotSummary, MessageHit } from "@clots/contracts";
 import { useNavigate } from "@tanstack/react-router";
 import { cn } from "cn";
-import { ArrowUpIcon, FolderPlusIcon, GaugeIcon, MonitorIcon, MoonIcon, PlusIcon, SearchIcon, SunIcon, type LucideIcon } from "lucide-react";
+import { ArrowUpIcon, FolderPlusIcon, GaugeIcon, MonitorIcon, MoonIcon, PlusIcon, SearchIcon, SunIcon, UserRoundPlusIcon, type LucideIcon } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 import { client, useStore } from "@/client.ts";
@@ -41,6 +41,14 @@ const LOOK_AT_FIELD: Gaze = { x: -0.18, y: -0.93 };
 const WAITING_TEXT = "text-[#b07610] dark:text-[#f5a524]";
 
 const KBD = "shrink-0 rounded-md bg-muted px-1.5 py-0.5 font-sans text-[11.5px] text-muted-foreground";
+
+/** The floating panel of the search and of the New dialog: it scales in under the top of the window. */
+const POPUP =
+  "fixed top-[92px] left-1/2 z-50 flex w-[600px] max-w-[calc(100%-2rem)] -translate-x-1/2 origin-top flex-col overflow-hidden rounded-[20px] bg-popover text-sm text-popover-foreground shadow-2xl ring-1 ring-foreground/9 outline-none transition-[opacity,scale] duration-160 ease-out data-ending-style:scale-[0.97] data-ending-style:opacity-0 data-ending-style:duration-120 data-starting-style:scale-[0.97] data-starting-style:opacity-0 data-instant:transition-none motion-reduce:data-ending-style:scale-100 motion-reduce:data-starting-style:scale-100";
+
+/** One row of a result list. The keys and the pointer both highlight it. */
+const ROW =
+  "group flex min-h-11 cursor-default items-center gap-3 rounded-[14px] px-3 py-2 outline-none select-none data-highlighted:bg-[#ececed] dark:data-highlighted:bg-[#2a2a2d]";
 
 /** What the search can do besides opening a bot. The sidebar owns the dialogs and menus that these open. */
 export interface SearchCommands {
@@ -86,10 +94,10 @@ const actionsFor = (commands: SearchCommands): ReadonlyArray<SearchAction> => [
 ];
 
 /**
- * Opens the search with ⌘K, and the first nine bots of the search with ⌘1 to ⌘9, in the order of
- * their last message. The bot shortcuts work while the search is closed too.
+ * Opens the search with ⌘K or ⌘F, the New dialog with ⌘N, and the first nine bots of the search with
+ * ⌘1 to ⌘9, in the order of their last message. The bot shortcuts work while the search is closed too.
  */
-export function useSearchShortcuts({ onToggle, onBotOpened }: { onToggle: () => void; onBotOpened: () => void }) {
+export function useSearchShortcuts({ onToggle, onNew, onBotOpened }: { onToggle: () => void; onNew: () => void; onBotOpened: () => void }) {
   const navigate = useNavigate();
   const bots = useStore(client.bots);
 
@@ -97,9 +105,18 @@ export function useSearchShortcuts({ onToggle, onBotOpened }: { onToggle: () => 
     const onKeyDown = (event: KeyboardEvent) => {
       if (!(ON_MAC ? event.metaKey : event.ctrlKey) || event.shiftKey || event.altKey) return;
 
-      if (event.key.toLowerCase() === "k") {
+      const key = event.key.toLowerCase();
+
+      if (key === "k" || key === "f") {
         event.preventDefault();
         onToggle();
+
+        return;
+      }
+
+      if (key === "n") {
+        event.preventDefault();
+        onNew();
 
         return;
       }
@@ -359,7 +376,7 @@ function SearchPanel({ commands, onSelect }: { commands: SearchCommands; onSelec
                     key={item.id}
                     value={item}
                     onClick={() => onSelect(item)}
-                    className="group flex min-h-11 cursor-default items-center gap-3 rounded-[14px] px-3 py-2 outline-none select-none data-highlighted:bg-[#ececed] dark:data-highlighted:bg-[#2a2a2d]"
+                    className={ROW}
                   >
                     {item.kind === "bot" && (
                       <BotResult item={item} query={needle} projectName={projectOf(item.bot)} highlighted={item.id === highlightedId} />
@@ -416,12 +433,75 @@ export function SearchDialog({
     >
       <DialogPortal>
         <DialogOverlay className={cn("supports-backdrop-filter:backdrop-blur-none", instant && "data-open:animate-none data-closed:animate-none")} />
-        <DialogPrimitive.Popup
-          data-instant={instant || undefined}
-          className="fixed top-[92px] left-1/2 z-50 flex w-[600px] max-w-[calc(100%-2rem)] -translate-x-1/2 origin-top flex-col overflow-hidden rounded-[20px] bg-popover text-sm text-popover-foreground shadow-2xl ring-1 ring-foreground/9 outline-none transition-[opacity,scale] duration-160 ease-out data-ending-style:scale-[0.97] data-ending-style:opacity-0 data-ending-style:duration-120 data-starting-style:scale-[0.97] data-starting-style:opacity-0 data-instant:transition-none motion-reduce:data-ending-style:scale-100 motion-reduce:data-starting-style:scale-100"
-        >
+        <DialogPrimitive.Popup data-instant={instant || undefined} className={POPUP}>
           <DialogTitle className="sr-only">Search</DialogTitle>
           <SearchPanel commands={commands} onSelect={select} />
+        </DialogPrimitive.Popup>
+      </DialogPortal>
+    </Dialog>
+  );
+}
+
+/**
+ * Offers what the operator can make: a bot or a project. The + in the sidebar and ⌘N open it. The
+ * arrow keys move the highlight, Enter picks, and the picked dialog opens once this one has closed.
+ */
+export function NewDialog({ open, onOpenChange, commands }: { open: boolean; onOpenChange: (open: boolean) => void; commands: SearchCommands }) {
+  const choices = [
+    { label: "New bot", icon: UserRoundPlusIcon, run: () => commands.newBot() },
+    { label: "New project", icon: FolderPlusIcon, run: commands.newProject },
+  ];
+  const [highlighted, setHighlighted] = useState(0);
+  const picked = useRef<() => void>(undefined);
+
+  const pick = (run: () => void) => {
+    picked.current = run;
+    onOpenChange(false);
+  };
+
+  const moveHighlight = (event: React.KeyboardEvent) => {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      setHighlighted((index) => (index + (event.key === "ArrowDown" ? 1 : -1) + choices.length) % choices.length);
+    }
+
+    if (event.key === "Enter") {
+      event.preventDefault();
+      pick(choices[highlighted]!.run);
+    }
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={onOpenChange}
+      onOpenChangeComplete={(isOpen) => {
+        // Each open starts on the first choice.
+        if (isOpen) return setHighlighted(0);
+
+        picked.current?.();
+        picked.current = undefined;
+      }}
+    >
+      <DialogPortal>
+        <DialogOverlay className="supports-backdrop-filter:backdrop-blur-none" />
+        <DialogPrimitive.Popup className={POPUP} onKeyDown={moveHighlight}>
+          <DialogTitle className="sr-only">New</DialogTitle>
+          <div role="listbox" aria-label="New" className="p-2">
+            {choices.map((choice, index) => (
+              <div
+                key={choice.label}
+                role="option"
+                aria-selected={index === highlighted}
+                data-highlighted={index === highlighted || undefined}
+                onMouseMove={() => setHighlighted(index)}
+                onClick={() => pick(choice.run)}
+                className={ROW}
+              >
+                <ActionResult action={{ id: choice.label, label: choice.label, keywords: [], icon: choice.icon, run: choice.run }} />
+              </div>
+            ))}
+          </div>
         </DialogPrimitive.Popup>
       </DialogPortal>
     </Dialog>
