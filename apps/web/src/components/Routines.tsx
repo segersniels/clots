@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
 import { client, useStore } from "../client.ts";
@@ -110,11 +110,13 @@ export function Routines({ botId }: { botId: BotId }) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {OPTIONS.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
+              <SelectGroup>
+                {OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
             </SelectContent>
           </Select>
           <Collapse open={preset === CUSTOM}>

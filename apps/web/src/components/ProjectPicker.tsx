@@ -1,6 +1,6 @@
 import type { BotSummary } from "@clots/contracts";
 
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import { client, useStore } from "../client.ts";
 
@@ -31,11 +31,13 @@ export function ProjectPicker({ bot }: { bot: BotSummary }) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent align="end">
-              {options.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
+              <SelectGroup>
+                {options.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
             </SelectContent>
           </Select>
         </div>

@@ -1,6 +1,6 @@
 import { BotModel, type BotSummary } from "@clots/contracts";
 
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import { client } from "../client.ts";
 
@@ -16,11 +16,13 @@ export function ModelPicker({ bot }: { bot: BotSummary }) {
             <SelectValue className="capitalize" />
           </SelectTrigger>
           <SelectContent align="end">
-            {BotModel.literals.map((model) => (
-              <SelectItem key={model} value={model} className="capitalize">
-                {model}
-              </SelectItem>
-            ))}
+            <SelectGroup>
+              {BotModel.literals.map((model) => (
+                <SelectItem key={model} value={model} className="capitalize">
+                  {model}
+                </SelectItem>
+              ))}
+            </SelectGroup>
           </SelectContent>
         </Select>
       </div>
