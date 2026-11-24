@@ -68,11 +68,8 @@ A bot has a name, a character, instructions, a model and its own working directo
 
 clots is new. These parts work and are tested on Linux: bots, chat, session resume, approvals, routines, the bot browser with take-over, and models per bot.
 
-On macOS, these parts are verified: the `clots` command, the background service with `clots up --local`, and the Clots app with a server on another machine.
+On macOS, these parts are verified: the `clots` command, the background service with `clots up --local`, and the Clots app, both with **On this Mac** and with a server on another machine.
 
-These parts are written but not yet verified end to end:
-
-- The Tailscale sidecar after the login, and the service install of `clots up` on Linux.
-- The **On this Mac** setup of the Clots app.
+These parts are written but not yet verified end to end: the Tailscale sidecar after the login, and the service install of `clots up` on Linux.
 
 Not built yet: a packaged installer (`brew`, `curl | sh`) and the iOS and Android apps.
