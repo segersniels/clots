@@ -2,11 +2,13 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, userInfo } from "node:os";
 import { join } from "node:path";
 
+import { runtimePaths } from "../paths.ts";
+
 const SYSTEMD_UNIT = "clots.service";
 const LAUNCHD_LABEL = "foo.clots.server";
 
-/** The command that the background service runs: this checkout's CLI in `serve` mode. */
-const serveCommand = [process.execPath, join(import.meta.dir, "../cli.ts"), "serve"];
+/** The command that the background service runs: this checkout or installation in `serve` mode. */
+const { serveCommand } = runtimePaths;
 
 /**
  * The variables that the service keeps from the shell that ran `clots up`. A service gets a

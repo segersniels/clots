@@ -3,6 +3,8 @@ import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
+import { runtimePaths } from "./paths.ts";
+
 /** The host settings of one clots server. */
 export class ClotsConfig extends Context.Service<
   ClotsConfig,
@@ -26,7 +28,7 @@ export class ClotsConfig extends Context.Service<
     // The operator installs Claude Code. clots does not bundle it.
     if (claudePath === null) throw new Error("clots: `claude` is not on PATH. Install Claude Code first.");
 
-    const webRoot = join(import.meta.dir, "../../web/dist");
+    const { webRoot } = runtimePaths;
 
     return ClotsConfig.of({
       home: process.env.CLOTS_HOME ?? join(homedir(), ".clots"),

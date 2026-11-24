@@ -14,28 +14,23 @@ Each bot is <a href="https://code.claude.com/docs/en/overview">Claude Code</a>, 
 
 ### Installing and running clots
 
-clots has no packaged release yet. You install it from source on the machine that runs your bots (Linux or macOS). You need [Bun](https://bun.sh), [Go](https://go.dev/dl/), and [Claude Code](https://code.claude.com/docs/en/setup) with a Claude subscription login.
+clots has no packaged release yet. You build the `clots` command from source on the machine that runs your bots (Linux or macOS). You need [Bun](https://bun.sh) and [Go](https://go.dev/dl/) to build it, and [Claude Code](https://code.claude.com/docs/en/setup) with a Claude subscription login to run it.
 
 ```shell
 git clone https://github.com/segersniels/clots.git
 cd clots
 bun install
-bun run build
+bun run build:cli
+dist/clots-<platform>/clots install    # for example dist/clots-darwin-arm64
 ```
 
-Run the server in the foreground and open <http://127.0.0.1:4587>:
+Then install clots as a background service and put it on your tailnet:
 
 ```shell
-bun run start
+clots up
 ```
 
-Or install clots as a background service and put it on your tailnet:
-
-```shell
-bun apps/server/src/cli.ts up
-```
-
-`clots up` checks your Claude login, installs the service, and prints a Tailscale login link with a QR code. After the login, it prints the address of your server, `https://clots.<your-tailnet>.ts.net`, for your phone and the desktop app.
+`clots up` checks your Claude login, installs the service, and prints a Tailscale login link with a QR code. After the login, it prints the address of your server, `https://clots.<your-tailnet>.ts.net`, for your phone and the desktop app. [Installing & building](./docs/install.md) has the details.
 
 ### What a bot is
 

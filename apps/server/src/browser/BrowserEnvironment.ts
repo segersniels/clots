@@ -3,13 +3,14 @@ import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import type { StoredBot } from "../bots/BotRepository.ts";
+import { runtimePaths } from "../paths.ts";
 import { closeChrome, realAgentBrowser } from "./BotChrome.ts";
 
-/** The directory that holds the `agent-browser` CLI, which clots installs as a dependency. */
-const agentBrowserBin = join(import.meta.dir, "../../node_modules/.bin");
+/** The directory that holds the real `agent-browser` CLI. */
+const agentBrowserBin = dirname(runtimePaths.agentBrowser);
 
 /** The directory of the `agent-browser` wrapper that starts the bot's own Chrome before each command. */
-const clotsBin = join(import.meta.dir, "../../bin");
+const clotsBin = runtimePaths.wrapperDirectory;
 
 /** The distance from a bot's stream port to the DevTools port of its Chrome. */
 const DEVTOOLS_PORT_OFFSET = 1000;

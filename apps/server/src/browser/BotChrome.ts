@@ -1,8 +1,10 @@
 import { spawn } from "node:child_process";
 import { join } from "node:path";
 
-/** The real `agent-browser` CLI, which clots installs as a dependency. */
-export const realAgentBrowser = join(import.meta.dir, "../../node_modules/.bin/agent-browser");
+import { runtimePaths } from "../paths.ts";
+
+/** The real `agent-browser` CLI, from the dependencies or the installation. */
+export const realAgentBrowser = runtimePaths.agentBrowser;
 
 /** The agent-browser commands that do not use the page, so they do not start a Chrome. */
 const COMMANDS_WITHOUT_PAGE = new Set(["close", "session", "skills", "install", "doctor", "help", "--help", "-h", "--version"]);

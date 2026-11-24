@@ -3,11 +3,14 @@ import { BunRuntime } from "@effect/platform-bun";
 import { Layer } from "effect";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { renderUnicodeCompact } from "uqr";
 
+import { runAgentBrowserCommand } from "./browser/BotChrome.ts";
 import { makeClaudeEnvironment } from "./bots/ClaudeEnvironment.ts";
+import { runsInstalled, runtimePaths } from "./paths.ts";
 import { ServerLayer } from "./server.ts";
+import { installBundle } from "./service/Install.ts";
 import { installService, removeService, serviceIsRunning, stopService } from "./service/Service.ts";
 import { readSidecarStatus, sidecarIsBuilt } from "./sidecar/Sidecar.ts";
 
@@ -73,7 +76,7 @@ const ensureClaudeLogin = (): boolean => {
 const up = async () => {
   if (!ensureClaudeLogin()) process.exit(1);
 
-  if (!existsSync(join(import.meta.dir, "../../web/dist")) || !sidecarIsBuilt()) {
+  if (!existsSync(runtimePaths.webRoot) || !sidecarIsBuilt()) {
     console.log("✗ The web client or the sidecar is not built. Run `bun run build` in the clots checkout.");
     process.exit(1);
   }
@@ -141,17 +144,52 @@ const stop = (remove: boolean) => {
   console.log(`✓ Background service ${remove ? "removed" : "stopped"}. Run \`clots up\` to start it again.`);
 };
 
+/** Copies this build to the install folder, so the `clots` command works from any directory. */
+const install = () => {
+  if (!runsInstalled) {
+    console.log("✗ Install a built binary: run `bun run build:cli`, then `dist/<platform>/clots install`.");
+    process.exit(1);
+  }
+
+  const { command, onPath } = installBundle();
+  console.log(`✓ Installed ${command}`);
+
+  if (!onPath) console.log(`  Add ${dirname(command)} to your PATH to run \`clots\` from any directory.`);
+
+  // The service still runs the binary that the new folder replaced.
+  if (serviceIsRunning()) {
+    console.log("  Run `clots up` to restart the background service with this version.");
+  } else {
+    console.log("  Run `clots up` to start the background service.");
+  }
+};
+
 const command = process.argv[2];
 
 if (command === "serve") {
   BunRuntime.runMain(Layer.launch(ServerLayer));
 } else if (command === "up") {
   await up();
+} else if (command === "install") {
+  install();
+} else if (command === "agent-browser") {
+  // The installed `bin/agent-browser` wrapper calls this, so a bot's browser needs no Bun.
+  process.exit(await runAgentBrowserCommand(process.argv.slice(3)));
 } else if (command === "stop") {
   stop(process.argv.includes("--force"));
 } else if (command === "status") {
   await status();
 } else {
-  console.log("Usage: clots <command>\n\n  up      Check the Claude login, install the background service, join the tailnet\n  stop    Stop the background service. With --force, also remove it\n  status  Show the state of the service and the tailnet\n  serve   Run the server in the foreground");
+  console.log(
+    [
+      "Usage: clots <command>",
+      "",
+      "  install  Copy this build to ~/.local/share/clots and add the `clots` command",
+      "  up       Check the Claude login, install the background service, join the tailnet",
+      "  stop     Stop the background service. With --force, also remove it",
+      "  status   Show the state of the service and the tailnet",
+      "  serve    Run the server in the foreground",
+    ].join("\n"),
+  );
   process.exit(command === undefined ? 0 : 1);
 }

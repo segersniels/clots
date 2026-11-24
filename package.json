@@ -20,6 +20,7 @@
   "scripts": {
     "dev": "CLOTS_WEB_DEV_PORT=5173 turbo run dev",
     "build": "turbo run build",
+    "build:cli": "turbo run build --filter=@clots/web --filter=@clots/sidecar && bun apps/server/scripts/build-cli.ts",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",

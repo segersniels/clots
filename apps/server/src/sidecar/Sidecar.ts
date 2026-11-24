@@ -3,9 +3,10 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { ClotsConfig } from "../config.ts";
+import { runtimePaths } from "../paths.ts";
 
-/** The sidecar binary that `bun run build` makes from `apps/sidecar`. */
-const SIDECAR_BINARY = join(import.meta.dir, "../../../sidecar/clots-sidecar");
+/** The sidecar binary that the build makes from `apps/sidecar`. */
+const SIDECAR_BINARY = runtimePaths.sidecar;
 
 /** What the sidecar reports in `status.json`. The Go struct in `apps/sidecar/main.go` matches it. */
 export interface SidecarStatus {

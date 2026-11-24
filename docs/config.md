@@ -17,7 +17,7 @@ To use a second Claude account, log in with another config directory and start c
 
 ```shell
 CLAUDE_CONFIG_DIR=~/.claude-work claude auth login
-CLAUDE_CONFIG_DIR=~/.claude-work CLOTS_HOME=~/.clots-work CLOTS_PORT=4588 bun run start
+CLAUDE_CONFIG_DIR=~/.claude-work CLOTS_HOME=~/.clots-work CLOTS_PORT=4588 clots serve
 ```
 
 ## The data directory
