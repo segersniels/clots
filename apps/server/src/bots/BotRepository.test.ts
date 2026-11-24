@@ -21,6 +21,7 @@ const run = <A>(program: Effect.Effect<A, never, BotRepository | SqlClient.SqlCl
     claudePath: "claude",
     webRoot: undefined,
     webDevPort: undefined,
+    tailnet: false,
   });
   const sql = MigrationsLayer.pipe(Layer.provideMerge(SqliteClient.layer({ filename: ":memory:" })));
 

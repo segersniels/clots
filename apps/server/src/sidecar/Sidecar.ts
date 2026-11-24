@@ -1,5 +1,5 @@
 import { Effect, Layer } from "effect";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { ClotsConfig } from "../config.ts";
@@ -45,6 +45,16 @@ const stopPreviousSidecar = (pidFile: string) => {
 export const SidecarLayer = Layer.effectDiscard(
   Effect.gen(function* () {
     const config = yield* ClotsConfig;
+    const pidFile = join(stateDirectory(config.home), "sidecar.pid");
+
+    // A local server needs no tailnet. A sidecar from an earlier start with the tailnet on stops, and its status goes.
+    if (!config.tailnet) {
+      stopPreviousSidecar(pidFile);
+      rmSync(join(stateDirectory(config.home), "status.json"), { force: true });
+      yield* Effect.logInfo("The tailnet is off, so clots is reachable on this machine only.");
+
+      return;
+    }
 
     if (!sidecarIsBuilt()) {
       yield* Effect.logWarning("The sidecar is not built, so clots is reachable on this machine only.");
@@ -53,7 +63,6 @@ export const SidecarLayer = Layer.effectDiscard(
     }
 
     mkdirSync(stateDirectory(config.home), { recursive: true });
-    const pidFile = join(stateDirectory(config.home), "sidecar.pid");
 
     yield* Effect.acquireRelease(
       Effect.sync(() => {

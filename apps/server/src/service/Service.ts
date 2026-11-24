@@ -18,6 +18,7 @@ const serviceEnvironment = (): Record<string, string> => ({
   PATH: process.env.PATH ?? "",
   ...(process.env.CLOTS_HOME === undefined ? {} : { CLOTS_HOME: process.env.CLOTS_HOME }),
   ...(process.env.CLOTS_PORT === undefined ? {} : { CLOTS_PORT: process.env.CLOTS_PORT }),
+  ...(process.env.CLOTS_TAILNET === undefined ? {} : { CLOTS_TAILNET: process.env.CLOTS_TAILNET }),
   ...(process.env.CLAUDE_CONFIG_DIR === undefined ? {} : { CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR }),
 });
 

@@ -20,6 +20,8 @@ export class ClotsConfig extends Context.Service<
      * so a device on the tailnet gets the client with hot reload. Vite forwards the API to this server.
      */
     readonly webDevPort: number | undefined;
+    /** Whether the sidecar puts the server on the tailnet. `clots up --local` turns it off. */
+    readonly tailnet: boolean;
   }
 >()("clots/config/ClotsConfig") {
   static readonly layer = Layer.sync(ClotsConfig, () => {
@@ -36,6 +38,7 @@ export class ClotsConfig extends Context.Service<
       claudePath,
       webRoot: existsSync(webRoot) ? webRoot : undefined,
       webDevPort: process.env.CLOTS_WEB_DEV_PORT === undefined ? undefined : Number(process.env.CLOTS_WEB_DEV_PORT),
+      tailnet: process.env.CLOTS_TAILNET !== "off",
     });
   });
 }

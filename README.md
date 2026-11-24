@@ -30,7 +30,7 @@ Then install clots as a background service and put it on your tailnet:
 clots up
 ```
 
-`clots up` checks your Claude login, installs the service, and prints a Tailscale login link with a QR code. After the login, it prints the address of your server, `https://clots.<your-tailnet>.ts.net`, for your phone and the desktop app. [Installing & building](./docs/install.md) has the details.
+`clots up` checks your Claude login, installs the service, and prints a Tailscale login link with a QR code. After the login, it prints the address of your server, `https://clots.<your-tailnet>.ts.net`, for your phone and the desktop app. For a server that only this machine uses, run `clots up --local` and open <http://127.0.0.1:4587>. [Installing & building](./docs/install.md) has the details.
 
 ### What a bot is
 

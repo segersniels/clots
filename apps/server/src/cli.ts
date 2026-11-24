@@ -73,17 +73,27 @@ const ensureClaudeLogin = (): boolean => {
   return true;
 };
 
-const up = async () => {
+/** Starts the background service. A local server stays off the tailnet, so it needs no Tailscale login. */
+const up = async (local: boolean) => {
   if (!ensureClaudeLogin()) process.exit(1);
 
-  if (!existsSync(runtimePaths.webRoot) || !sidecarIsBuilt()) {
+  if (!existsSync(runtimePaths.webRoot) || (!local && !sidecarIsBuilt())) {
     console.log("✗ The web client or the sidecar is not built. Run `bun run build` in the clots checkout.");
     process.exit(1);
+  }
+
+  // The service keeps this variable, and the server reads it when it starts.
+  if (local) {
+    process.env.CLOTS_TAILNET = "off";
+  } else {
+    delete process.env.CLOTS_TAILNET;
   }
 
   installService();
   console.log(`✓ Background service ${serviceIsRunning() ? "runs" : "is installed, but it does not run yet"}`);
   console.log(`✓ Local address: http://127.0.0.1:${PORT}`);
+
+  if (local) return;
 
   let shownAuthUrl: string | undefined;
   let toldAboutHttps = false;
@@ -169,7 +179,7 @@ const command = process.argv[2];
 if (command === "serve") {
   BunRuntime.runMain(Layer.launch(ServerLayer));
 } else if (command === "up") {
-  await up();
+  await up(process.argv.includes("--local"));
 } else if (command === "install") {
   install();
 } else if (command === "agent-browser") {
@@ -186,6 +196,7 @@ if (command === "serve") {
       "",
       "  install  Copy this build to ~/.local/share/clots and add the `clots` command",
       "  up       Check the Claude login, install the background service, join the tailnet",
+      "           With --local, the server stays on this machine and needs no Tailscale",
       "  stop     Stop the background service. With --force, also remove it",
       "  status   Show the state of the service and the tailnet",
       "  serve    Run the server in the foreground",

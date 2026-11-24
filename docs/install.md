@@ -60,6 +60,8 @@ clots up
 
 On Linux it also runs `loginctl enable-linger`, so that the service keeps running after you log out.
 
+For a server that only this machine uses, run `clots up --local`. It skips steps 3 and 4: the server stays off the tailnet and needs no Tailscale login.
+
 Check the state at any time:
 
 ```shell
