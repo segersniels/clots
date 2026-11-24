@@ -64,7 +64,8 @@ export function ReferencePicker({
             onPick(item);
           }}
           onMouseMove={() => onHover(index)}
-          className="h-auto w-full justify-start gap-2 rounded-lg px-2.5 py-1.5 text-left font-normal aria-selected:bg-accent"
+          // The keys move the highlight row by row. A fade would leave the last row lit behind it, like a menu that lags.
+          className="h-auto w-full justify-start gap-2 rounded-lg px-2.5 py-1.5 text-left font-normal transition-none aria-selected:bg-accent"
         >
           {item.icon}
           <span className="shrink-0 font-medium">{item.name}</span>
