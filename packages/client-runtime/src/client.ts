@@ -50,6 +50,7 @@ export interface ClotsClient {
   resolveApproval(botId: BotId, approvalId: string, decision: ApprovalDecision): Promise<void>;
   resolveHandoff(botId: BotId, handoffId: string): Promise<void>;
   createSchedule(botId: BotId, cron: string, prompt: string): Promise<Schedule>;
+  updateSchedule(id: string, cron: string, prompt: string): Promise<void>;
   setSchedulePaused(id: string, paused: boolean): Promise<void>;
   deleteSchedule(id: string): Promise<void>;
   getUpdateInfo(): Promise<UpdateInfo>;
@@ -203,6 +204,7 @@ export const makeClotsClient = (origin: string): ClotsClient => {
       call((rpc) => rpc.ResolveApproval({ botId, approvalId, decision })),
     resolveHandoff: (botId, handoffId) => call((rpc) => rpc.ResolveHandoff({ botId, handoffId })),
     createSchedule: (botId, cron, prompt) => call((rpc) => rpc.CreateSchedule({ botId, cron, prompt })),
+    updateSchedule: (id, cron, prompt) => call((rpc) => rpc.UpdateSchedule({ id, cron, prompt })),
     setSchedulePaused: (id, paused) => call((rpc) => rpc.SetSchedulePaused({ id, paused })),
     deleteSchedule: (id) => call((rpc) => rpc.DeleteSchedule({ id })),
     getUpdateInfo: () => call((rpc) => rpc.GetUpdateInfo()),

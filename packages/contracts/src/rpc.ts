@@ -163,6 +163,11 @@ export class ClotsRpcs extends RpcGroup.make(
     success: Schedule,
     error: Schema.Union([BotNotFound, InvalidCron]),
   }),
+  /** Changes the schedule and the prompt of a routine. The next run follows from the new schedule. */
+  Rpc.make("UpdateSchedule", {
+    payload: { id: Schema.String, cron: Schema.String, prompt: Schema.String },
+    error: InvalidCron,
+  }),
   Rpc.make("SetSchedulePaused", { payload: { id: Schema.String, paused: Schema.Boolean } }),
   Rpc.make("DeleteSchedule", { payload: { id: Schema.String } }),
   Rpc.make("GetUpdateInfo", { success: UpdateInfo }),

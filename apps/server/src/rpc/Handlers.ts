@@ -224,6 +224,14 @@ export const HandlersLayer = ClotsRpcs.toLayer(
           return yield* schedules.create(botId, cron, prompt, next);
         }),
 
+      UpdateSchedule: ({ id, cron, prompt }) =>
+        Effect.gen(function* () {
+          const next = nextRunAt(cron, Date.now());
+          if (next === undefined) return yield* new InvalidCron({ cron });
+
+          yield* schedules.update(id, cron, prompt, next);
+        }),
+
       SetSchedulePaused: ({ id, paused }) => schedules.setPaused(id, paused),
 
       DeleteSchedule: ({ id }) => schedules.remove(id),

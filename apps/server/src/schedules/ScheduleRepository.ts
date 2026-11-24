@@ -26,6 +26,8 @@ export class ScheduleRepository extends Context.Service<
     /** Lists the schedules whose run time passed, including the paused ones. */
     due(now: number): Effect.Effect<ReadonlyArray<Schedule>>;
     create(botId: BotId, cron: string, prompt: string, nextRunAt: number): Effect.Effect<Schedule>;
+    /** Changes what a routine sends and when. Its paused state stays. */
+    update(id: string, cron: string, prompt: string, nextRunAt: number): Effect.Effect<void>;
     setPaused(id: string, paused: boolean): Effect.Effect<void>;
     setNextRunAt(id: string, nextRunAt: number): Effect.Effect<void>;
     remove(id: string): Effect.Effect<void>;
@@ -69,6 +71,9 @@ export class ScheduleRepository extends Context.Service<
             VALUES (${schedule.id}, ${botId}, ${cron}, ${prompt}, ${nextRunAt})
           `).pipe(Effect.as(schedule));
         },
+
+        update: (id, cron, prompt, nextRunAt) =>
+          write(sql`UPDATE schedules SET cron = ${cron}, prompt = ${prompt}, next_run_at = ${nextRunAt} WHERE id = ${id}`),
 
         setPaused: (id, paused) =>
           write(sql`UPDATE schedules SET paused = ${paused ? 1 : 0} WHERE id = ${id}`),
