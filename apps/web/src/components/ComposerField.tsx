@@ -294,9 +294,14 @@ export function ComposerField({
   const knownKey = [...skills.map((skill) => skill.name), ...otherBots.map((bot) => bot.name)].join("\n");
 
   useEffect(() => {
-    if (editor === null || editor.isFocused) return;
+    if (editor === null) return;
+
+    // The field is focused when it opens. A caret inside the text means the operator edits it, so the text stays as it is.
+    const atEnd = editor.state.selection.to === editor.state.doc.content.size - 1;
+    if (editor.isFocused && !atEnd) return;
 
     editor.commands.setContent(toContent(editor.getMarkdown(), known), { emitUpdate: false });
+    if (editor.isFocused) editor.commands.focus("end");
   }, [editor, knownKey]);
 
   useImperativeHandle(ref, () => ({
