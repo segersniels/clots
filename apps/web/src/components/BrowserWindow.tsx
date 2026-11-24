@@ -49,6 +49,44 @@ function splitAddress(address: string) {
   }
 }
 
+/**
+ * Finds the name of a tab. Chrome names a page that has no title yet after its address, such as
+ * `bing.com/webmasters/reco…`, so a title that only repeats the address gives way to the host.
+ */
+function tabName(tab: BrowserTab) {
+  const bare = (text: string) =>
+    text
+      .replace(/^[a-z][a-z\d+.-]*:\/\//i, "")
+      .replace(/^www\./, "")
+      .replace(/…$/, "");
+
+  return bare(tab.url).startsWith(bare(tab.title)) ? splitAddress(tab.url).host : tab.title;
+}
+
+/** Shows the name of a tab. A new name, such as the title that a page sets after it loads, crossfades over the old one. */
+function TabName({ name }: { name: string }) {
+  const [names, setNames] = useState<{ current: string; previous: string | null }>({ current: name, previous: null });
+
+  if (names.current !== name) setNames({ current: name, previous: names.current });
+
+  // A tab that opens shows its name at once. Only a change fades.
+  const fadeIn = names.previous === null ? "" : "transition-opacity duration-150 ease-out starting:opacity-0";
+
+  return (
+    <span className="relative min-w-0">
+      {/* The old name lies over the new one, so the tab takes the width of the new name. */}
+      {names.previous !== null && (
+        <span key={names.previous} aria-hidden className="absolute inset-0 truncate opacity-0 transition-opacity duration-150 ease-out starting:opacity-100">
+          {names.previous}
+        </span>
+      )}
+      <span key={names.current} className={`block truncate ${fadeIn}`}>
+        {names.current}
+      </span>
+    </span>
+  );
+}
+
 /** Turns what the operator typed into an address. A bare host such as `example.com` gets `https://`. */
 function toAddress(typed: string) {
   const trimmed = typed.trim();
@@ -146,11 +184,11 @@ export function BrowserTabStrip({
             >
               {/* The stream sends no favicon, so a dot stands in for it. */}
               <span className="size-2 shrink-0 rounded-full bg-muted-foreground/40" />
-              <span className="truncate">{tab.title || splitAddress(tab.url).host}</span>
+              <TabName name={tabName(tab)} />
             </button>
             {/* The last tab stays: a window without a page has nothing to take over. */}
             {tabs.length > 1 && (
-              <Button variant="ghost" size="icon-xs" aria-label={`Close ${tab.title || "tab"}`} title="Close tab" className="mr-1 shrink-0" onClick={() => onClose(tab)}>
+              <Button variant="ghost" size="icon-xs" aria-label={`Close ${tabName(tab)}`} title="Close tab" className="mr-1 shrink-0" onClick={() => onClose(tab)}>
                 <XIcon />
               </Button>
             )}
