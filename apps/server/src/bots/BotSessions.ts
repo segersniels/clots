@@ -72,6 +72,9 @@ const claudeIsRunning = (pid: number) => {
   return status !== "" && !status.startsWith("Z") && status.includes("stream-json");
 };
 
+/** The thread size, in tokens, at which a bot compacts its conversation. */
+const AUTO_COMPACT_WINDOW = 200_000;
+
 /** The start of the id of the step that shows a compaction while it runs. */
 const COMPACT_STEP = "compact-";
 
@@ -930,8 +933,12 @@ export class BotSessions extends Context.Service<
               },
               model: bot.model,
               settingSources: ["user", "project", "local"],
-              // Claude Code keeps its memory per working directory, so all bots in a project would share it. Each bot keeps its own.
-              settings: { autoMemoryDirectory: join(bot.workingDirectory, "memory") },
+              settings: {
+                // Claude Code keeps its memory per working directory, so all bots in a project would share it. Each bot keeps its own.
+                autoMemoryDirectory: join(bot.workingDirectory, "memory"),
+                // Each request pays for the whole thread again. Without this, a thread on a 1M model compacts only near 970k tokens.
+                autoCompactWindow: AUTO_COMPACT_WINDOW,
+              },
               // A recorded prompt survives a resume, so a restart for new settings would keep the old name and instructions.
               systemPrompt: { type: "preset", preset: "claude_code", append: systemPrompt, snapshot: false },
               // The thread shows whole replies, but a partial message tells it at once that a tool call starts.
