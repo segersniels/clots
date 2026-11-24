@@ -63,9 +63,10 @@ export type BotSummary = typeof BotSummary.Type;
 /**
  * A `trace` message keeps the tool calls that the bot made between two of its messages. A `bot`
  * message comes from another bot through the `send_bot_message` tool. A `compact` message notes that
- * Claude Code compacted the conversation.
+ * Claude Code compacted the conversation. A `settings` message notes that the operator changed the
+ * name or the instructions of the bot.
  */
-export const MessageRole = Schema.Literals(["user", "assistant", "routine", "trace", "bot", "compact"]);
+export const MessageRole = Schema.Literals(["user", "assistant", "routine", "trace", "bot", "compact", "settings"]);
 export type MessageRole = typeof MessageRole.Type;
 
 /** A file that the operator sent with a message. The server keeps the bytes. */

@@ -125,7 +125,8 @@ export const HandlersLayer = ClotsRpcs.toLayer(
 
       UpdateBot: ({ botId, ...changes }) =>
         requireBot(botId).pipe(
-          Effect.andThen(bots.update(botId, changes)),
+          Effect.tap(() => bots.update(botId, changes)),
+          Effect.flatMap((bot) => sessions.noteSettingsChange(bot, changes)),
           Effect.andThen(PubSub.publish(sessions.statusChanges, undefined)),
           Effect.asVoid,
         ),

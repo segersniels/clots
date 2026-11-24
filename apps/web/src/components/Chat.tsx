@@ -203,8 +203,8 @@ export function Chat({ botId, botName }: { botId: BotId; botName: string }) {
                 // Messages from the same side sit close together. A change of side gets more room.
                 const changesSide = previous !== undefined && (previous.role === "assistant" || previous.role === "trace") !== fromBot;
 
-                // A compaction is no message but a divider: the bot's memory before it is a summary.
-                if (message.role === "compact") {
+                // A compaction or a settings change is no message but a divider: the bot works differently after it.
+                if (message.role === "compact" || message.role === "settings") {
                   return (
                     <MessageScrollerItem key={message.id} messageId={message.id} className="py-3">
                       <p className="flex items-center gap-3 text-[0.6875rem] text-muted-foreground before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">

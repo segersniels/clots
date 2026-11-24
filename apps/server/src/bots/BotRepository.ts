@@ -117,8 +117,8 @@ export class BotRepository extends Context.Service<
           threads.unread,
           (
             SELECT text FROM messages
-            -- A trace has no text, so the bot list skips it.
-            WHERE thread_id = threads.id AND role NOT IN ('trace', 'compact')
+            -- A trace has no text, and a divider is no message, so the bot list skips them.
+            WHERE thread_id = threads.id AND role NOT IN ('trace', 'compact', 'settings')
             ORDER BY sequence DESC LIMIT 1
           ) AS lastMessageText,
           (SELECT MAX(created_at) FROM messages WHERE thread_id = threads.id) AS lastMessageAt

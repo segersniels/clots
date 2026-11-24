@@ -30,7 +30,7 @@ import { basename, join } from "node:path";
 import { z } from "zod";
 
 import { ClotsConfig } from "../config.ts";
-import { BotRepository, type StoredBot } from "./BotRepository.ts";
+import { BotRepository, type BotChanges, type StoredBot } from "./BotRepository.ts";
 import { closeBrowser, makeBrowserEnvironment } from "../browser/BrowserEnvironment.ts";
 import { makeClaudeEnvironment, removeClaudeTranscripts, transcriptPath } from "./ClaudeEnvironment.ts";
 
@@ -192,6 +192,8 @@ export class BotSessions extends Context.Service<
     deleteBot(bot: StoredBot): Effect.Effect<void>;
     /** Asks the bot's session to compact its conversation, as `/compact` does in Claude Code. */
     compact(bot: StoredBot): Effect.Effect<void>;
+    /** Marks in the thread that the operator renamed the bot or changed its instructions. Other changes add nothing. */
+    noteSettingsChange(bot: StoredBot, changes: BotChanges): Effect.Effect<void>;
     /** Switches the model of a running session. A bot without a session reads its model at the next start. */
     setModel(botId: BotId, model: BotModel): Effect.Effect<void>;
     resolveApproval(botId: BotId, approvalId: string, decision: ApprovalDecision): Effect.Effect<void>;
@@ -943,6 +945,17 @@ export class BotSessions extends Context.Service<
           } as SDKUserMessage);
         });
 
+      const noteSettingsChange = (bot: StoredBot, changes: BotChanges) => {
+        const notes = [
+          changes.name !== undefined && changes.name !== bot.name ? `Renamed to ${changes.name}` : "",
+          changes.instructions !== undefined && changes.instructions !== bot.instructions ? "Instructions updated" : "",
+        ].filter((note) => note !== "");
+
+        if (notes.length === 0) return Effect.void;
+
+        return record(runtimeFor(bot.id), bot.id, "settings", notes.join(" · "));
+      };
+
       const deleteBot = (bot: StoredBot) =>
         removeRuntime(bot.id).pipe(
           Effect.andThen(closeBrowser(bot)),
@@ -988,6 +1001,8 @@ export class BotSessions extends Context.Service<
         deleteBot,
 
         compact,
+
+        noteSettingsChange,
 
         resolveApproval: (botId, approvalId, decision) =>
           Effect.sync(() => runtimeFor(botId).approvals.get(approvalId)?.(decision)),
