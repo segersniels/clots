@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { readPaneOpen, savePaneOpen } from "@/lib/pane-width";
 
 import { client, useStore } from "../client.ts";
 import { hasContent, useDraft, type Draft } from "../drafts.ts";
@@ -432,6 +433,40 @@ function useBotDrag(storeGroups: Groups) {
   };
 }
 
+/**
+ * Keeps whether a bot group is open across restarts. The storage holds the closed groups, so a
+ * new group starts open.
+ */
+function useGroupOpen(group: string) {
+  const key = `clots.groupClosed.${group}`;
+  const [open, setOpen] = useState(() => !readPaneOpen(key));
+
+  const toggle = () => {
+    setOpen(!open);
+    savePaneOpen(key, open);
+  };
+
+  return [open, toggle] as const;
+}
+
+/** The header of a bot group. It opens and closes the group's list. */
+function GroupToggle({ name, open, onToggle, title }: { name: string; open: boolean; onToggle: () => void; title?: string }) {
+  return (
+    <button
+      type="button"
+      aria-expanded={open}
+      onClick={onToggle}
+      className="flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-[0.8125rem] text-muted-foreground transition-colors duration-150 hover:bg-sidebar-accent"
+      title={title}
+    >
+      <span className="truncate">{name}</span>
+      <ChevronDownIcon
+        className={`size-3.5 transition-[rotate] duration-200 ease-out motion-reduce:transition-none ${open ? "" : "-rotate-90"}`}
+      />
+    </button>
+  );
+}
+
 /** Shows one project as a header that opens and closes the list of its bots. */
 function ProjectSection({
   project,
@@ -444,7 +479,7 @@ function ProjectSection({
   botCount: number;
   highlighted: boolean;
 }) {
-  const [open, setOpen] = useState(true);
+  const [open, toggleOpen] = useGroupOpen(project.id);
   const [renaming, setRenaming] = useState(false);
   const renameField = useRef<HTMLInputElement>(null);
 
@@ -462,18 +497,7 @@ function ProjectSection({
             />
           </div>
         ) : (
-          <button
-            type="button"
-            aria-expanded={open}
-            onClick={() => setOpen(!open)}
-            className="flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-[0.8125rem] text-muted-foreground transition-colors duration-150 hover:bg-sidebar-accent"
-            title={project.directory ?? undefined}
-          >
-            <span className="truncate">{project.name}</span>
-            <ChevronDownIcon
-              className={`size-3.5 transition-[rotate] duration-200 ease-out motion-reduce:transition-none ${open ? "" : "-rotate-90"}`}
-            />
-          </button>
+          <GroupToggle name={project.name} open={open} onToggle={toggleOpen} {...(project.directory === null ? {} : { title: project.directory })} />
         )}
       </ProjectMenu>
 
@@ -494,6 +518,7 @@ export function BotList() {
   const connection = useStore(client.connection);
   const [searching, setSearching] = useState(false);
   const [search, setSearch] = useState("");
+  const [personalOpen, togglePersonal] = useGroupOpen(PERSONAL);
   const searchField = useRef<HTMLInputElement>(null);
   const reduceMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
   const shown = bots.filter((bot) => bot.name.toLowerCase().includes(search.trim().toLowerCase()));
@@ -597,11 +622,13 @@ export function BotList() {
 
           <BotDropZone group={PERSONAL} highlighted={drag.highlightedGroup === PERSONAL}>
             {/* Without a project there is one plain list, so the heading would only add noise. */}
-            {projects.length > 0 && <h2 className="px-2.5 py-1.5 text-[0.8125rem] text-muted-foreground">Personal</h2>}
-            <div className={BOT_ROWS}>
-              <BotRows rows={personal} />
-              {projects.length > 0 && personal.length === 0 && search === "" && <p className={EMPTY_HINT}>Drag Bots here</p>}
-            </div>
+            {projects.length > 0 && <GroupToggle name="Personal" open={personalOpen} onToggle={togglePersonal} />}
+            <Collapse open={personalOpen || projects.length === 0}>
+              <div className={BOT_ROWS}>
+                <BotRows rows={personal} />
+                {projects.length > 0 && personal.length === 0 && search === "" && <p className={EMPTY_HINT}>Drag Bots here</p>}
+              </div>
+            </Collapse>
           </BotDropZone>
 
           {bots.length === 0 && <p className="pt-24 text-center text-muted-foreground">No chats yet</p>}
