@@ -83,8 +83,8 @@ export const HandlersLayer = ClotsRpcs.toLayer(
           Stream.fromPubSub(sessions.statusChanges),
         ),
 
-      CreateBot: (newBot) =>
-        bots.create(newBot).pipe(Effect.tap(() => PubSub.publish(sessions.statusChanges, undefined))),
+      CreateBot: ({ projectId, ...newBot }) =>
+        bots.create({ ...newBot, projectId: projectId ?? null }).pipe(Effect.tap(() => PubSub.publish(sessions.statusChanges, undefined))),
 
       WatchProjects: () => watch(projects.list, Stream.fromPubSub(projects.changes)),
 

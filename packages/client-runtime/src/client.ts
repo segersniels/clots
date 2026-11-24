@@ -28,7 +28,7 @@ export interface ClotsClient {
   thread(botId: BotId): Store<ThreadState>;
   schedules(botId: BotId): Store<ReadonlyArray<Schedule>>;
   skills(botId: BotId): Store<ReadonlyArray<Skill>>;
-  createBot(bot: Pick<Bot, "name" | "instructions" | "color" | "shape">): Promise<Bot>;
+  createBot(bot: Pick<Bot, "name" | "instructions" | "color" | "shape"> & Partial<Pick<Bot, "projectId">>): Promise<Bot>;
   updateBot(botId: BotId, changes: Partial<Pick<Bot, "name" | "instructions" | "color" | "shape">>): Promise<void>;
   setBotModel(botId: BotId, model: BotModel): Promise<void>;
   setBotUnread(botId: BotId, unread: boolean): Promise<void>;

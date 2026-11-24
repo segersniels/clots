@@ -53,8 +53,15 @@ export class ProjectDirectoryNotFound extends Schema.TaggedError<ProjectDirector
 
 export class ClotsRpcs extends RpcGroup.make(
   Rpc.make("WatchBots", { success: Schema.Array(BotSummary), stream: true }),
+  /** Creates a bot in a project, or in no project when `projectId` is left out or `null`. */
   Rpc.make("CreateBot", {
-    payload: { name: Schema.String, instructions: Schema.String, color: BotColor, shape: BotShape },
+    payload: {
+      name: Schema.String,
+      instructions: Schema.String,
+      color: BotColor,
+      shape: BotShape,
+      projectId: Schema.optional(Schema.NullOr(Schema.String)),
+    },
     success: Bot,
   }),
   /**
