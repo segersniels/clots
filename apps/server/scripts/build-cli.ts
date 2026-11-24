@@ -4,7 +4,7 @@
  * sidecar. Install the result with `dist/clots-<platform>/clots install`.
  */
 import { $ } from "bun";
-import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 // @ts-expect-error The package ships this helper as plain JavaScript without types.
@@ -14,7 +14,8 @@ const root = join(import.meta.dir, "../../..");
 const bundle = join(root, "dist", `clots-${process.platform}-${process.arch}`);
 const webClient = join(root, "apps/web/dist");
 const sidecar = join(root, "apps/sidecar/clots-sidecar");
-const agentBrowserPackage = join(import.meta.dir, "../node_modules/agent-browser");
+// Bun links each package in from its store. agent-browser finds its platform package only from the real folder.
+const agentBrowserPackage = realpathSync(join(import.meta.dir, "../node_modules/agent-browser"));
 const agentBrowser: string | null = findNativeBinary(agentBrowserPackage, nativeTarget());
 
 for (const [name, path] of [
