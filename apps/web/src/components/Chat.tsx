@@ -46,6 +46,9 @@ const BUBBLE = "rounded-[1.1rem] px-3.5 py-2 text-sm leading-normal";
 const ENTER =
   "transition-[opacity,translate] duration-200 ease-out starting:translate-y-2 starting:opacity-0 motion-reduce:starting:translate-y-0";
 
+/** Spaces out the entrances of messages that arrive together, such as the update of a thread from the cache. */
+const STAGGER_MS = 50;
+
 /** The label above a message on the operator's side that the operator did not type. */
 const SENDER_LABELS: Partial<Record<MessageRole, string>> = { routine: "Routine", bot: "Bot message" };
 
@@ -161,8 +164,16 @@ function OlderMessagesLoader({ hasOlder, onLoad }: { hasOlder: boolean; onLoad: 
 
 export function Chat({ botId, botName }: { botId: BotId; botName: string }) {
   const thread = useStore(client.thread(botId));
-  // Only items that arrive while the thread is open ease in. The stored history shows at once.
-  const openedAt = useRef(Date.now());
+  // The messages that the thread shows first stay still. Later ones, live or from the update of a cached thread, ease in.
+  const shownThrough = useRef(thread.synced ? thread.lastSequence : null);
+  if (shownThrough.current === null && thread.synced) shownThrough.current = thread.lastSequence;
+  // The newest message of the previous render. The messages after it arrived together.
+  const renderedThrough = useRef(thread.lastSequence);
+  useEffect(() => {
+    renderedThrough.current = thread.lastSequence;
+  });
+  // Only a thread that still has to load fades in. A thread from the cache is there at once.
+  const [loadsLate] = useState(!thread.synced);
   const { live } = thread;
   const [shownCount, setShownCount] = useState(MESSAGES_PER_PAGE);
   const firstShown = Math.max(0, thread.messages.length - shownCount);
@@ -179,6 +190,16 @@ export function Chat({ botId, botName }: { botId: BotId; botName: string }) {
   // The line keeps the last tasks while it closes, so it does not go blank before it is gone.
   const shownTasks = useRef(live.tasks);
   if (live.tasks.length > 0) shownTasks.current = live.tasks;
+
+  /** Gives a message that arrived after the thread showed its entrance, a bit later than the one before it in the same batch. */
+  const entrance = (sequence: number) => {
+    if (shownThrough.current === null || sequence <= shownThrough.current) return undefined;
+
+    const place = Math.max(0, sequence - Math.max(renderedThrough.current, shownThrough.current) - 1);
+
+    return { className: ENTER, style: { transitionDelay: `${Math.min(place, 4) * STAGGER_MS}ms` } };
+  };
+
   const backgroundTitle =
     shownTasks.current.length === 1
       ? `In the background: ${shownTasks.current[0]!.description}`
@@ -188,8 +209,10 @@ export function Chat({ botId, botName }: { botId: BotId; botName: string }) {
     <>
       {/* No item is a scroll anchor: the thread follows its end, so a request from the bot is always in view. */}
       <MessageScrollerProvider autoScroll defaultScrollPosition="end">
-        {/* A quick fade in, so that switching bots does not cut hard from one thread to the next. */}
-        <MessageScroller className="flex-1 transition-opacity duration-150 ease-out starting:opacity-0">
+        {/* A thread that loads stays hidden until its history is in, then fades in once, complete and at its end. */}
+        <MessageScroller
+          className={`flex-1 ${loadsLate ? "transition-opacity duration-150 ease-out" : ""} ${thread.synced ? "" : "opacity-0"}`}
+        >
           <OlderMessagesLoader hasOlder={firstShown > 0} onLoad={showOlder} />
           {/* The thread runs under the floating header and fades out there. The top padding clears the header. */}
           <MessageScrollerViewport preserveScrollOnPrepend className="[mask-image:linear-gradient(to_bottom,transparent,black_4rem)]">
@@ -202,11 +225,12 @@ export function Chat({ botId, botName }: { botId: BotId; botName: string }) {
                 const fromBot = message.role === "assistant" || message.role === "trace";
                 // Messages from the same side sit close together. A change of side gets more room.
                 const changesSide = previous !== undefined && (previous.role === "assistant" || previous.role === "trace") !== fromBot;
+                const enter = entrance(message.sequence);
 
                 // A compaction or a settings change is no message but a divider: the bot works differently after it.
                 if (message.role === "compact" || message.role === "settings") {
                   return (
-                    <MessageScrollerItem key={message.id} messageId={message.id} className="py-3">
+                    <MessageScrollerItem key={message.id} messageId={message.id} className={`py-3 ${enter?.className ?? ""}`} style={enter?.style}>
                       <p className="flex items-center gap-3 text-[0.6875rem] text-muted-foreground before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">
                         {message.text}
                       </p>
@@ -214,10 +238,17 @@ export function Chat({ botId, botName }: { botId: BotId; botName: string }) {
                   );
                 }
 
-                // A trace takes the place of the live steps, so it sits where they sat and does not ease in.
+                // A trace that takes the place of the live steps sits where they sat, so only a trace without them eases in.
                 if (message.role === "trace") {
+                  const traceEnter = live.steps.length === 0 ? enter : undefined;
+
                   return (
-                    <MessageScrollerItem key={message.id} messageId={message.id} className="px-1 pt-2">
+                    <MessageScrollerItem
+                      key={message.id}
+                      messageId={message.id}
+                      className={`px-1 pt-2 ${traceEnter?.className ?? ""}`}
+                      style={traceEnter?.style}
+                    >
                       <Steps
                         steps={message.steps}
                         title={`Worked for ${formatDuration(message.createdAt - (previous?.createdAt ?? message.createdAt))}`}
@@ -231,8 +262,8 @@ export function Chat({ botId, botName }: { botId: BotId; botName: string }) {
                   <MessageScrollerItem
                     key={message.id}
                     messageId={message.id}
-                    // A bot reply takes the place of its streamed text, so it must not ease in a second time.
-                    className={`${changesSide && !showsTime ? "pt-3" : ""} ${!fromBot && message.createdAt >= openedAt.current ? ENTER : ""}`}
+                    className={`${changesSide && !showsTime ? "pt-3" : ""} ${enter?.className ?? ""}`}
+                    style={enter?.style}
                   >
                     {showsTime && (
                       <p className="py-3 text-center text-[0.6875rem] text-muted-foreground">{formatClock(message.createdAt)}</p>
