@@ -73,7 +73,8 @@ function MessageScrollerItem({
       data-slot="message-scroller-item"
       scrollAnchor={scrollAnchor}
       className={cn(
-        "min-w-0 shrink-0 [contain-intrinsic-size:auto_10rem] [content-visibility:auto]",
+        // No content-visibility: its guessed heights move the end of a thread after it opens, so the thread jumps.
+        "min-w-0 shrink-0",
         className
       )}
       {...props}
