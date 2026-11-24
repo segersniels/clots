@@ -2,7 +2,7 @@ import { Character } from "@clots/character";
 import { isNewerVersion, type BotSummary, type UpdateInfo } from "@clots/contracts";
 import { cn } from "cn";
 import { ArrowUpIcon, ArrowUpRightIcon, CheckIcon, LaptopIcon, ServerIcon, XIcon } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 import { client, useStore } from "@/client.ts";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,9 @@ const FILL_MS = 14_000;
 
 /** How long the fill takes to finish once the server is back, before the pill says that the update is done. */
 const FILL_FINISH_MS = 200;
+
+/** The pill's left and right padding together, which its width adds to the width of its label. */
+const PILL_PADDING_PX = 17;
 
 /** How long the client waits for the server to come back before it reports a failed update. */
 const RESTART_TIMEOUT_MS = 90_000;
@@ -260,6 +263,8 @@ export function UpdatePill({ updates }: { updates: Updates }) {
   const view = pillViewOf(updates);
   const shown = useRef<{ view: PillView; filled: boolean }>({ view: "available", filled: false });
   const [gone, setGone] = useState(view === undefined);
+  const label = useRef<HTMLSpanElement>(null);
+  const [labelWidth, setLabelWidth] = useState<number>();
 
   // A pill that left frees its place, so the text next to the account circle has the whole line.
   if (view !== undefined && gone) setGone(false);
@@ -279,6 +284,21 @@ export function UpdatePill({ updates }: { updates: Updates }) {
 
     return () => clearTimeout(timer);
   }, [phase.name]);
+
+  // The pill sits at the end of the line, so a snapping width would make its left edge jump. It follows its label instead.
+  useLayoutEffect(() => {
+    const element = label.current;
+
+    if (element === null) return;
+
+    // A hidden pill measures zero. It keeps its last width, so it does not grow from nothing when it comes back.
+    const observer = new ResizeObserver(() => {
+      if (element.offsetWidth > 0) setLabelWidth(element.offsetWidth);
+    });
+    observer.observe(element);
+
+    return () => observer.disconnect();
+  }, []);
 
   // A closing pill keeps its last look, so it fades out as it was.
   if (view !== undefined) shown.current = { view, filled };
@@ -307,16 +327,19 @@ export function UpdatePill({ updates }: { updates: Updates }) {
               type="button"
               disabled={!look.opens}
               title={shown.current.view === "available" ? `Update clots to ${info?.latest?.version}` : undefined}
-              className="relative flex h-8 items-center overflow-hidden rounded-full bg-sidebar-accent/80 pr-3 pl-[5px] text-[13px] font-medium whitespace-nowrap transition-[background-color,scale] duration-150 ease-out enabled:hover:bg-sidebar-accent enabled:active:scale-[0.97] data-popup-open:bg-sidebar-accent motion-reduce:active:scale-100"
+              style={{ width: labelWidth === undefined ? undefined : labelWidth + PILL_PADDING_PX }}
+              className="relative flex h-8 items-center overflow-hidden rounded-full bg-sidebar-accent/80 pr-3 pl-[5px] text-[13px] font-medium whitespace-nowrap [transition:background-color_150ms_var(--ease-out),scale_150ms_var(--ease-out),width_200ms_var(--ease-out)] enabled:hover:bg-sidebar-accent enabled:active:scale-[0.97] data-popup-open:bg-sidebar-accent motion-reduce:[transition:background-color_150ms_var(--ease-out)] motion-reduce:active:scale-100"
             />
           }
         >
           {filling && <RestartFill finishing={shown.current.view === "done"} gone={shown.current.filled} />}
-          <span key={look.label} className="relative flex items-center gap-[7px] transition-opacity duration-150 starting:opacity-0">
-            <span className={cn("flex size-[22px] shrink-0 items-center justify-center rounded-full", look.dot)}>{look.icon}</span>
-            {look.label}
-            {shown.current.view === "available" && <span className="font-normal text-muted-foreground tabular-nums">{info?.latest?.version}</span>}
-            {shown.current.view === "failed" && <span className="font-normal text-muted-foreground">Details</span>}
+          <span ref={label} className="relative flex shrink-0">
+            <span key={look.label} className="flex items-center gap-[7px] transition-opacity duration-150 starting:opacity-0">
+              <span className={cn("flex size-[22px] shrink-0 items-center justify-center rounded-full", look.dot)}>{look.icon}</span>
+              {look.label}
+              {shown.current.view === "available" && <span className="font-normal text-muted-foreground tabular-nums">{info?.latest?.version}</span>}
+              {shown.current.view === "failed" && <span className="font-normal text-muted-foreground">Details</span>}
+            </span>
           </span>
         </PopoverTrigger>
         <PopoverContent side="top" align="end" sideOffset={8} className="w-72 gap-1 rounded-xl p-2 shadow-lg">
