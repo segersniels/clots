@@ -87,6 +87,22 @@ export const closeChrome = async (port: number) => {
   });
 };
 
+/** The title and address of one page of the bot's Chrome. */
+export interface PageInfo {
+  readonly targetId: string;
+  readonly title: string;
+  readonly url: string;
+}
+
+/** Reads the title and address of each page of the bot's Chrome. Without a Chrome of its own, the bot has none. */
+export const readPages = async (port: number): Promise<ReadonlyArray<PageInfo>> => {
+  const targets = await fetch(`http://127.0.0.1:${port}/json/list`)
+    .then((response) => response.json() as Promise<ReadonlyArray<{ id: string; type: string; title: string; url: string }>>)
+    .catch(() => []);
+
+  return targets.filter((target) => target.type === "page").map(({ id, title, url }) => ({ targetId: id, title, url }));
+};
+
 /** Stops the loading of one page of the bot's Chrome, as the stop button of a browser does. */
 export const stopLoading = async (port: number, targetId: string) => {
   const targets = await fetch(`http://127.0.0.1:${port}/json/list`)

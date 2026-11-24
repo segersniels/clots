@@ -3,6 +3,16 @@ import { Effect } from "effect";
 import { HttpRouter, HttpServerResponse } from "effect/http";
 
 import { BotRepository } from "../bots/BotRepository.ts";
+import { readPages } from "./BotChrome.ts";
+import { devToolsPort } from "./BrowserEnvironment.ts";
+
+/** The time between two looks at the titles and addresses of the bot's pages while a client watches. */
+const PAGE_POLL_MS = 500;
+
+/** The tabs as agent-browser lists them, with the fields that clots takes from Chrome. */
+interface TabList {
+  readonly tabs: ReadonlyArray<{ readonly targetId: string; readonly title: string; readonly url: string }>;
+}
 
 /**
  * Relays a bot's agent-browser stream to a client. agent-browser accepts only loopback clients, so
@@ -27,8 +37,51 @@ export const BrowserProxyLayer = HttpRouter.add(
       Effect.sync(() => new WebSocket(`ws://127.0.0.1:${bot.browserStreamPort}/?pacing=ack&maxFps=10`)),
       (opened) => Effect.sync(() => opened.close()),
     );
+
+    const send = (text: string) => Effect.runForkWith(services)(Effect.ignore(writer.write(text)));
+
+    /**
+     * agent-browser keeps the titles and addresses from its last command, and Chrome sends no event
+     * when a page sets its title. So the tabs go out with what Chrome shows now, when agent-browser
+     * lists them and twice a second, and only when something changed.
+     */
+    let listed: TabList | undefined;
+    let sent = "";
+
+    const sendTabs = async () => {
+      if (listed === undefined) return;
+
+      const pages = await readPages(devToolsPort(bot));
+      const tabs = listed.tabs.map((tab) => {
+        const page = pages.find((each) => each.targetId === tab.targetId);
+
+        return page === undefined ? tab : { ...tab, title: page.title, url: page.url };
+      });
+      const text = JSON.stringify({ ...listed, tabs });
+
+      if (text === sent) return;
+
+      sent = text;
+      send(text);
+    };
+
+    yield* Effect.acquireRelease(
+      Effect.sync(() => setInterval(() => void sendTabs(), PAGE_POLL_MS)),
+      (timer) => Effect.sync(() => clearInterval(timer)),
+    );
+
     upstream.addEventListener("message", (event) => {
-      Effect.runForkWith(services)(Effect.ignore(writer.write(String(event.data))));
+      const text = String(event.data);
+
+      // A frame is base64 inside quotes, so only a tabs message can hold this text.
+      if (!text.includes('"type":"tabs"')) {
+        send(text);
+
+        return;
+      }
+
+      listed = JSON.parse(text);
+      void sendTabs();
     });
 
     // The bot has no browser yet, or closed it. The client connects again later.

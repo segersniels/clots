@@ -54,7 +54,7 @@ const executable = process.env.AGENT_BROWSER_EXECUTABLE_PATH ?? systemBrowser ??
 const userAgent = normalUserAgent(executable);
 
 /** The DevTools port of the bot's own Chrome. */
-const devToolsPort = (bot: StoredBot) => bot.browserStreamPort + DEVTOOLS_PORT_OFFSET;
+export const devToolsPort = (bot: StoredBot) => bot.browserStreamPort + DEVTOOLS_PORT_OFFSET;
 
 /**
  * Builds the variables that give a bot its own browser: one agent-browser session, one persistent
