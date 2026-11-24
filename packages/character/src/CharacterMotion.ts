@@ -38,6 +38,13 @@ export function paddedLobes(shape: CharacterShape): Lobe[] {
   return lobes;
 }
 
+/** Finds the lobe that carries the sheen, so the sheen never sits between the eyes. */
+function sheenLobeOf(shape: CharacterShape): Lobe {
+  const { lobes, sheenLobe = 0 } = SHAPE_GEOMETRY[shape];
+
+  return lobes[sheenLobe]!;
+}
+
 /** The blur alpha at which the goo filter cuts off the edge of the body. */
 const GOO_CUTOFF = 0.42;
 
@@ -67,6 +74,8 @@ export class CharacterMotion implements Animated {
   private toLobes: Lobe[];
   private fromEyes: readonly number[];
   private toEyes: readonly number[];
+  private fromSheenLobe: Lobe;
+  private toSheenLobe: Lobe;
   private fromFit: ShapeFit;
   private toFit: ShapeFit;
   private morphStart = -Infinity;
@@ -98,6 +107,7 @@ export class CharacterMotion implements Animated {
     this.hops = props().hops;
     this.fromLobes = this.toLobes = paddedLobes(this.shape);
     this.fromEyes = this.toEyes = SHAPE_GEOMETRY[this.shape].eyes;
+    this.fromSheenLobe = this.toSheenLobe = sheenLobeOf(this.shape);
     this.fromFit = this.toFit = this.fitOf(this.shape);
   }
 
@@ -155,12 +165,13 @@ export class CharacterMotion implements Animated {
         `translate(50 50) scale(${fit.scale}) translate(${-fit.x} ${-fit.y})`,
     );
 
-    const sheenX = bodyX - bodyR * 0.42;
-    const sheenY = bodyY - bodyR * 0.48;
+    const [lightX, lightY, lightR] = this.sheenLobeAt(now);
+    const sheenX = lightX - lightR * 0.42;
+    const sheenY = lightY - lightR * 0.48;
     this.sheen.setAttribute("cx", String(sheenX));
     this.sheen.setAttribute("cy", String(sheenY));
-    this.sheen.setAttribute("rx", String(bodyR * 0.2));
-    this.sheen.setAttribute("ry", String(bodyR * 0.11));
+    this.sheen.setAttribute("rx", String(lightR * 0.2));
+    this.sheen.setAttribute("ry", String(lightR * 0.11));
     this.sheen.setAttribute("transform", `rotate(-35 ${sheenX} ${sheenY})`);
 
     this.drawEyes(now, eyeX, eyeY, eyeGap, this.aim(t, mood, gaze), reduced, mood);
@@ -171,6 +182,8 @@ export class CharacterMotion implements Animated {
     this.fromEyes = this.eyesAt(now);
     this.toLobes = paddedLobes(shape);
     this.toEyes = SHAPE_GEOMETRY[shape].eyes;
+    this.fromSheenLobe = this.sheenLobeAt(now);
+    this.toSheenLobe = sheenLobeOf(shape);
     this.fromFit = this.fitAt(now);
     this.toFit = this.fitOf(shape);
     this.shape = shape;
@@ -216,6 +229,15 @@ export class CharacterMotion implements Animated {
     const progress = this.morphProgress(now);
 
     return this.toEyes.map((value, index) => lerp(this.fromEyes[index]!, value, progress)) as [number, number, number];
+  }
+
+  /** Moves the sheen from the lobe of the old shape to the lobe of the new one, so it never jumps. */
+  private sheenLobeAt(now: number): Lobe {
+    const progress = this.morphProgress(now);
+    const [fromX, fromY, fromR] = this.fromSheenLobe;
+    const [toX, toY, toR] = this.toSheenLobe;
+
+    return [lerp(fromX, toX, progress), lerp(fromY, toY, progress), lerp(fromR, toR, progress)];
   }
 
   /** Breathes all the time, and hops after a shape change or on a loop while the character waits. */

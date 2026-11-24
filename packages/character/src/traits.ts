@@ -11,6 +11,8 @@ export interface ShapeGeometry {
   readonly lobes: ReadonlyArray<Lobe>;
   /** The center point between the two eyes and the distance between them. */
   readonly eyes: readonly [x: number, y: number, gap: number];
+  /** The index of the lobe that carries the sheen. It defaults to the body, unless the eyes sit there. */
+  readonly sheenLobe?: number;
 }
 
 /** The shapes that a character can have, in the order that a picker shows them. */
@@ -32,10 +34,10 @@ export const SHAPE_GEOMETRY: Record<CharacterShape, ShapeGeometry> = {
   lump: { lobes: [[46, 55, 32], [78, 28, 10]], eyes: [44, 52, 12] },
   worm: { lobes: [[67, 46, 23], [44, 55, 18], [24, 62, 13]], eyes: [69, 43, 11] },
   bud: { lobes: [[50, 50, 25], [50, 23, 13], [77, 50, 13], [50, 77, 13], [23, 50, 13]], eyes: [50, 49, 11] },
-  dollop: { lobes: [[50, 64, 26], [50, 42, 19], [55, 22, 9]], eyes: [50, 60, 12] },
+  dollop: { lobes: [[50, 64, 26], [50, 42, 19], [55, 22, 9]], eyes: [50, 60, 12], sheenLobe: 1 },
   tumble: { lobes: [[45, 56, 28], [71, 39, 16], [70, 71, 13], [25, 32, 11]], eyes: [46, 54, 12] },
-  grape: { lobes: [[52, 62, 19], [36, 40, 17], [63, 37, 17], [31, 65, 15], [74, 60, 13]], eyes: [50, 52, 12] },
-  puddle: { lobes: [[50, 58, 23], [29, 63, 17], [72, 63, 17]], eyes: [50, 54, 12] },
+  grape: { lobes: [[52, 62, 19], [36, 40, 17], [63, 37, 17], [31, 65, 15], [74, 60, 13]], eyes: [50, 52, 12], sheenLobe: 1 },
+  puddle: { lobes: [[50, 58, 23], [29, 63, 17], [72, 63, 17]], eyes: [50, 54, 12], sheenLobe: 1 },
 };
 
 /** The longest side that fitted art may take, in box units. It keeps a little room for the hop and the droplet. */
