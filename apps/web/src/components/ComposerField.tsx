@@ -163,6 +163,8 @@ export function ComposerField({
       ReferenceNode,
     ],
     content: toContent(initialText, known),
+    // Opening a bot is to talk to it. A touch screen would open its keyboard over the thread, so it waits for a tap there.
+    autofocus: matchMedia("(pointer: coarse)").matches ? false : "end",
     editorProps: {
       attributes: {
         "aria-label": placeholder,
