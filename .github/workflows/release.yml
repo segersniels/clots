@@ -99,6 +99,9 @@ jobs:
         with:
           path: assets
           merge-multiple: true
+      # scripts/install.sh checks each download against this file.
+      - name: Write the checksums
+        run: cd assets && sha256sum * > checksums.txt
       - name: Create the GitHub release
         run: gh release create "v$VERSION" assets/* --title "v$VERSION" --generate-notes --repo "$GITHUB_REPOSITORY"
         env:
