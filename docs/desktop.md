@@ -7,7 +7,13 @@ The desktop app (`apps/desktop`) is an Electron window around the web client. It
 
 ## Install
 
-Download [Clots.dmg](https://github.com/segersniels/clots/releases/latest/download/Clots.dmg) from the latest release and drag Clots to Applications. macOS blocks an app from the internet that Apple did not notarize, so clear the download flag once:
+```shell
+curl --proto '=https' --tlsv1.2 -fsSL https://raw.githubusercontent.com/segersniels/clots/main/scripts/install.sh | sh -s -- --app
+```
+
+The script copies Clots from the latest release's disk image to Applications. A file that `curl` downloads has no quarantine flag, so macOS opens the app without a warning.
+
+To install by hand, download [Clots.dmg](https://github.com/segersniels/clots/releases/latest/download/Clots.dmg) and drag Clots to Applications. macOS blocks an app from the internet that Apple did not notarize, so clear the download flag once:
 
 ```shell
 xattr -cr /Applications/Clots.app
@@ -38,7 +44,7 @@ To change this later, use the menu **Server → Change Server…**.
 The sidebar shows new versions:
 
 - **The server** updates itself when you click **Update**. This works for a server on this Mac and for one on another machine.
-- **The app** shows **Clots app** with the new version. The click opens the release page. Download the new DMG and replace the app in Applications. With **On this Mac**, the new app also brings the new server: it installs it on the next start.
+- **The app** shows **Clots app** with the new version. The click opens the release page. Run the install command again, or download the new DMG and replace the app in Applications. With **On this Mac**, the new app also brings the new server: it installs it on the next start.
 
 ## Run from source
 

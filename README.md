@@ -16,19 +16,18 @@ Each bot is <a href="https://code.claude.com/docs/en/overview">Claude Code</a>, 
 
 You need [Claude Code](https://code.claude.com/docs/en/setup) with a Claude subscription login.
 
-**On a Mac** (Apple Silicon), download [Clots.dmg](https://github.com/segersniels/clots/releases/latest/download/Clots.dmg) and drag Clots to Applications. The app is not notarized by Apple yet, so clear the download flag once:
+**On a Mac** (Apple Silicon), install the Clots app:
 
 ```shell
-xattr -cr /Applications/Clots.app
+curl --proto '=https' --tlsv1.2 -fsSL https://raw.githubusercontent.com/segersniels/clots/main/scripts/install.sh | sh -s -- --app
 ```
 
 Open Clots and choose **On this Mac**. The app sets up everything else. The [desktop app docs](./docs/desktop.md) explain each step.
 
-**On a server** (Linux x64 or arm64, or macOS), install the `clots` command on the machine that runs your bots. Pick the archive for your platform: `clots-linux-x64`, `clots-linux-arm64` or `clots-darwin-arm64`.
+**On a server** (Linux x64 or arm64, or an Apple Silicon Mac), install the `clots` command on the machine that runs your bots:
 
 ```shell
-curl -fsSL https://github.com/segersniels/clots/releases/latest/download/clots-linux-x64.tar.gz | tar -xz
-clots-linux-x64/clots install
+curl --proto '=https' --tlsv1.2 -fsSL https://raw.githubusercontent.com/segersniels/clots/main/scripts/install.sh | sh
 ```
 
 Then install clots as a background service and put it on your tailnet:

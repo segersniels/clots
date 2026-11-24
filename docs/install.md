@@ -30,14 +30,20 @@ clots never reads, stores or passes your Claude tokens. It starts the `claude` b
 
 ## Install the `clots` command
 
-Each [release](https://github.com/segersniels/clots/releases/latest) has an archive per platform: `clots-linux-x64`, `clots-linux-arm64` and `clots-darwin-arm64`. Download the one for your machine and install it:
+```shell
+curl --proto '=https' --tlsv1.2 -fsSL https://raw.githubusercontent.com/segersniels/clots/main/scripts/install.sh | sh
+```
+
+The script picks the archive of the [latest release](https://github.com/segersniels/clots/releases/latest) for your machine: `clots-linux-x64`, `clots-linux-arm64` or `clots-darwin-arm64`. It checks the download against the release's `checksums.txt` and runs `clots install`. To install a specific version, end the command with `| CLOTS_VERSION=0.2.0 sh`.
+
+`clots install` copies the folder to `~/.local/share/clots` and links `~/.local/bin/clots` to it. It needs no root. If `~/.local/bin` is not on your PATH, the install tells you to add it.
+
+To install by hand, download the archive for your machine and run `clots install` from it:
 
 ```shell
 curl -fsSL https://github.com/segersniels/clots/releases/latest/download/clots-linux-x64.tar.gz | tar -xz
 clots-linux-x64/clots install
 ```
-
-`clots install` copies the folder to `~/.local/share/clots` and links `~/.local/bin/clots` to it. It needs no root. If `~/.local/bin` is not on your PATH, the install tells you to add it.
 
 ## Build from source
 
