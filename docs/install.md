@@ -88,9 +88,6 @@ Check the state at any time:
 clots status
 ```
 
-> [!NOTE]
-> The service install and the tailnet steps are not yet verified end to end. If `clots up` fails, run `clots serve` and open an issue with the output.
-
 Stop the service, for example to run the server in the foreground:
 
 ```shell

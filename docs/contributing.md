@@ -2,6 +2,10 @@
 
 Thank you for your interest in clots. This page explains how to run the project on your machine and what a change must pass.
 
+## Issues
+
+[Open an issue](https://github.com/segersniels/clots/issues/new/choose) to report a bug or to suggest a feature. For a bug, add the output of `clots --version` and the steps to reproduce it. For a large change, open an issue before you start, so that we can agree on the approach.
+
 ## Set up
 
 Install the tools from [Installing & building](./install.md#requirements) and log in to Claude (`claude auth login`). Then:
@@ -57,7 +61,7 @@ The sidecar starts with the server when its binary is built. It prints a Tailsca
 
 ## Checks
 
-Run these before you open a pull request. All of them must pass.
+Run these before you open a pull request. All of them must pass. The CI workflow runs them on each pull request.
 
 ```shell
 bun run lint

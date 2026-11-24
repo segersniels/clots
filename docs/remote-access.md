@@ -2,9 +2,6 @@
 
 The clots server listens on loopback only. To reach it from your phone or your laptop, clots puts a small sidecar on your [Tailscale](https://tailscale.com) network. There is no hosted relay, no clots account and no port to open on your router.
 
-> [!NOTE]
-> The steps after the Tailscale login are not yet verified end to end.
-
 ## How it works
 
 The sidecar (`apps/sidecar`) is a Go program that uses [tsnet](https://tailscale.com/kb/1244/tsnet). It:
