@@ -121,6 +121,14 @@ const clones = Effect.gen(function* () {
   yield* sql`ALTER TABLE bots ADD COLUMN cloned_from TEXT`;
 });
 
+const sortOrder = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient;
+
+  // The operator orders the bots of a group by hand. Existing bots keep the order of their creation.
+  yield* sql`ALTER TABLE bots ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0`;
+  yield* sql`UPDATE bots SET sort_order = (SELECT COUNT(*) FROM bots AS earlier WHERE earlier.created_at <= bots.created_at)`;
+});
+
 const resume = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
 
@@ -140,6 +148,7 @@ export const MigrationsLayer = SqliteMigrator.layer({
     "0006_unread": unread,
     "0007_skills": skills,
     "0008_clones": clones,
+    "0009_sort_order": sortOrder,
     "0010_resume": resume,
   }),
 });

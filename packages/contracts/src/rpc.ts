@@ -62,6 +62,9 @@ export class ClotsRpcs extends RpcGroup.make(
   /** Closes the bot's browser. Its logins stay in the profile, and the bot opens the browser again when it needs it. */
   Rpc.make("StopBrowser", { payload: { botId: BotId }, error: BotNotFound }),
 
+  /** Puts the bots of one sidebar group in the given order. */
+  Rpc.make("ReorderBots", { payload: { botIds: Schema.Array(BotId) } }),
+
   Rpc.make("SetBotUnread", {
     payload: { botId: BotId, unread: Schema.Boolean },
     error: BotNotFound,

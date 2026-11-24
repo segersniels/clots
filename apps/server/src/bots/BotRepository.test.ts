@@ -173,3 +173,29 @@ test("a removed bot leaves no rows and no notes directory, and the other bots st
   expect(remaining).toEqual(["Atlas"]);
   expect(orphanRows).toBe(0);
 });
+
+test("the operator's order holds, a new bot comes last, and a bot that joins a group goes to its end", async () => {
+  const [reordered, afterJoin] = await run(
+    Effect.gen(function* () {
+      const bots = yield* BotRepository;
+      const sql = yield* SqlClient.SqlClient;
+      yield* sql`INSERT INTO projects (id, name, directory, created_at) VALUES ('site', 'Site', NULL, 0)`;
+      const scout = yield* bots.create(newScout);
+      const atlas = yield* bots.create(newAtlas);
+      const nova = yield* bots.create({ ...newScout, name: "Nova" });
+      const names = Effect.map(bots.list, (list) => list.filter((bot) => bot.projectId === null).map((bot) => bot.name));
+
+      yield* bots.reorder([nova.id, scout.id, atlas.id]);
+      yield* bots.create({ ...newScout, name: "Late" });
+      const reordered = yield* names;
+
+      yield* bots.setProject(nova.id, "site");
+      yield* bots.setProject(nova.id, null);
+
+      return [reordered, yield* names] as const;
+    }).pipe(Effect.orDie),
+  );
+
+  expect(reordered).toEqual(["Nova", "Scout", "Atlas", "Late"]);
+  expect(afterJoin).toEqual(["Scout", "Atlas", "Late", "Nova"]);
+});

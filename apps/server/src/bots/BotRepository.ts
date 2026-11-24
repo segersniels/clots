@@ -72,6 +72,8 @@ export class BotRepository extends Context.Service<
     setModel(botId: BotId, model: BotModel): Effect.Effect<void>;
     /** Moves the bot to a project. A move to another directory also forgets the session, which belongs to the old one. */
     setProject(botId: BotId, projectId: string | null): Effect.Effect<void>;
+    /** Puts the given bots in this order. Bots that the list leaves out keep their place. */
+    reorder(botIds: ReadonlyArray<BotId>): Effect.Effect<void>;
     appendMessage(
       botId: BotId,
       role: MessageRole,
@@ -121,7 +123,7 @@ export class BotRepository extends Context.Service<
         JOIN threads ON threads.bot_id = bots.id
         LEFT JOIN projects ON projects.id = bots.project_id
         ${where}
-        ORDER BY bots.created_at
+        ORDER BY bots.sort_order, bots.created_at
       `.pipe(Effect.map((rows) => rows.map(toStoredBot)));
 
       const list = select(sql``).pipe(Effect.orDie);
@@ -148,10 +150,11 @@ export class BotRepository extends Context.Service<
           mkdirSync(workingDirectory, { recursive: true });
 
           yield* sql`
-            INSERT INTO bots (id, name, instructions, color, shape, model, project_id, cloned_from, working_directory, browser_stream_port, created_at)
+            INSERT INTO bots (id, name, instructions, color, shape, model, project_id, cloned_from, working_directory, browser_stream_port, sort_order, created_at)
             SELECT
               ${id}, ${name}, ${instructions}, ${color}, ${shape}, ${model}, ${projectId}, ${clonedFrom}, ${workingDirectory},
               COALESCE(MAX(browser_stream_port) + 1, ${FIRST_BROWSER_STREAM_PORT}),
+              COALESCE(MAX(sort_order), 0) + 1,
               ${createdAt}
             FROM bots
           `;
@@ -217,7 +220,27 @@ export class BotRepository extends Context.Service<
                 ''
               )
           `;
-          yield* sql`UPDATE bots SET project_id = ${projectId} WHERE id = ${botId}`;
+          // A bot that joins another group goes to its end.
+          yield* sql`
+            UPDATE bots
+            SET
+              sort_order = CASE WHEN project_id IS ${projectId} THEN sort_order ELSE (SELECT MAX(sort_order) + 1 FROM bots) END,
+              project_id = ${projectId}
+            WHERE id = ${botId}
+          `;
+        }).pipe(sql.withTransaction, Effect.orDie);
+
+      const reorder = (botIds: ReadonlyArray<BotId>) =>
+        Effect.gen(function* () {
+          // The bots swap their places among themselves, so their order against other bots stays.
+          const rows = yield* sql<{ sortOrder: number }>`
+            SELECT sort_order AS sortOrder FROM bots WHERE id IN ${sql.in(botIds)} ORDER BY sort_order
+          `;
+          const places = rows.map((row) => row.sortOrder);
+
+          for (const [index, botId] of botIds.entries()) {
+            yield* sql`UPDATE bots SET sort_order = ${places[index] ?? index} WHERE id = ${botId}`;
+          }
         }).pipe(sql.withTransaction, Effect.orDie);
 
       const appendMessage = (
@@ -276,6 +299,7 @@ export class BotRepository extends Context.Service<
         setSyncedUuid,
         setModel,
         setProject,
+        reorder,
         appendMessage,
         messagesAfter,
         skills,
