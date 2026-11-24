@@ -41,7 +41,7 @@ bun apps/server/src/cli.ts up
 
 A bot has a name, a character, instructions, a model and its own working directory. Its character is a small clot with a face that shows what the bot does: it breathes when idle, rolls a droplet while it works, and hops when it needs you. It has one ongoing thread that never ends: clots resumes the same Claude Code session after each restart. A bot keeps its durable memory in files in its working directory.
 
-- **Routines** send a prompt on a schedule, such as "Morning briefing, every day at 8:00".
+- **Routines** send a prompt on a schedule, such as "Morning briefing, every day at 9:00".
 - **Approvals** ask you before a bot runs a risky tool.
 - **The bot's screen** shows its browser live. You can take over for a login or a captcha.
 - **Teamwork**: a bot can message other bots, and clone a bot to split a task.

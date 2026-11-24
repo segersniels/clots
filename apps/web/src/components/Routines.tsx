@@ -13,7 +13,7 @@ import { Collapse } from "./Collapse.tsx";
 const CUSTOM = "custom";
 
 const PRESETS = [
-  { label: "Every day at 8:00 AM", value: "0 8 * * *" },
+  { label: "Every day at 9:00 AM", value: "0 9 * * *" },
   { label: "Weekdays at 9:00 AM", value: "0 9 * * 1-5" },
   { label: "Weekdays at 6:00 PM", value: "0 18 * * 1-5" },
   { label: "Every hour", value: "0 * * * *" },
@@ -122,7 +122,7 @@ export function Routines({ botId }: { botId: BotId }) {
               value={customCron}
               onChange={(event) => setCustomCron(event.target.value)}
               required={preset === CUSTOM}
-              placeholder="0 8 * * *"
+              placeholder="0 9 * * *"
               aria-label="Cron expression"
               aria-invalid={error}
               className="font-mono"
