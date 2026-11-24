@@ -8,8 +8,7 @@
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="./docs/assets/clots-dark.png" />
-    <img src="./docs/assets/clots-light.png" alt="The clots web client: bots grouped by project in the sidebar, a chat with a morning briefing and a bot mention, and the bot's details with its screen, project, model, routines and instructions" width="100%" />
+    <img src="./docs/assets/intro-light.png" alt="The clots app: bots grouped by project in the sidebar, each a small clot character with its status, and a new bot named Reviewer that asks what it should do, with instructions that mention a skill and another bot" width="100%" />
   </picture>
 </p>
 
