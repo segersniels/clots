@@ -185,6 +185,7 @@ function BotRow({ bot }: { bot: BotSummary }) {
 
   // A bot that needs the operator keeps its status line. The open bot already shows its draft in the composer.
   const showDraft = hasContent(draft) && bot.id !== openBotId && bot.status !== "waiting";
+  const dotShown = bot.status === "waiting" || bot.unread;
   const glancing = useGlance(showDraft && bot.status === "idle" && !reduceMotion);
 
   useEffect(() => {
@@ -222,7 +223,7 @@ function BotRow({ bot }: { bot: BotSummary }) {
               <span className="shrink-0 text-[0.6875rem] text-muted-foreground">{formatRecent(bot.lastMessageAt)}</span>
             )}
           </span>
-          <span className="flex items-center gap-2">
+          <span className="flex items-center">
             {/* The status line and the draft share one place under the name and fade into each other. */}
             <span className="grid min-w-0 flex-1 text-[0.8125rem] *:col-start-1 *:row-start-1">
               <span
@@ -244,10 +245,17 @@ function BotRow({ bot }: { bot: BotSummary }) {
                 <span className="min-w-0 truncate text-muted-foreground">{draft && describeDraft(draft)}</span>
               </span>
             </span>
-            {/* The dot marks a bot that waits for the operator, or that the operator marked as unread. */}
-            {(bot.status === "waiting" || bot.unread) && (
-              <span className="size-2 shrink-0 rounded-full bg-attention transition-[scale,opacity] duration-200 ease-out starting:scale-0 starting:opacity-0" />
-            )}
+            {/* The dot marks a bot that waits for the operator, or that is unread. Its place opens and closes, so the status line does not jump. */}
+            <span
+              aria-hidden
+              className={`flex shrink-0 justify-end overflow-hidden transition-[width] duration-200 ease-out ${dotShown ? "w-4" : "w-0"}`}
+            >
+              <span
+                className={`size-2 shrink-0 rounded-full bg-attention transition-[scale,opacity] duration-200 ease-out motion-reduce:scale-100 ${
+                  dotShown ? "scale-100 opacity-100" : "scale-50 opacity-0"
+                }`}
+              />
+            </span>
           </span>
         </span>
       </Link>
