@@ -188,7 +188,9 @@ function BotRow({ bot }: { bot: BotSummary }) {
   // A bot that needs the operator keeps its status line. The open bot already shows its draft in the composer.
   const showDraft = hasContent(draft) && bot.id !== openBotId && bot.status !== "waiting";
   const dotShown = bot.status === "waiting" || bot.unread;
-  const glancing = useGlance(showDraft && bot.status === "idle" && !reduceMotion);
+  // An idle bot with an unread reply calls the operator, as a bot that waits for an answer does.
+  const mood = bot.status === "idle" && bot.unread ? "waiting" : bot.status;
+  const glancing = useGlance(showDraft && mood === "idle" && !reduceMotion);
 
   useEffect(() => {
     listHasShown = true;
@@ -206,7 +208,7 @@ function BotRow({ bot }: { bot: BotSummary }) {
         }`}
         activeProps={{ className: "bg-sidebar-accent" }}
       >
-        <Character shape={bot.shape} color={bot.color} mood={bot.status} size={36} gaze={glancing ? DRAFT_GAZE : undefined} />
+        <Character shape={bot.shape} color={bot.color} mood={mood} size={36} gaze={glancing ? DRAFT_GAZE : undefined} />
         <span className="min-w-0 flex-1">
           <span className="flex items-baseline gap-2">
             {renaming ? (
