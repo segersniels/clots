@@ -1,8 +1,27 @@
 import { Character } from "@clots/character";
 import type { BotId, BotSummary, Project } from "@clots/contracts";
+import {
+  closestCenter,
+  defaultDropAnimation,
+  DndContext,
+  DragOverlay,
+  MouseSensor,
+  pointerWithin,
+  TouchSensor,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type CollisionDetection,
+  type DragEndEvent,
+  type DragOverEvent,
+  type DragStartEvent,
+  type UniqueIdentifier,
+} from "@dnd-kit/core";
+import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { ChevronDownIcon, FolderPlusIcon, PencilLineIcon, PlusIcon, SearchIcon, UserRoundPlusIcon } from "lucide-react";
-import { Fragment, useEffect, useRef, useState, type DragEvent, type ReactNode, type RefObject } from "react";
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -16,45 +35,45 @@ import { BotMenu } from "./BotMenu.tsx";
 import { Collapse } from "./Collapse.tsx";
 import { ProjectMenu } from "./ProjectMenu.tsx";
 
-/** The drag data type that carries the id of a bot. Other drags, such as files, do not have it. */
-const BOT_DRAG_TYPE = "application/x-clots-bot";
-
 const EMPTY_HINT = "px-2.5 py-1.5 text-[0.8125rem] text-muted-foreground/70";
 
 /** Keeps the bot rows apart from each other and from the heading above them. */
 const BOT_ROWS = "flex flex-col gap-1 pt-1";
 
-/** Takes a dragged bot and moves it to a project, or to no project when `projectId` is `null`. */
-function BotDropZone({ projectId, children }: { projectId: string | null; children: ReactNode }) {
-  const [over, setOver] = useState(false);
+/** The group of the bots without a project. The other groups use their project id. */
+const PERSONAL = "personal";
 
-  const allowDrop = (event: DragEvent) => {
-    if (!event.dataTransfer.types.includes(BOT_DRAG_TYPE)) return;
+/** The ids of the top-level bot rows of each group, in the order that the sidebar shows them. */
+type Groups = Readonly<Record<string, ReadonlyArray<BotId>>>;
 
-    // Without this, the browser refuses the drop.
-    event.preventDefault();
-    setOver(true);
-  };
+/** A top-level row of a group: a bot and the clones that it orchestrates. */
+interface Row {
+  readonly bot: BotSummary;
+  readonly clones: ReadonlyArray<BotSummary>;
+}
 
-  const leave = (event: DragEvent<HTMLElement>) => {
-    // The event also fires when the pointer moves onto a child of the zone.
-    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOver(false);
-  };
+/** Slides the rows out of the way of a dragged bot, and the dragged copy into its place on the drop. */
+const SLIDE = { duration: 250, easing: "cubic-bezier(0.23, 1, 0.32, 1)" };
 
-  const drop = (event: DragEvent) => {
-    event.preventDefault();
-    setOver(false);
+/** Gives the drop area of a group an id that cannot be the id of a bot. */
+const groupDropId = (group: string) => `group:${group}`;
 
-    const botId = event.dataTransfer.getData(BOT_DRAG_TYPE) as BotId;
-    void client.setBotProject(botId, projectId);
-  };
+/** Finds the group of a bot row, or of the drop area of a group. */
+function groupOf(groups: Groups, id: UniqueIdentifier) {
+  const name = String(id);
+  if (name.startsWith("group:")) return name.slice("group:".length);
+
+  return Object.keys(groups).find((group) => groups[group]?.includes(name as BotId));
+}
+
+/** Takes a dragged bot into a group, also when the group is empty or closed. */
+function BotDropZone({ group, highlighted, children }: { group: string; highlighted: boolean; children: ReactNode }) {
+  const { setNodeRef } = useDroppable({ id: groupDropId(group) });
 
   return (
     <section
-      onDragOver={allowDrop}
-      onDragLeave={leave}
-      onDrop={drop}
-      className={`rounded-xl transition-colors duration-150 ${over ? "bg-sidebar-accent/60 outline-1 outline-ring" : ""}`}
+      ref={setNodeRef}
+      className={`rounded-xl transition-colors duration-150 ${highlighted ? "bg-sidebar-accent/60 outline-1 outline-ring" : ""}`}
     >
       {children}
     </section>
@@ -179,11 +198,6 @@ function BotRow({ bot }: { bot: BotSummary }) {
         to="/bots/$botId"
         params={{ botId: bot.id }}
         disabled={renaming}
-        draggable={!renaming}
-        onDragStart={(event) => {
-          event.dataTransfer.setData(BOT_DRAG_TYPE, bot.id);
-          event.dataTransfer.effectAllowed = "move";
-        }}
         className={`flex items-center gap-2.5 rounded-xl px-2.5 py-2 transition-[color,opacity,translate] duration-200 ease-out ${
           entersLate ? "starting:translate-y-1 starting:opacity-0 motion-reduce:starting:translate-y-0" : ""
         }`}
@@ -274,33 +288,160 @@ function CloneGroup({ clones }: { clones: ReadonlyArray<BotSummary> }) {
   );
 }
 
-/** Lists bots with the clones of each orchestrator grouped under it. A clone whose orchestrator is not in the list stays a plain row. */
-function BotRows({ bots }: { bots: ReadonlyArray<BotSummary> }) {
-  const listed = new Set(bots.map((bot) => bot.id));
-  const grouped = (bot: BotSummary) => bot.clonedFrom !== null && listed.has(bot.clonedFrom);
+/** Makes a top-level row draggable. While the operator drags it, its place stays empty and shows where it lands. */
+function SortableRow({ bot, clones }: Row) {
+  const reduceMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const { setNodeRef, listeners, transform, transition, isDragging } = useSortable({
+    id: bot.id,
+    transition: reduceMotion ? null : SLIDE,
+  });
 
-  return bots
-    .filter((bot) => !grouped(bot))
-    .map((bot) => {
-      const clones = bots.filter((candidate) => candidate.clonedFrom === bot.id);
+  // The row keeps the link as its only focus stop, so it leaves out the drag handle attributes.
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Translate.toString(transform), transition }}
+      {...listeners}
+      className={isDragging ? "rounded-xl bg-sidebar-accent/50 *:opacity-0" : undefined}
+    >
+      <BotRow bot={bot} />
+      {clones.length > 0 && <CloneGroup clones={clones} />}
+    </div>
+  );
+}
 
-      return (
-        <Fragment key={bot.id}>
-          <BotRow bot={bot} />
-          {clones.length > 0 && <CloneGroup clones={clones} />}
-        </Fragment>
-      );
+/** Lists the top-level rows of one group. The clones of each orchestrator are grouped under it. */
+function BotRows({ rows }: { rows: ReadonlyArray<Row> }) {
+  return (
+    <SortableContext items={rows.map((row) => row.bot.id)} strategy={verticalListSortingStrategy}>
+      <div className="flex flex-col gap-1">
+        {rows.map((row) => (
+          <SortableRow key={row.bot.id} {...row} />
+        ))}
+      </div>
+    </SortableContext>
+  );
+}
+
+/**
+ * Lets the operator drag a bot to another place in its group, or into another group. During the drag,
+ * and until the store shows the new order, the list shows the dragged order instead of the store order.
+ */
+function useBotDrag(storeGroups: Groups) {
+  const [dragged, setDragged] = useState<{ botId: BotId; from: string } | null>(null);
+  const [override, setOverride] = useState<Groups | null>(null);
+  const groups = override ?? storeGroups;
+  const storeOrder = JSON.stringify(storeGroups);
+
+  // The server saved the drop, so the store order is the same as the dragged order now.
+  useEffect(() => {
+    if (dragged === null && override !== null && JSON.stringify(override) === storeOrder) setOverride(null);
+  }, [dragged, override, storeOrder]);
+
+  const sensors = useSensors(
+    // A drag starts after a short move, so a click still opens the bot.
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    // On a touch screen a swipe scrolls the list, and a press and hold starts a drag.
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
+  );
+
+  /** Aims at the nearest row of the group under the pointer, so a bot can only land in that group. */
+  const collisionDetection: CollisionDetection = (args) => {
+    const zone = pointerWithin(args).find((collision) => String(collision.id).startsWith("group:"));
+    const group = zone === undefined ? undefined : groupOf(groups, zone.id);
+    const rows = args.droppableContainers.filter((container) =>
+      group === undefined ? !String(container.id).startsWith("group:") : groups[group]?.includes(container.id as BotId),
+    );
+
+    // An empty group takes the bot as its only row.
+    if (zone !== undefined && rows.length === 0) return [zone];
+
+    return closestCenter({ ...args, droppableContainers: rows });
+  };
+
+  const onDragStart = ({ active }: DragStartEvent) => {
+    const from = groupOf(groups, active.id);
+    if (from === undefined) return;
+
+    setDragged({ botId: active.id as BotId, from });
+    setOverride(groups);
+  };
+
+  /** Moves the dragged bot into the group under the pointer. Inside a group, the sortable list moves it. */
+  const onDragOver = ({ active, over }: DragOverEvent) => {
+    if (over === null) return;
+
+    const from = groupOf(groups, active.id);
+    const to = groupOf(groups, over.id);
+    if (from === undefined || to === undefined || from === to) return;
+
+    const target = [...(groups[to] ?? [])];
+    const overIndex = target.indexOf(over.id as BotId);
+    target.splice(overIndex === -1 ? target.length : overIndex, 0, active.id as BotId);
+
+    setOverride({ ...groups, [from]: (groups[from] ?? []).filter((botId) => botId !== active.id), [to]: target });
+  };
+
+  const onDragEnd = ({ active, over }: DragEndEvent) => {
+    setDragged(null);
+
+    const group = groupOf(groups, active.id);
+    if (dragged === null || group === undefined) return setOverride(null);
+
+    const rows = groups[group] ?? [];
+    const overIndex = over === null ? -1 : rows.indexOf(over.id as BotId);
+    const order = overIndex === -1 ? rows : arrayMove([...rows], rows.indexOf(active.id as BotId), overIndex);
+    const dropped = { ...groups, [group]: order };
+    setOverride(dropped);
+
+    const joins = group !== dragged.from;
+    if (!joins && order.join() === storeGroups[group]?.join()) return;
+
+    const botId = dragged.botId;
+    void (async () => {
+      // A bot from another group joins this one first, then takes its place.
+      if (joins) await client.setBotProject(botId, group === PERSONAL ? null : group);
+      await client.reorderBots(order);
+    })().finally(() => {
+      // A failed call, or a bot that came or went meanwhile, must not hold the dragged order forever.
+      setTimeout(() => setOverride((current) => (current === dropped ? null : current)), 2000);
     });
+  };
+
+  const onDragCancel = () => {
+    setDragged(null);
+    setOverride(null);
+  };
+
+  const joinedGroup = dragged === null ? undefined : groupOf(groups, dragged.botId);
+
+  return {
+    groups,
+    draggedBotId: dragged?.botId,
+    // The group lights up when the dragged bot joins it from another group.
+    highlightedGroup: dragged !== null && joinedGroup !== dragged.from ? joinedGroup : undefined,
+    context: { sensors, collisionDetection, onDragStart, onDragOver, onDragEnd, onDragCancel },
+  };
 }
 
 /** Shows one project as a header that opens and closes the list of its bots. */
-function ProjectSection({ project, bots, botCount }: { project: Project; bots: ReadonlyArray<BotSummary>; botCount: number }) {
+function ProjectSection({
+  project,
+  rows,
+  botCount,
+  highlighted,
+}: {
+  project: Project;
+  rows: ReadonlyArray<Row>;
+  botCount: number;
+  highlighted: boolean;
+}) {
   const [open, setOpen] = useState(true);
   const [renaming, setRenaming] = useState(false);
   const renameField = useRef<HTMLInputElement>(null);
 
   return (
-    <BotDropZone projectId={project.id}>
+    <BotDropZone group={project.id} highlighted={highlighted}>
       <ProjectMenu project={project} botCount={botCount} onRename={() => setRenaming(true)} renameField={renameField}>
         {renaming ? (
           <div className="flex w-full items-center rounded-lg px-2.5 py-1.5 text-[0.8125rem]">
@@ -330,8 +471,8 @@ function ProjectSection({ project, bots, botCount }: { project: Project; bots: R
 
       <Collapse open={open}>
         <div className={BOT_ROWS}>
-          <BotRows bots={bots} />
-          {bots.length === 0 && <p className={EMPTY_HINT}>Drag Bots here</p>}
+          <BotRows rows={rows} />
+          {rows.length === 0 && <p className={EMPTY_HINT}>Drag Bots here</p>}
         </div>
       </Collapse>
     </BotDropZone>
@@ -346,8 +487,37 @@ export function BotList() {
   const [searching, setSearching] = useState(false);
   const [search, setSearch] = useState("");
   const searchField = useRef<HTMLInputElement>(null);
+  const reduceMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
   const shown = bots.filter((bot) => bot.name.toLowerCase().includes(search.trim().toLowerCase()));
-  const personal = shown.filter((bot) => bot.projectId === null);
+  const shownById = new Map(shown.map((bot) => [bot.id, bot]));
+  const groupOfBot = (bot: BotSummary) => bot.projectId ?? PERSONAL;
+
+  /** Checks whether a bot shows under its orchestrator, which is the case when both are in the same group. */
+  const isGroupedClone = (bot: BotSummary) => {
+    const orchestrator = bot.clonedFrom === null ? undefined : shownById.get(bot.clonedFrom);
+
+    return orchestrator !== undefined && groupOfBot(orchestrator) === groupOfBot(bot);
+  };
+
+  const storeGroups: Groups = Object.fromEntries(
+    [...projects.map((project) => project.id), PERSONAL].map((group) => [
+      group,
+      shown.filter((bot) => groupOfBot(bot) === group && !isGroupedClone(bot)).map((bot) => bot.id),
+    ]),
+  );
+  const drag = useBotDrag(storeGroups);
+  const draggedBot = drag.draggedBotId === undefined ? undefined : shownById.get(drag.draggedBotId);
+
+  /** Lists the rows of a group in the order that the store or the running drag gives. */
+  const rowsOf = (group: string): ReadonlyArray<Row> =>
+    (drag.groups[group] ?? []).flatMap((botId) => {
+      const bot = shownById.get(botId);
+      if (bot === undefined) return [];
+
+      return [{ bot, clones: shown.filter((clone) => clone.clonedFrom === botId && isGroupedClone(clone)) }];
+    });
+
+  const personal = rowsOf(PERSONAL);
 
   // The field is always in the page, so it takes the focus when it opens.
   useEffect(() => {
@@ -405,28 +575,40 @@ export function BotList() {
         </Collapse>
       </div>
 
-      <div className="flex flex-1 flex-col gap-3 overflow-y-auto px-2 pb-3">
-        {projects.map((project) => (
-          <ProjectSection
-            key={project.id}
-            project={project}
-            bots={shown.filter((bot) => bot.projectId === project.id)}
-            botCount={bots.filter((bot) => bot.projectId === project.id).length}
-          />
-        ))}
+      <DndContext {...drag.context}>
+        <div className="flex flex-1 flex-col gap-3 overflow-y-auto px-2 pb-3">
+          {projects.map((project) => (
+            <ProjectSection
+              key={project.id}
+              project={project}
+              rows={rowsOf(project.id)}
+              botCount={bots.filter((bot) => bot.projectId === project.id).length}
+              highlighted={drag.highlightedGroup === project.id}
+            />
+          ))}
 
-        <BotDropZone projectId={null}>
-          {/* Without a project there is one plain list, so the heading would only add noise. */}
-          {projects.length > 0 && <h2 className="px-2.5 py-1.5 text-[0.8125rem] text-muted-foreground">Personal</h2>}
-          <div className={BOT_ROWS}>
-            <BotRows bots={personal} />
-            {projects.length > 0 && personal.length === 0 && search === "" && <p className={EMPTY_HINT}>Drag Bots here</p>}
-          </div>
-        </BotDropZone>
+          <BotDropZone group={PERSONAL} highlighted={drag.highlightedGroup === PERSONAL}>
+            {/* Without a project there is one plain list, so the heading would only add noise. */}
+            {projects.length > 0 && <h2 className="px-2.5 py-1.5 text-[0.8125rem] text-muted-foreground">Personal</h2>}
+            <div className={BOT_ROWS}>
+              <BotRows rows={personal} />
+              {projects.length > 0 && personal.length === 0 && search === "" && <p className={EMPTY_HINT}>Drag Bots here</p>}
+            </div>
+          </BotDropZone>
 
-        {bots.length === 0 && <p className="pt-24 text-center text-muted-foreground">No chats yet</p>}
-        {bots.length > 0 && shown.length === 0 && <p className="pt-8 text-center text-muted-foreground">No bot matches</p>}
-      </div>
+          {bots.length === 0 && <p className="pt-24 text-center text-muted-foreground">No chats yet</p>}
+          {bots.length > 0 && shown.length === 0 && <p className="pt-8 text-center text-muted-foreground">No bot matches</p>}
+        </div>
+
+        {/* The copy under the pointer. Its rows do not animate, so it shows at once and stays still. */}
+        <DragOverlay dropAnimation={reduceMotion ? null : { ...defaultDropAnimation, ...SLIDE }}>
+          {draggedBot !== undefined && (
+            <div className="rounded-xl bg-sidebar-accent shadow-lg ring-1 ring-foreground/10 **:transition-none">
+              <BotRow bot={draggedBot} />
+            </div>
+          )}
+        </DragOverlay>
+      </DndContext>
 
       {connection !== "connected" && (
         <footer className="px-5 py-3 text-xs text-muted-foreground">
