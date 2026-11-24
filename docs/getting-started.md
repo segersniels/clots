@@ -92,8 +92,6 @@ The details pane on the right shows the bot's browser live, when the bot has one
 
 Each bot has its own browser profile, so its logins stay.
 
-Some sites block a login in the bot's browser. In the desktop app, click **Sign in on this machine**. A window opens on the site that the bot shows. Sign in there as usual and close the window. The app then gives that site's login to the bot's browser.
-
 ## Model
 
 The details pane has a model menu with four choices: **Haiku**, **Sonnet**, **Opus** and **Fable**. A choice changes the model at once, also in the middle of a thread. clots stores only the class. Claude Code picks the newest model of that class that your account can use.

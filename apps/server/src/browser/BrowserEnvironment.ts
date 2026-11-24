@@ -1,6 +1,4 @@
-import type { BrowserCookie } from "@clots/contracts";
 import { Effect } from "effect";
-import { rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import type { StoredBot } from "../bots/BotRepository.ts";
@@ -85,19 +83,6 @@ export const makeBrowserEnvironment = (bot: StoredBot): Record<string, string> =
   };
 };
 
-/** Runs one agent-browser command in the bot's browser session and returns its exit code. */
-const runAgentBrowser = (bot: StoredBot, args: ReadonlyArray<string>) =>
-  Effect.promise(async () => {
-    // Through the wrapper, the command starts the bot's Chrome first.
-    const running = Bun.spawn([executable === undefined ? realAgentBrowser : join(clotsBin, "agent-browser"), ...args], {
-      env: { ...process.env, ...makeBrowserEnvironment(bot) },
-      stdout: "ignore",
-      stderr: "ignore",
-    });
-
-    return await running.exited;
-  });
-
 /**
  * Closes the bot's browser. That frees its stream port for the next bot and stops Chromium from
  * writing to the bot's profile. A browser that hangs does not block the caller for long.
@@ -113,22 +98,3 @@ export const closeBrowser = (bot: StoredBot) =>
     await detaching.exited;
     await closeChrome(devToolsPort(bot));
   }).pipe(Effect.timeout("15 seconds"), Effect.ignore);
-
-/**
- * Loads the cookies of a site that the operator signed in to on their own machine into the bot's
- * browser, which starts if it is closed. Then it opens `url`, so the preview shows the bot signed in.
- */
-export const importLogin = (bot: StoredBot, url: string, cookies: ReadonlyArray<BrowserCookie>) =>
-  Effect.gen(function* () {
-    // The state file holds session tokens, so only the owner can read it, and it goes away at once.
-    const stateFile = join(bot.workingDirectory, `.sign-in-${crypto.randomUUID()}.json`);
-    const state = { cookies: cookies.map((cookie) => ({ ...cookie, session: cookie.expires === -1 })), origins: [] };
-    writeFileSync(stateFile, JSON.stringify(state), { mode: 0o600 });
-
-    const loaded = yield* runAgentBrowser(bot, ["state", "load", stateFile]).pipe(
-      Effect.ensuring(Effect.sync(() => rmSync(stateFile, { force: true }))),
-    );
-    if (loaded !== 0) return yield* Effect.die(new Error("The bot's browser could not load the login."));
-
-    yield* runAgentBrowser(bot, ["open", url]);
-  }).pipe(Effect.timeout("60 seconds"), Effect.orDie);

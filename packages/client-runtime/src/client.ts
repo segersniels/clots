@@ -6,7 +6,6 @@ import {
   type BotId,
   type BotModel,
   type BotSummary,
-  type BrowserCookie,
   type Project,
   type Upload,
   type Schedule,
@@ -34,8 +33,6 @@ export interface ClotsClient {
   setBotUnread(botId: BotId, unread: boolean): Promise<void>;
   /** Closes the bot's browser. The bot opens it again when it needs it. */
   stopBrowser(botId: BotId): Promise<void>;
-  /** Signs the bot's browser in with the cookies of a site that the operator signed in to on this machine. */
-  importBrowserLogin(botId: BotId, url: string, cookies: ReadonlyArray<BrowserCookie>): Promise<void>;
   duplicateBot(botId: BotId): Promise<Bot>;
   deleteBot(botId: BotId): Promise<void>;
   compactBot(botId: BotId): Promise<void>;
@@ -190,7 +187,6 @@ export const makeClotsClient = (origin: string): ClotsClient => {
     setBotModel: (botId, model) => call((rpc) => rpc.SetBotModel({ botId, model })),
     setBotUnread: (botId, unread) => call((rpc) => rpc.SetBotUnread({ botId, unread })),
     stopBrowser: (botId) => call((rpc) => rpc.StopBrowser({ botId })),
-    importBrowserLogin: (botId, url, cookies) => call((rpc) => rpc.ImportBrowserLogin({ botId, url, cookies })),
     duplicateBot: (botId) => call((rpc) => rpc.DuplicateBot({ botId })),
     deleteBot: (botId) => call((rpc) => rpc.DeleteBot({ botId })),
     compactBot: (botId) => call((rpc) => rpc.CompactBot({ botId })),

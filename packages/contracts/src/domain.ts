@@ -92,22 +92,6 @@ export const Upload = Schema.Struct({
 });
 export type Upload = typeof Upload.Type;
 
-/**
- * A cookie of a site that the operator signed in to on their own machine. The server loads it into
- * the bot's browser, so the bot is signed in too. `expires` is in seconds, and -1 marks a session cookie.
- */
-export const BrowserCookie = Schema.Struct({
-  name: Schema.String,
-  value: Schema.String,
-  domain: Schema.String,
-  path: Schema.String,
-  expires: Schema.Number,
-  httpOnly: Schema.Boolean,
-  secure: Schema.Boolean,
-  sameSite: Schema.optional(Schema.Literals(["Strict", "Lax", "None"])),
-});
-export type BrowserCookie = typeof BrowserCookie.Type;
-
 /** One tool call of the running turn, as the thread shows it. */
 export const TraceStep = Schema.Struct({
   id: Schema.String,
