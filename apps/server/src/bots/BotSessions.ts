@@ -1127,7 +1127,8 @@ export class BotSessions extends Context.Service<
           changes.instructions !== undefined && changes.instructions !== bot.instructions ? "Instructions updated" : "",
         ].filter((note) => note !== "");
 
-        if (notes.length === 0) return Effect.void;
+        // A thread without messages has no conversation for the divider to split, and it shows the empty state until the first message.
+        if (notes.length === 0 || bot.lastMessageAt === null) return Effect.void;
 
         return record(runtimeFor(bot.id), bot.id, "settings", notes.join(" · "));
       };
