@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { usePageVisible } from "@/hooks/use-page-visible";
 import { saveLastBot } from "@/lib/last-bot";
 import { readPaneOpen, readPaneWidth, savePaneOpen, savePaneWidth } from "@/lib/pane-width";
 
@@ -45,6 +46,7 @@ function BotPage() {
   const bot = bots.find((candidate) => candidate.id === botId);
   const wide = useMediaQuery(WIDE_WINDOW);
   const reduceMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const visible = usePageVisible();
   const details = usePanelRef();
   // The pane opens as the operator left it. On a narrow window it would cover the chat, so it starts closed there.
   const [detailsOpen, setDetailsOpen] = useState(() => wide && readPaneOpen(DETAILS_OPEN_KEY));
@@ -55,11 +57,11 @@ function BotPage() {
   // A ref, so that a drag does not render the whole page on each move.
   const detailsWidth = useRef(readPaneWidth(DETAILS_WIDTH_KEY, DEFAULT_DETAILS_WIDTH));
 
-  // To open a bot is to read it. A bot that the operator marks as unread while it is open keeps the mark.
+  // To open a bot is to read it, and so is coming back to the window that shows it.
   useEffect(() => {
-    void client.setBotUnread(botId, false);
     saveLastBot(botId);
-  }, [botId]);
+    if (visible) void client.setBotUnread(botId, false);
+  }, [botId, visible]);
 
   // The bot is gone, for example deleted on another device, so the app forgets it and goes home.
   const missing = bots.length > 0 && bot === undefined;

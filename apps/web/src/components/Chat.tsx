@@ -23,6 +23,7 @@ import {
   TraceLine,
   TraceTitle,
 } from "@/components/ui/trace";
+import { usePageVisible } from "@/hooks/use-page-visible";
 
 import { client, useStore } from "../client.ts";
 import { readCachedThread, saveCachedThread } from "../thread-cache.ts";
@@ -161,7 +162,9 @@ function OlderMessagesLoader({ hasOlder, onLoad }: { hasOlder: boolean; onLoad: 
 }
 
 export function Chat({ botId, botName, autoFocus = true }: { botId: BotId; botName: string; autoFocus?: boolean }) {
-  const thread = useStore(client.thread(botId));
+  // The operator reads a bot only while its conversation is on screen. A hidden window lets go of the thread, so the bot can turn unread.
+  const visible = usePageVisible();
+  const thread = useStore(client.thread(botId), visible);
   // After the app starts again, the thread shows its last messages from before, until the server sends the history.
   const [cached] = useState(() => (thread.synced ? null : readCachedThread(botId)));
   const messages = thread.synced || cached === null ? thread.messages : cached;
