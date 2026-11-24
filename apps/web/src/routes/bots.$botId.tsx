@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { saveLastBot } from "@/lib/last-bot";
-import { readPaneWidth, savePaneWidth } from "@/lib/pane-width";
+import { readPaneOpen, readPaneWidth, savePaneOpen, savePaneWidth } from "@/lib/pane-width";
 
 import { client, useStore } from "../client.ts";
 import { BotIdentity, BotInstructions } from "../components/BotSettings.tsx";
@@ -27,6 +27,9 @@ const DEFAULT_DETAILS_WIDTH = 288;
 /** The storage key of the details pane width that the operator chose. */
 const DETAILS_WIDTH_KEY = "clots.detailsWidth";
 
+/** The storage key of whether the operator left the details pane open. */
+const DETAILS_OPEN_KEY = "clots.detailsOpen";
+
 /** The window width from which the details pane is a column beside the chat. It matches the Tailwind `lg` breakpoint. */
 const WIDE_WINDOW = "(min-width: 64rem)";
 
@@ -41,9 +44,10 @@ function BotPage() {
   const wide = useMediaQuery(WIDE_WINDOW);
   const reduceMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
   const details = usePanelRef();
-  const [detailsOpen, setDetailsOpen] = useState(false);
+  // The pane opens as the operator left it. On a narrow window it would cover the chat, so it starts closed there.
+  const [detailsOpen, setDetailsOpen] = useState(() => wide && readPaneOpen(DETAILS_OPEN_KEY));
   // The content stays mounted while the pane closes, and leaves when the pane is gone.
-  const [detailsMounted, setDetailsMounted] = useState(false);
+  const [detailsMounted, setDetailsMounted] = useState(detailsOpen);
   // The column animates only when it opens, closes or resets. During a drag it follows the pointer at once.
   const [animating, setAnimating] = useState(false);
   // A ref, so that a drag does not render the whole page on each move.
@@ -71,6 +75,7 @@ function BotPage() {
     const open = !detailsOpen;
     if (open) setDetailsMounted(true);
     setDetailsOpen(open);
+    savePaneOpen(DETAILS_OPEN_KEY, open);
 
     // A narrow window slides the pane with CSS alone.
     if (!wide) return;
@@ -101,6 +106,7 @@ function BotPage() {
     if (inPixels === 0 && detailsOpen) {
       setDetailsOpen(false);
       setDetailsMounted(false);
+      savePaneOpen(DETAILS_OPEN_KEY, false);
     }
 
     if (inPixels === 0) return;
