@@ -215,13 +215,29 @@ function UsageRow({ account }: { account: Account | undefined }) {
  * end, and its menu shows the Claude account of the server, the plan's limits and this device's theme.
  * While the client has no connection, the circle dims and keeps the last known numbers.
  */
-export function AccountMenu({ connected, connecting }: { connected: boolean; connecting: boolean }) {
+export function AccountMenu({
+  connected,
+  connecting,
+  open,
+  onOpenChange,
+}: {
+  connected: boolean;
+  connecting: boolean;
+  /** The search opens the menu too, so the sidebar owns whether it is open. */
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   const { account, refresh } = useAccount(connected);
   const highest = highestOf(account?.usage);
 
+  // The menu shows fresh numbers on each open, however it opens.
+  useEffect(() => {
+    if (open && connected) refresh();
+  }, [open]);
+
   return (
     <div className="flex min-w-0 items-center gap-2">
-      <Popover onOpenChange={(open) => open && connected && refresh()}>
+      <Popover open={open} onOpenChange={onOpenChange}>
         <PopoverTrigger
           render={
             <button

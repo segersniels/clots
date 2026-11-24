@@ -40,6 +40,7 @@ import { NewBotDialog, NewProjectDialog, NoBots } from "./CreateDialog.tsx";
 import { AccountMenu } from "./AccountMenu.tsx";
 import { UpdatePill, useUpdates } from "./UpdateControl.tsx";
 import { ProjectMenu } from "./ProjectMenu.tsx";
+import { SearchDialog, useSearchShortcuts, type SearchCommands } from "./SearchDialog.tsx";
 
 const EMPTY_HINT = "px-2.5 py-1.5 text-[0.8125rem] text-muted-foreground/70";
 
@@ -528,19 +529,18 @@ export function BotList() {
   const bots = useStore(client.bots);
   const openBotId = useParams({ strict: false }).botId;
   const [creating, setCreating] = useState<"bot" | "project" | null>(null);
+  const [newBotName, setNewBotName] = useState("");
   /** Closes the create dialog when it reports that it closed. */
   const closeCreate = (open: boolean) => open || setCreating(null);
   const projects = useStore(client.projects);
   const connection = useStore(client.connection);
   const updates = useUpdates();
-  const [searching, setSearching] = useState(false);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState<{ open: boolean; instant: boolean }>({ open: false, instant: false });
+  const [accountOpen, setAccountOpen] = useState(false);
   const [personalOpen, togglePersonal] = useGroupOpen(PERSONAL);
-  const searchField = useRef<HTMLInputElement>(null);
   const reduceMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
   const wide = useMediaQuery(WIDE_WINDOW);
-  const shown = bots.filter((bot) => bot.name.toLowerCase().includes(search.trim().toLowerCase()));
-  const shownById = new Map(shown.map((bot) => [bot.id, bot]));
+  const botsById = new Map(bots.map((bot) => [bot.id, bot]));
   const groupOfBot = (bot: BotSummary) => bot.projectId ?? PERSONAL;
   const botIds = bots.map((bot) => bot.id).join();
 
@@ -551,7 +551,7 @@ export function BotList() {
 
   /** Checks whether a bot shows under its orchestrator, which is the case when both are in the same group. */
   const isGroupedClone = (bot: BotSummary) => {
-    const orchestrator = bot.clonedFrom === null ? undefined : shownById.get(bot.clonedFrom);
+    const orchestrator = bot.clonedFrom === null ? undefined : botsById.get(bot.clonedFrom);
 
     return orchestrator !== undefined && groupOfBot(orchestrator) === groupOfBot(bot);
   };
@@ -559,33 +559,38 @@ export function BotList() {
   const storeGroups: Groups = Object.fromEntries(
     [...projects.map((project) => project.id), PERSONAL].map((group) => [
       group,
-      shown.filter((bot) => groupOfBot(bot) === group && !isGroupedClone(bot)).map((bot) => bot.id),
+      bots.filter((bot) => groupOfBot(bot) === group && !isGroupedClone(bot)).map((bot) => bot.id),
     ]),
   );
   const drag = useBotDrag(storeGroups);
-  const draggedBot = drag.draggedBotId === undefined ? undefined : shownById.get(drag.draggedBotId);
+  const draggedBot = drag.draggedBotId === undefined ? undefined : botsById.get(drag.draggedBotId);
 
   /** Lists the rows of a group in the order that the store or the running drag gives. */
   const rowsOf = (group: string): ReadonlyArray<Row> =>
     (drag.groups[group] ?? []).flatMap((botId) => {
-      const bot = shownById.get(botId);
+      const bot = botsById.get(botId);
       if (bot === undefined) return [];
 
-      return [{ bot, clones: shown.filter((clone) => clone.clonedFrom === botId && isGroupedClone(clone)) }];
+      return [{ bot, clones: bots.filter((clone) => clone.clonedFrom === botId && isGroupedClone(clone)) }];
     });
 
   const personal = rowsOf(PERSONAL);
 
-  // The field is always in the page, so it takes the focus when it opens.
-  useEffect(() => {
-    if (searching) searchField.current?.focus();
-  }, [searching]);
-
-  /** Closes the search field and shows all bots again. */
-  const stopSearching = () => {
-    setSearching(false);
-    setSearch("");
+  const searchCommands: SearchCommands = {
+    newBot: (name = "") => {
+      setNewBotName(name);
+      setCreating("bot");
+    },
+    newProject: () => setCreating("project"),
+    checkForUpdates: updates.check,
+    openAccount: () => setAccountOpen(true),
   };
+
+  // A shortcut opens the search without motion. The button opens it with motion.
+  useSearchShortcuts({
+    onToggle: () => setSearch((current) => ({ open: !current.open, instant: true })),
+    onBotOpened: () => setSearch((current) => ({ ...current, open: false })),
+  });
 
   return (
     <nav className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
@@ -593,20 +598,25 @@ export function BotList() {
         <Button
           variant="secondary"
           size="icon"
-          aria-label="Search bots"
-          aria-pressed={searching}
+          aria-label="Search"
           className="rounded-full"
-          onClick={() => (searching ? stopSearching() : setSearching(true))}
+          onClick={() => setSearch({ open: true, instant: false })}
         >
           <SearchIcon />
         </Button>
+        <SearchDialog
+          open={search.open}
+          onOpenChange={(open) => setSearch((current) => ({ ...current, open }))}
+          instant={search.instant}
+          commands={searchCommands}
+        />
 
         <DropdownMenu>
           <DropdownMenuTrigger render={<Button variant="secondary" size="icon" aria-label="New" className="rounded-full" />}>
             <PlusIcon />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-40">
-            <DropdownMenuItem onClick={() => setCreating("bot")}>
+            <DropdownMenuItem onClick={() => searchCommands.newBot()}>
               <UserRoundPlusIcon className="text-muted-foreground" />
               New bot
             </DropdownMenuItem>
@@ -622,23 +632,10 @@ export function BotList() {
           open={creating === "bot"}
           onOpenChange={closeCreate}
           projectId={bots.find((bot) => bot.id === openBotId)?.projectId ?? null}
+          name={newBotName}
         />
         <NewProjectDialog open={creating === "project"} onOpenChange={closeCreate} />
       </header>
-
-      <div className="px-3">
-        <Collapse open={searching}>
-          <Input
-            ref={searchField}
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            onKeyDown={(event) => event.key === "Escape" && stopSearching()}
-            placeholder="Search"
-            aria-label="Search bots"
-            className="mb-2 rounded-full border-transparent bg-sidebar-accent px-3.5"
-          />
-        </Collapse>
-      </div>
 
       <DndContext {...drag.context}>
         <ScrollArea className="min-h-0 flex-1">
@@ -659,7 +656,7 @@ export function BotList() {
               <Collapse open={personalOpen || projects.length === 0}>
                 <div className={BOT_ROWS}>
                   <BotRows rows={personal} />
-                  {projects.length > 0 && personal.length === 0 && search === "" && <p className={EMPTY_HINT}>Drag Bots here</p>}
+                  {projects.length > 0 && personal.length === 0 && <p className={EMPTY_HINT}>Drag Bots here</p>}
                 </div>
               </Collapse>
             </BotDropZone>
@@ -670,7 +667,6 @@ export function BotList() {
                 <NoBots />
               </div>
             )}
-            {bots.length > 0 && shown.length === 0 && <p className="pt-8 text-center text-muted-foreground">No bot matches</p>}
           </div>
         </ScrollArea>
 
@@ -686,7 +682,12 @@ export function BotList() {
 
       <footer className="flex items-center gap-2 px-3 pt-1.5 pb-3">
         {/* A restart that this client asked for drops the connection by design. The update pill tells that story. */}
-        <AccountMenu connected={connection === "connected"} connecting={connection !== "connected" && !updates.restarting} />
+        <AccountMenu
+          connected={connection === "connected"}
+          connecting={connection !== "connected" && !updates.restarting}
+          open={accountOpen}
+          onOpenChange={setAccountOpen}
+        />
         <UpdatePill updates={updates} />
       </footer>
     </nav>

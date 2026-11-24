@@ -47,11 +47,12 @@ export function useUpdates() {
   const [info, setInfo] = useState<UpdateInfo>();
   const [phase, setPhase] = useState<UpdatePhase>({ name: "idle" });
 
+  const check = () => void client.getUpdateInfo().then(setInfo, () => undefined);
+
   // A new connection can mean a new server version, so the client asks again on each one.
   useEffect(() => {
     if (connection !== "connected") return;
 
-    const check = () => void client.getUpdateInfo().then(setInfo, () => undefined);
     check();
     const timer = setInterval(check, CHECK_INTERVAL_MS);
 
@@ -101,7 +102,7 @@ export function useUpdates() {
     }
   };
 
-  return { info, phase, appUpdate, serverUpdate: info?.serverUpdate === true, updateServer, restarting: phase.name === "restarting" };
+  return { info, phase, appUpdate, serverUpdate: info?.serverUpdate === true, updateServer, check, restarting: phase.name === "restarting" };
 }
 
 type Updates = ReturnType<typeof useUpdates>;

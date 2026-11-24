@@ -151,23 +151,34 @@ export function NewBotDialog({
   open,
   onOpenChange,
   projectId,
+  name = "",
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** The project that the dialog proposes, such as the one of the bot that is open. */
   projectId: string | null;
+  /** The name that the dialog proposes, such as a search that found no bot. */
+  name?: string;
 }) {
   return (
     <CreateDialog title="New bot" open={open} onOpenChange={onOpenChange}>
-      <NewBotForm projectId={projectId} onCreated={() => onOpenChange(false)} />
+      <NewBotForm projectId={projectId} proposedName={name} onCreated={() => onOpenChange(false)} />
     </CreateDialog>
   );
 }
 
 /** Holds the fields of a new bot. It mounts with the dialog, so each open starts fresh. */
-function NewBotForm({ projectId: proposedProject, onCreated }: { projectId: string | null; onCreated: () => void }) {
+function NewBotForm({
+  projectId: proposedProject,
+  proposedName,
+  onCreated,
+}: {
+  projectId: string | null;
+  proposedName: string;
+  onCreated: () => void;
+}) {
   const navigate = useNavigate();
-  const [name, setName] = useState("");
+  const [name, setName] = useState(proposedName);
   const [color, setColor] = useState<BotColor>("blue");
   const [shape, setShape] = useState<BotShape>("bean");
   const [projectId, setProjectId] = useState(proposedProject);
