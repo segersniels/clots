@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/trace";
 
 import { client, useStore } from "../client.ts";
+import { readCachedThread, saveCachedThread } from "../thread-cache.ts";
 import { formatClock, formatDuration } from "../time.ts";
 import { Collapse } from "./Collapse.tsx";
 import { Composer } from "./Composer.tsx";
@@ -161,19 +162,27 @@ function OlderMessagesLoader({ hasOlder, onLoad }: { hasOlder: boolean; onLoad: 
 
 export function Chat({ botId, botName, autoFocus = true }: { botId: BotId; botName: string; autoFocus?: boolean }) {
   const thread = useStore(client.thread(botId));
+  // After the app starts again, the thread shows its last messages from before, until the server sends the history.
+  const [cached] = useState(() => (thread.synced ? null : readCachedThread(botId)));
+  const messages = thread.synced || cached === null ? thread.messages : cached;
   // The messages that the thread shows first stay still. Later ones, live or from the update of a cached thread, ease in.
-  const shownThrough = useRef(thread.synced ? thread.lastSequence : null);
+  const shownThrough = useRef(thread.synced ? thread.lastSequence : (cached?.at(-1)?.sequence ?? null));
   if (shownThrough.current === null && thread.synced) shownThrough.current = thread.lastSequence;
   // The newest message of the previous render. The messages after it arrived together.
-  const renderedThrough = useRef(thread.lastSequence);
+  const renderedThrough = useRef(messages.at(-1)?.sequence ?? 0);
   useEffect(() => {
-    renderedThrough.current = thread.lastSequence;
+    renderedThrough.current = messages.at(-1)?.sequence ?? 0;
   });
-  // Only a thread that still has to load fades in. A thread from the cache is there at once.
-  const [loadsLate] = useState(!thread.synced);
+  // Only a thread with nothing to show yet fades in. A thread in memory or in the cache is there at once.
+  const [loadsLate] = useState(!thread.synced && cached === null);
   const { live } = thread;
   const [shownCount, setShownCount] = useState(MESSAGES_PER_PAGE);
-  const firstShown = Math.max(0, thread.messages.length - shownCount);
+  const firstShown = Math.max(0, messages.length - shownCount);
+
+  // The synced thread is the one to show at the next start.
+  useEffect(() => {
+    if (thread.synced) saveCachedThread(botId, thread.messages);
+  }, [botId, thread.synced, thread.messages]);
   // A stable callback, so that one visit to the top loads one page and not one per render.
   const showOlder = useCallback(() => setShownCount((count) => count + MESSAGES_PER_PAGE), []);
   const skills = useStore(client.skills(botId));
@@ -208,16 +217,16 @@ export function Chat({ botId, botName, autoFocus = true }: { botId: BotId; botNa
       <MessageScrollerProvider autoScroll defaultScrollPosition="end">
         {/* A thread that loads stays hidden until its history is in, then fades in once, complete and at its end. */}
         <MessageScroller
-          className={`flex-1 ${loadsLate ? "transition-opacity duration-150 ease-out" : ""} ${thread.synced ? "" : "opacity-0"}`}
+          className={`flex-1 ${loadsLate ? "transition-opacity duration-150 ease-out" : ""} ${thread.synced || cached !== null ? "" : "opacity-0"}`}
         >
           <OlderMessagesLoader hasOlder={firstShown > 0} onLoad={showOlder} />
           {/* The thread runs under the floating header and fades out there. The top padding clears the header. */}
           <MessageScrollerViewport preserveScrollOnPrepend className="[mask-image:linear-gradient(to_bottom,transparent,black_4rem)]">
             <MessageScrollerContent className="gap-1.5 px-4 pt-16 pb-3">
-              {thread.messages.slice(firstShown).map((message, offset) => {
+              {messages.slice(firstShown).map((message, offset) => {
                 // The full history still decides the time labels and the spacing at the first shown message.
                 const index = firstShown + offset;
-                const previous = thread.messages[index - 1];
+                const previous = messages[index - 1];
                 const showsTime = previous === undefined || message.createdAt - previous.createdAt > TIME_LABEL_GAP_MS;
                 const fromBot = message.role === "assistant" || message.role === "trace";
                 // Messages from the same side sit close together. A change of side gets more room.

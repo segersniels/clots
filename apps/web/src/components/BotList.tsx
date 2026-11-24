@@ -31,6 +31,7 @@ import { readPaneOpen, savePaneOpen } from "@/lib/pane-width";
 
 import { client, useStore } from "../client.ts";
 import { hasContent, useDraft, type Draft } from "../drafts.ts";
+import { forgetDeletedThreads } from "../thread-cache.ts";
 import { formatRecent } from "../time.ts";
 import { BotMenu } from "./BotMenu.tsx";
 import { Collapse } from "./Collapse.tsx";
@@ -536,6 +537,12 @@ export function BotList() {
   const shown = bots.filter((bot) => bot.name.toLowerCase().includes(search.trim().toLowerCase()));
   const shownById = new Map(shown.map((bot) => [bot.id, bot]));
   const groupOfBot = (bot: BotSummary) => bot.projectId ?? PERSONAL;
+  const botIds = bots.map((bot) => bot.id).join();
+
+  // Bots also go away by their own hand or on another device. An empty list may not have arrived yet, so it forgets nothing.
+  useEffect(() => {
+    if (botIds !== "") forgetDeletedThreads(botIds.split(",") as Array<BotId>);
+  }, [botIds]);
 
   /** Checks whether a bot shows under its orchestrator, which is the case when both are in the same group. */
   const isGroupedClone = (bot: BotSummary) => {
