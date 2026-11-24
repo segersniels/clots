@@ -5,7 +5,7 @@ import { join } from "node:path";
 export const realAgentBrowser = join(import.meta.dir, "../../node_modules/.bin/agent-browser");
 
 /** The agent-browser commands that do not use the page, so they do not start a Chrome. */
-const COMMANDS_WITHOUT_PAGE = new Set(["close", "skills", "help", "--help", "-h", "--version"]);
+const COMMANDS_WITHOUT_PAGE = new Set(["close", "session", "skills", "install", "doctor", "help", "--help", "-h", "--version"]);
 
 /** The Chrome that clots runs for one bot. */
 export interface BotChrome {
