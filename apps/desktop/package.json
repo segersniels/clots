@@ -7,7 +7,7 @@
   "scripts": {
     "build": "bun run --cwd ../web build:setup && bun build src/main.ts src/preload.ts --target=node --format=cjs --external electron --outdir dist --entry-naming '[name].cjs'",
     "start": "bun run build && electron .",
-    "package:mac": "bun run build && electron-builder --mac",
+    "package:mac": "bun run --cwd ../.. build:cli && bun run build && electron-builder --mac && open release/Clots.dmg",
     "lint": "oxlint src",
     "typecheck": "tsc --noEmit"
   },
@@ -20,13 +20,17 @@
   },
   "build": {
     "appId": "foo.clots.desktop",
-    "productName": "clots",
+    "productName": "Clots",
     "files": ["dist/**", "resources/**"],
+    "extraResources": [{ "from": "../../dist/clots-${platform}-${arch}", "to": "clots" }],
     "directories": { "output": "release" },
     "mac": {
       "category": "public.app-category.productivity",
       "icon": "resources/icon.png",
-      "target": [{ "target": "dmg", "arch": ["arm64", "x64"] }]
-    }
+      "target": ["dmg"],
+      "identity": "-",
+      "hardenedRuntime": false
+    },
+    "dmg": { "artifactName": "Clots.${ext}" }
   }
 }
