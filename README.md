@@ -2,7 +2,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="./docs/assets/clots-dark.png" />
-    <img src="./docs/assets/clots-light.png" alt="The clots web client: bots grouped by project in the sidebar, a chat with a morning briefing, and the bot's details with its screen, project, model and routines" width="90%" />
+    <img src="./docs/assets/clots-light.png" alt="The clots web client: bots grouped by project in the sidebar, a chat with a morning briefing and a bot mention, and the bot's details with its screen, project, model, routines and instructions" width="90%" />
   </picture>
 </p>
 </br>

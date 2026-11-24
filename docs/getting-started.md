@@ -102,9 +102,14 @@ A new bot starts on Opus.
 
 A routine sends a prompt to the bot on a schedule.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/routines-dark.png" />
+  <img src="./assets/routines-light.png" alt="The routines of a bot: each row shows the prompt, the next run and the schedule. A row's menu holds Edit, Pause and Delete." width="45%" />
+</picture>
+
 1. Click **+** next to **Routines** in the details pane.
-2. Enter the prompt, for example "Morning briefing".
+2. Enter the prompt, for example "Morning briefing". Type `/` to pick a skill, or `@` to mention another bot.
 3. Pick a schedule, or pick **Custom cron** and enter a cron expression with five fields.
 4. Click **Add routine**.
 
-The clock icon pauses and resumes a routine. Schedules use the time zone of the host. A routine that was due while the server was down runs once after the start.
+Each routine shows when it runs next. Its **…** menu edits, pauses, resumes or deletes it. Schedules use the time zone of the host. A routine that was due while the server was down runs once after the start.

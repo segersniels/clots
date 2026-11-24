@@ -24,6 +24,13 @@ Your tailnet must have HTTPS certificates enabled. If it does not, `clots up` te
 
 When the node is ready, `clots up` prints the address. Open it on any device that is on your tailnet.
 
+In the [Clots app](./desktop.md), choose **On another machine** and enter the address:
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/setup-remote-dark.png" />
+  <img src="./assets/setup-remote-light.png" alt="The Clots app connects to a clots server on another machine: the server address field with Connect, and the steps for a new server" width="70%" />
+</picture>
+
 ## Who can connect
 
 The default admission mode is `tailscale_owner`: only the Tailscale user who logged the `clots` node in can connect. Tagged devices and other users of the tailnet get a 403 response.

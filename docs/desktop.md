@@ -17,7 +17,18 @@ xattr -cr /Applications/Clots.app
 
 The app asks where clots runs:
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/setup-choose-dark.png" />
+  <img src="./assets/setup-choose-light.png" alt="The first start of the Clots app: choose On this Mac or On another machine" width="70%" />
+</picture>
+
 - **On this Mac:** the app checks that Claude Code is installed and logged in with a subscription, and that Chrome or Chromium is installed. Then it installs the `clots` command that ships inside the app and starts it as a background service with `clots up --local`. The server keeps running when you close the app, and it needs no Tailscale.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/setup-local-dark.png" />
+  <img src="./assets/setup-local-light.png" alt="The setup on this Mac: Claude Code, the Claude login, the browser and the clots server are all checked and ready" width="70%" />
+</picture>
+
 - **On another machine:** enter the address that `clots up` printed on that machine, for example `clots.your-tailnet.ts.net`. [Installing & building](./install.md) explains how to set up that server.
 
 To change this later, use the menu **Server → Change Server…**.
