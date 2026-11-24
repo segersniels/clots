@@ -141,7 +141,8 @@ export function BrowserTabStrip({
               aria-selected={tab.active}
               title={tab.title || tab.url}
               onClick={() => onSelect(tab)}
-              className="flex h-full min-w-0 items-center gap-2 pr-1 pl-3 outline-none"
+              // Without a close button next to it, the name gets the same room on both sides.
+              className={`flex h-full min-w-0 items-center gap-2 pl-3 outline-none ${tabs.length > 1 ? "pr-1" : "pr-3"}`}
             >
               {/* The stream sends no favicon, so a dot stands in for it. */}
               <span className="size-2 shrink-0 rounded-full bg-muted-foreground/40" />
@@ -156,7 +157,8 @@ export function BrowserTabStrip({
           </div>
         ))}
       </div>
-      <Button variant="ghost" size="icon-xs" aria-label="New tab" title="New tab" className="mb-1.5 shrink-0 text-muted-foreground" onClick={onNew}>
+      {/* The tabs sit on the bottom edge. The margin puts the + on the same middle line as their names. */}
+      <Button variant="ghost" size="icon-xs" aria-label="New tab" title="New tab" className="mb-1 shrink-0 text-muted-foreground" onClick={onNew}>
         <PlusIcon />
       </Button>
     </div>
