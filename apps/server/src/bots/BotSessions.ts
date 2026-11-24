@@ -129,6 +129,8 @@ interface BotRuntime {
     readonly query: Query;
     /** The system prompt that the session started with. A bot whose settings changed since then needs a new session. */
     readonly systemPrompt: string;
+    /** The bot's settings that the session started with, so the next session can tell the bot what changed. */
+    readonly startedAs: StoredBot;
     /** Completes when the session has stopped and wrote its last message. */
     readonly ended: Deferred.Deferred<void>;
   } | null;
@@ -146,16 +148,27 @@ interface BotRuntime {
   viewers: number;
 }
 
-/** Tells a bot in its first prompt after a restart that its system prompt changed. */
-const SETTINGS_CHANGED_NOTE = "(The operator changed your clots settings. Your system prompt has the current version.)";
+/**
+ * Tells a bot in its first prompt after a restart what the operator changed. Without the old name,
+ * a renamed bot finds its earlier messages under a name that its system prompt does not have.
+ */
+const settingsNote = (before: StoredBot, after: StoredBot) => {
+  const changes = [
+    before.name === after.name ? "" : `you were renamed from ${before.name} to ${after.name}`,
+    before.instructions === after.instructions ? "" : "your instructions changed",
+  ].filter((change) => change !== "");
+  const details = changes.length === 0 ? "" : `: ${changes.join(", and ")}`;
+
+  return `(The operator changed your clots settings${details}. Your system prompt has the current version.)`;
+};
 
 /** Adds the settings note to a prompt. A slash command such as `/compact` stays as it is. */
-const withSettingsNote = (prompt: SDKUserMessage): SDKUserMessage => {
+const withSettingsNote = (prompt: SDKUserMessage, note: string): SDKUserMessage => {
   const content = prompt.message.content;
 
   if (typeof content === "string") return prompt;
 
-  return { ...prompt, message: { role: "user", content: [...content, { type: "text", text: SETTINGS_CHANGED_NOTE }] } };
+  return { ...prompt, message: { role: "user", content: [...content, { type: "text", text: note }] } };
 };
 
 const systemPromptFor = (bot: StoredBot) =>
@@ -939,7 +952,7 @@ export class BotSessions extends Context.Service<
               },
             },
           });
-          runtime.session = { prompts, query: session, systemPrompt, ended };
+          runtime.session = { prompts, query: session, systemPrompt, startedAs: bot, ended };
 
           // Iterate the Query itself: `return()` on the raw generator waits behind a pending read.
           const messages: AsyncIterable<SDKMessage> = { [Symbol.asyncIterator]: () => session };
@@ -1050,7 +1063,7 @@ export class BotSessions extends Context.Service<
 
           // Changed settings need a new session, but the running turn must finish first.
           if (runtime.session !== null && runtime.session.systemPrompt !== systemPromptFor(bot)) {
-            runtime.restart = { prompts: [withSettingsNote(prompt)] };
+            runtime.restart = { prompts: [withSettingsNote(prompt, settingsNote(runtime.session.startedAs, bot))] };
             yield* restartAfterTurn(bot.id, runtime, runtime.session).pipe(Effect.forkIn(scope));
 
             return;
