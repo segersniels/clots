@@ -4,10 +4,17 @@ import { useState } from "react";
 
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Textarea } from "@/components/ui/textarea";
 
 import { client } from "../client.ts";
 import { CharacterPicker } from "./CharacterPicker.tsx";
+import { ComposerField } from "./ComposerField.tsx";
+
+/** The look of a form field with skill and bot chips: the filled surface of the details pane. Each use adds its height. */
+export const CHIP_FIELD_CLASSES =
+  "max-h-60 overflow-y-auto rounded-xl bg-muted/60 transition-[background-color,box-shadow] duration-150 focus-within:bg-muted focus-within:ring-1 focus-within:ring-ring/40";
+
+/** Caps the picker of a pane field at about six rows, so it covers at most the row above and never its label. */
+export const CHIP_PICKER_CLASSES = "max-h-[13.5rem]";
 
 /** Shows the character and the name of a bot. A click on either one edits it. */
 export function BotIdentity({ bot }: { bot: BotSummary }) {
@@ -60,15 +67,19 @@ export function BotInstructions({ bot }: { bot: BotSummary }) {
   return (
     <section className="flex flex-col gap-2">
       <h2 className="px-1 text-[0.8125rem] text-muted-foreground">Instructions</h2>
-      <Textarea
-        value={instructions}
-        onChange={(event) => setInstructions(event.target.value)}
-        onBlur={saveInstructions}
-        rows={4}
-        aria-label="Instructions"
-        placeholder="What this bot does and how it behaves"
-        className="max-h-60 resize-none rounded-xl border-transparent bg-muted/60 dark:bg-muted/60"
-      />
+      <div className="relative">
+        <ComposerField
+          botId={bot.id}
+          label="Instructions"
+          placeholder="What this bot does and how it behaves"
+          initialText={bot.instructions}
+          onTextChange={setInstructions}
+          onBlur={saveInstructions}
+          autoFocus={false}
+          className={`${CHIP_FIELD_CLASSES} min-h-24`}
+          pickerClassName={CHIP_PICKER_CLASSES}
+        />
+      </div>
     </section>
   );
 }
