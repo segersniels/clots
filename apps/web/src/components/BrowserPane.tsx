@@ -4,9 +4,19 @@ import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, t
 import { EyeOffIcon, SquareIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 
-import { client } from "../client.ts";
+import { client, useStore } from "../client.ts";
+import {
+  AddressBar,
+  BrowserNavigation,
+  BrowserTabStrip,
+  BrowserToolbar,
+  BrowserViewport,
+  BrowserWindow,
+  GiveBackButton,
+  OWN_ESCAPE,
+  type BrowserTab,
+} from "./BrowserWindow.tsx";
 import { Collapse } from "./Collapse.tsx";
 
 /** Is `true` when the operator uses a Mac, where the Command key does what Control does on Linux. */
@@ -21,6 +31,24 @@ const TAKE_OVER_FPS = 30;
 /** The wait before the pane looks again for a browser that the bot has not started yet. */
 const RECONNECT_DELAY_MS = 3000;
 
+/** The storage key prefix of the last shape of each bot's page, so the take-over window opens at the right size. */
+const SCREEN_RATIO_KEY = "clots.screenRatio.";
+
+/** The shape of the page before the first frame of a bot that never showed one. */
+const DEFAULT_SCREEN_RATIO = 16 / 10;
+
+/** Reads the last shape of the bot's page. A missing value or a blocked storage gives the default shape. */
+function readScreenRatio(botId: BotId) {
+  try {
+    return Number(localStorage.getItem(SCREEN_RATIO_KEY + botId)) || DEFAULT_SCREEN_RATIO;
+  } catch {
+    return DEFAULT_SCREEN_RATIO;
+  }
+}
+
+/** The agent-browser commands that load a page. The stream reports when each starts and ends, which drives the loading line. */
+const NAVIGATIONS = new Set(["navigate", "back", "forward", "reload"]);
+
 /**
  * Shows the live screen of the bot's browser. In take-over mode, the pane sends the operator's
  * mouse and keyboard input to the page.
@@ -29,8 +57,13 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
   const [frame, setFrame] = useState<string | null>(null);
   const [pageWidth, setPageWidth] = useState(1280);
   // The frame metadata can state a wrong page height, so the page's shape comes from the frame itself.
-  const [frameRatio, setFrameRatio] = useState(16 / 9);
+  const [frameRatio, setFrameRatio] = useState(() => readScreenRatio(botId));
   const [takeOver, setTakeOver] = useState(false);
+  const [tabs, setTabs] = useState<ReadonlyArray<BrowserTab>>([]);
+  const [address, setAddress] = useState("");
+  // The ids of the navigations that run. A page loads while one runs, also when the bot started it.
+  const [navigations, setNavigations] = useState<ReadonlySet<string>>(new Set());
+  const bot = useStore(client.bots).find((candidate) => candidate.id === botId);
   // The browser takes a moment to close. The button stays disabled until the stream ends.
   const [stopping, setStopping] = useState(false);
   const socket = useRef<WebSocket | null>(null);
@@ -55,6 +88,23 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
 
       opened.addEventListener("message", (event) => {
         const message = JSON.parse(String(event.data));
+
+        if (message.type === "tabs") {
+          const listed: ReadonlyArray<BrowserTab> = message.tabs;
+          setTabs(listed);
+          setAddress(listed.find((tab) => tab.active)?.url ?? "");
+        }
+
+        if (message.type === "url") setAddress(message.url);
+
+        if (message.type === "command" && NAVIGATIONS.has(message.action)) {
+          setNavigations((running) => new Set(running).add(message.id));
+        }
+
+        if (message.type === "result") {
+          setNavigations((running) => (running.has(message.id) ? new Set([...running].filter((id) => id !== message.id)) : running));
+        }
+
         if (message.type !== "frame") return;
 
         setFrame(`data:image/jpeg;base64,${message.data}`);
@@ -66,6 +116,9 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
 
       opened.addEventListener("close", () => {
         setFrame(null);
+        setTabs([]);
+        setAddress("");
+        setNavigations(new Set());
         setStopping(false);
         if (!closed) retry = setTimeout(connect, RECONNECT_DELAY_MS);
       });
@@ -94,6 +147,22 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
       await client.stopBrowser(botId);
     } catch {
       setStopping(false);
+    }
+  };
+
+  const navigate = (action: Parameters<typeof client.navigateBrowser>[1], target?: string) =>
+    void client.navigateBrowser(botId, action, target);
+
+  /** Follows the shape of the page, and keeps it, so the next take-over of this bot opens at that size. */
+  const followFrameShape = (image: HTMLImageElement) => {
+    const ratio = image.naturalWidth / image.naturalHeight;
+    if (Math.abs(ratio - frameRatio) < 0.001) return;
+
+    setFrameRatio(ratio);
+    try {
+      localStorage.setItem(SCREEN_RATIO_KEY + botId, String(ratio));
+    } catch {
+      // The window opens at the default shape next time.
     }
   };
 
@@ -178,7 +247,7 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
                 alt={`${botName}'s screen`}
                 tabIndex={0}
                 draggable={false}
-                onLoad={(event) => setFrameRatio(event.currentTarget.naturalWidth / event.currentTarget.naturalHeight)}
+                onLoad={(event) => followFrameShape(event.currentTarget)}
                 onClick={() => setTakeOver(true)}
                 onKeyDown={(event) => event.key === "Enter" && setTakeOver(true)}
                 className="w-full cursor-pointer rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
@@ -187,40 +256,46 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
           )}
         </Collapse>
 
-        <Dialog open={takeOver && frame !== null} onOpenChange={setTakeOver}>
-          <DialogContent
-            showCloseButton={false}
+        {bot !== undefined && (
+          <BrowserWindow
+            botName={botName}
+            open={takeOver}
+            onOpenChange={setTakeOver}
+            frameRatio={frameRatio}
+            withTabs={tabs.length > 1}
             initialFocus={screen}
-            // The largest size that fits the window and keeps the page's shape, so a click maps to the right spot.
-            style={{ width: `min(calc(100vw - 2rem), calc((100dvh - 8rem) * ${frameRatio} + 1.5rem))` }}
-            className="max-w-none gap-3 p-3 sm:max-w-none"
           >
-            <div className="flex items-center justify-between gap-4 pl-1">
-              <div className="flex flex-col gap-1">
-                <DialogTitle>{botName}'s screen</DialogTitle>
-                <DialogDescription>You have control. Your clicks and keys go to the page.</DialogDescription>
-              </div>
-              <DialogClose render={<Button variant="secondary" />}>Give back</DialogClose>
-            </div>
-
-            {frame !== null && (
-              <img
-                ref={screen}
-                src={frame}
-                alt={`${botName}'s screen`}
-                tabIndex={0}
-                draggable={false}
-                onMouseDown={sendMouse("mousePressed")}
-                onMouseUp={sendMouse("mouseReleased")}
-                onMouseMove={sendMouse("mouseMoved")}
-                onKeyDown={sendKey("keyDown")}
-                onKeyUp={sendKey("keyUp")}
-                onPaste={pasteText}
-                className="w-full cursor-default rounded-lg outline-none"
+            {/* The strip shows only when the bot has more than one tab. */}
+            {tabs.length > 1 && <BrowserTabStrip tabs={tabs} onSelect={(tab) => navigate("tab", tab.tabId)} />}
+            <BrowserToolbar>
+              <BrowserNavigation
+                loading={navigations.size > 0}
+                onNavigate={(action) => navigate(action, action === "stop" ? tabs.find((tab) => tab.active)?.targetId : undefined)}
               />
-            )}
-          </DialogContent>
-        </Dialog>
+              <AddressBar address={address} loading={navigations.size > 0} onOpen={(typed) => navigate("open", typed)} />
+              <GiveBackButton bot={bot} />
+            </BrowserToolbar>
+            <BrowserViewport botName={botName} frameRatio={frameRatio} live={frame !== null}>
+              {frame === null ? null : (
+                <img
+                  {...OWN_ESCAPE}
+                  ref={screen}
+                  src={frame}
+                  alt={`${botName}'s screen`}
+                  tabIndex={0}
+                  draggable={false}
+                  onMouseDown={sendMouse("mousePressed")}
+                  onMouseUp={sendMouse("mouseReleased")}
+                  onMouseMove={sendMouse("mouseMoved")}
+                  onKeyDown={sendKey("keyDown")}
+                  onKeyUp={sendKey("keyUp")}
+                  onPaste={pasteText}
+                  className="block w-full cursor-default outline-none"
+                />
+              )}
+            </BrowserViewport>
+          </BrowserWindow>
+        )}
       </div>
     </section>
   );

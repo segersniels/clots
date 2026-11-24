@@ -104,14 +104,14 @@ function Dot({ className, children }: { className: string; children: ReactNode }
 }
 
 /** Where the progress line heads, and how long it takes. Without a real percentage it creeps, so it never looks stuck. */
-interface Progress {
+export interface Progress {
   readonly from?: number;
   readonly to: number;
   readonly durationMs: number;
 }
 
 /** Draws the thin progress line along the bottom edge of the row. It starts at `from` and moves to `to` on the next frame. */
-function ProgressLine({ from, to, durationMs }: Progress) {
+export function ProgressLine({ from, to, durationMs }: Progress) {
   const [width, setWidth] = useState(from ?? to);
 
   useEffect(() => {
