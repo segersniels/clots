@@ -23,7 +23,7 @@ import type {
   TraceStep,
   Upload,
 } from "@clots/contracts";
-import { Cause, Context, Deferred, Effect, Layer, PubSub, Queue, Stream } from "effect";
+import { Cause, Context, Deferred, Effect, Layer, PubSub, Queue, Scope, Stream } from "effect";
 import { spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
@@ -129,6 +129,8 @@ interface BotRuntime {
   leftover: { readonly pid: number; readonly prompts: Array<SDKUserMessage> } | null;
   /** The prompts that wait while a session with an old system prompt finishes its work. */
   restart: { readonly prompts: Array<SDKUserMessage> } | null;
+  /** The open conversation views of the bot, on any device. A turn that ends while nobody views it marks the bot unread. */
+  viewers: number;
 }
 
 /** Tells a bot in its first prompt after a restart that its system prompt changed. */
@@ -200,6 +202,8 @@ export class BotSessions extends Context.Service<
     resolveHandoff(botId: BotId, handoffId: string): Effect.Effect<void>;
     live(botId: BotId): ThreadLiveState;
     events(botId: BotId): PubSub.PubSub<ThreadEvent>;
+    /** Counts the operator as a viewer of the bot's conversation until the scope closes. */
+    view(botId: BotId): Effect.Effect<void, never, Scope.Scope>;
     /** Fires when the status of a bot changes. */
     readonly statusChanges: PubSub.PubSub<void>;
     /** Fires when the skills of a bot change. */
@@ -234,6 +238,7 @@ export class BotSessions extends Context.Service<
           lastPromptFrom: null,
           leftover: null,
           restart: null,
+          viewers: 0,
         };
         runtimes.set(botId, runtime);
 
@@ -631,6 +636,12 @@ export class BotSessions extends Context.Service<
               yield* record(runtime, botId, "assistant", `The turn failed: ${message.subtype}.`);
             }
 
+            // The operator did not see the turn end, so the sidebar marks the bot.
+            if (runtime.viewers === 0) {
+              yield* repository.setUnread(botId, true);
+              PubSub.publishUnsafe(statusChanges, undefined);
+            }
+
             setLive(runtime, { status: "idle", steps: [] });
 
             return;
@@ -975,6 +986,11 @@ export class BotSessions extends Context.Service<
         skillChanges,
         live: (botId) => runtimeFor(botId).live,
         events: (botId) => runtimeFor(botId).events,
+        view: (botId) =>
+          Effect.acquireRelease(
+            Effect.sync(() => void (runtimeFor(botId).viewers += 1)),
+            () => Effect.sync(() => void (runtimeFor(botId).viewers -= 1)),
+          ),
 
         send,
 
