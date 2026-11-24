@@ -54,6 +54,20 @@ const MAX_CLONES = 10;
 /** The wait before a clone that deletes itself goes, so that its tool call can end first. */
 const SELF_DELETE_DELAY_MS = 1000;
 
+/** The start of the id of the step that shows a compaction while it runs. */
+const COMPACT_STEP = "compact-";
+
+/** Writes a token count the short way, for example 4.5k or 180k. */
+const shortTokens = (tokens: number) => (tokens < 10_000 ? `${(tokens / 1000).toFixed(1)}k` : `${Math.round(tokens / 1000)}k`);
+
+/** Describes a finished compaction for the thread, for example "Conversation compacted · 180k → 32k tokens". */
+const compactNote = (trigger: "manual" | "auto", before: number, after: number | undefined) => {
+  const what = trigger === "auto" ? "Conversation compacted automatically" : "Conversation compacted";
+  if (after === undefined) return `${what} · ${shortTokens(before)} tokens before`;
+
+  return `${what} · ${shortTokens(before)} → ${shortTokens(after)} tokens`;
+};
+
 /** Gives a clone a name that no other bot has, so that `@Name` finds exactly one bot. */
 const uniqueName = (wanted: string, bots: ReadonlyArray<StoredBot>) => {
   const taken = new Set(bots.map((bot) => bot.name.toLowerCase()));
@@ -142,6 +156,8 @@ export class BotSessions extends Context.Service<
      * Claude transcripts. The session and the browser stop first, so neither writes to the files while they go.
      */
     deleteBot(bot: StoredBot): Effect.Effect<void>;
+    /** Asks the bot's session to compact its conversation, as `/compact` does in Claude Code. */
+    compact(bot: StoredBot): Effect.Effect<void>;
     /** Switches the model of a running session. A bot without a session reads its model at the next start. */
     setModel(botId: BotId, model: BotModel): Effect.Effect<void>;
     resolveApproval(botId: BotId, approvalId: string, decision: ApprovalDecision): Effect.Effect<void>;
@@ -530,6 +546,27 @@ export class BotSessions extends Context.Service<
             return;
           }
 
+          // Compaction summarizes the older context. While it runs, the thread shows it as a step.
+          if (message.type === "system" && message.subtype === "status") {
+            if (message.status === "compacting") {
+              const step = { id: `${COMPACT_STEP}${Date.now()}`, title: "Compacting the conversation", status: "running" as const };
+              setLive(runtime, { status: statusWhileRunning(runtime), steps: [...runtime.live.steps, step] });
+            }
+
+            return;
+          }
+
+          // A finished compaction leaves a note in the thread, so the operator sees where the bot's memory was summarized.
+          if (message.type === "system" && message.subtype === "compact_boundary") {
+            const running = runtime.live.steps.filter((step) => step.id.startsWith(COMPACT_STEP) && step.status === "running");
+            setStepStatus(runtime, new Set(running.map((step) => step.id)));
+
+            const { trigger, pre_tokens, post_tokens } = message.compact_metadata;
+            yield* record(runtime, botId, "compact", compactNote(trigger, pre_tokens, post_tokens));
+
+            return;
+          }
+
           // The session found more skills, for example in a project directory.
           if (message.type === "system" && message.subtype === "commands_changed") {
             yield* saveSkills(botId, message.commands);
@@ -731,6 +768,20 @@ export class BotSessions extends Context.Service<
 
       const removeRuntime = (botId: BotId) => stop(botId).pipe(Effect.andThen(Effect.sync(() => runtimes.delete(botId))));
 
+      const compact = (bot: StoredBot) =>
+        Effect.gen(function* () {
+          const runtime = runtimeFor(bot.id);
+          setLive(runtime, { status: statusWhileRunning(runtime) });
+
+          // Claude Code runs its own command. The thread gets a note when it is done, not a message from the operator.
+          const session = runtime.session ?? (yield* startSession(bot, runtime));
+          Queue.offerUnsafe(session.prompts, {
+            type: "user",
+            message: { role: "user", content: "/compact" },
+            parent_tool_use_id: null,
+          } as SDKUserMessage);
+        });
+
       const deleteBot = (bot: StoredBot) =>
         removeRuntime(bot.id).pipe(
           Effect.andThen(closeBrowser(bot)),
@@ -765,6 +816,8 @@ export class BotSessions extends Context.Service<
         remove: removeRuntime,
 
         deleteBot,
+
+        compact,
 
         resolveApproval: (botId, approvalId, decision) =>
           Effect.sync(() => runtimeFor(botId).approvals.get(approvalId)?.(decision)),

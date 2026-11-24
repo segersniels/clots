@@ -38,6 +38,7 @@ export interface ClotsClient {
   importBrowserLogin(botId: BotId, url: string, cookies: ReadonlyArray<BrowserCookie>): Promise<void>;
   duplicateBot(botId: BotId): Promise<Bot>;
   deleteBot(botId: BotId): Promise<void>;
+  compactBot(botId: BotId): Promise<void>;
   /** Creates a project. `directory` is an optional path on the host. */
   createProject(name: string, directory: string | null): Promise<Project>;
   renameProject(projectId: string, name: string): Promise<void>;
@@ -192,6 +193,7 @@ export const makeClotsClient = (origin: string): ClotsClient => {
     importBrowserLogin: (botId, url, cookies) => call((rpc) => rpc.ImportBrowserLogin({ botId, url, cookies })),
     duplicateBot: (botId) => call((rpc) => rpc.DuplicateBot({ botId })),
     deleteBot: (botId) => call((rpc) => rpc.DeleteBot({ botId })),
+    compactBot: (botId) => call((rpc) => rpc.CompactBot({ botId })),
     sendMessage: (botId, text, attachments = []) => call((rpc) => rpc.SendMessage({ botId, text, attachments })),
     interruptBot: (botId) => call((rpc) => rpc.InterruptBot({ botId })),
     resolveApproval: (botId, approvalId, decision) =>
