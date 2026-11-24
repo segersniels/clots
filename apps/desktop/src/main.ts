@@ -43,6 +43,9 @@ const isServerPage = (url: string | undefined) => {
 
 let window: BrowserWindow | undefined;
 
+/** Set when the app quits, so the window closes for real instead of hiding. */
+let quitting = false;
+
 /** Shows the setup page. `query` opens a given screen, such as the remote screen with its last error. */
 const showSetup = (query: Record<string, string> = {}) => window?.loadFile(appFile("resources/setup/setup.html"), { query });
 
@@ -61,6 +64,14 @@ const createWindow = () => {
   });
   const { webContents } = window;
   webContents.setUserAgent(webContents.getUserAgent() + USER_AGENT_TAG);
+
+  // On macOS the app keeps running in the dock after the close button. The page stays alive, so it still sends notifications.
+  window.on("close", (event) => {
+    if (process.platform !== "darwin" || quitting) return;
+
+    event.preventDefault();
+    window?.hide();
+  });
 
   // The server does not answer. A local server gets its checklist again, which starts it. A remote one shows the error.
   webContents.on("did-fail-load", (_event, code, description, url, isMainFrame) => {
@@ -182,10 +193,16 @@ void app.whenReady().then(() => {
 
   createWindow();
 
-  // On macOS the app stays open without a window, and the dock icon opens a new one.
+  // On macOS the dock icon shows the hidden window again.
   app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    if (window === undefined || window.isDestroyed()) return createWindow();
+
+    window.show();
   });
+});
+
+app.on("before-quit", () => {
+  quitting = true;
 });
 
 app.on("window-all-closed", () => {
