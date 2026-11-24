@@ -34,12 +34,15 @@ function ImageAttachment({ url, name }: { url: string; name: string }) {
   );
 }
 
-/** Shows the files of a message: an image as a picture, another file as a card that opens it. */
+/**
+ * Shows the files of a message: an image as a picture, another file as a card that opens it. The
+ * operator's files sit on the right. The images that a bot opened sit in a row on the bot's side.
+ */
 export function MessageAttachments({ message }: { message: Message }) {
   if (message.attachments.length === 0) return null;
 
   return (
-    <div className="flex flex-col items-end gap-1.5">
+    <div className={message.role === "trace" ? "flex flex-wrap gap-1.5 pt-1.5" : "flex flex-col items-end gap-1.5"}>
       {message.attachments.map((attachment) => {
         const url = `${ATTACHMENTS_PATH}/${message.botId}/${attachment.id}`;
 

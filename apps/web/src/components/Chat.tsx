@@ -260,6 +260,8 @@ export function Chat({ botId, botName, autoFocus = true }: { botId: BotId; botNa
                         title={`Worked for ${formatDuration(message.createdAt - (previous?.createdAt ?? message.createdAt))}`}
                         running={false}
                       />
+                      {/* What the bot looked at, such as a design, shows without opening the steps. */}
+                      <MessageAttachments message={message} />
                     </MessageScrollerItem>
                   );
                 }

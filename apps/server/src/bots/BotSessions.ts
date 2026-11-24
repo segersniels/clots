@@ -23,10 +23,11 @@ import type {
   TraceStep,
   Upload,
 } from "@clots/contracts";
+import { MAX_UPLOAD_BYTES } from "@clots/contracts";
 import { Cause, Context, Deferred, Effect, Layer, PubSub, Queue, Scope, Stream } from "effect";
 import { spawn } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
-import { basename, join } from "node:path";
+import { copyFileSync, mkdirSync, statSync, writeFileSync } from "node:fs";
+import { basename, extname, join } from "node:path";
 import { z } from "zod";
 
 import { ClotsConfig } from "../config.ts";
@@ -99,6 +100,15 @@ const uniqueName = (wanted: string, bots: ReadonlyArray<StoredBot>) => {
 /** Builds the text that a tool returns. */
 const toolText = (text: string) => ({ content: [{ type: "text" as const, text }] });
 
+/** The image files that the thread shows when a bot opens one with Read, by extension. */
+const SHOWN_IMAGE_TYPES: Readonly<Record<string, string>> = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+};
+
 /** The image types that Claude takes as an image block. Other files reach the bot as a path only. */
 const INLINE_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
 
@@ -124,6 +134,8 @@ interface BotRuntime {
   } | null;
   readonly approvals: Map<string, (decision: ApprovalDecision) => void>;
   finishHandoff: (() => void) | null;
+  /** The images that the running steps opened, by step id. The trace of those steps shows them. */
+  readonly stepImages: Map<string, Attachment>;
   /** Who sent the latest prompt: the operator, a routine or another bot. A clone may delete itself only after the operator's. */
   lastPromptFrom: MessageRole | null;
   /** A session from before a server restart that still runs, and the prompts that wait until it ends. */
@@ -237,6 +249,7 @@ export class BotSessions extends Context.Service<
           session: null,
           approvals: new Map(),
           finishHandoff: null,
+          stepImages: new Map(),
           lastPromptFrom: null,
           leftover: null,
           restart: null,
@@ -605,8 +618,36 @@ export class BotSessions extends Context.Service<
           if (finished.length === 0) return;
 
           const steps = finished.map((step) => ({ ...step, status: "done" as const }));
-          yield* record(runtime, botId, "trace", "", [], steps);
+          const images = finished.flatMap((step) => runtime.stepImages.get(step.id) ?? []);
+          for (const step of finished) runtime.stepImages.delete(step.id);
+
+          yield* record(runtime, botId, "trace", "", images, steps);
           setLive(runtime, { steps: runtime.live.steps.filter((step) => !finished.includes(step)) });
+        });
+
+      /**
+       * Keeps a copy of an image that the bot opened with Read, so that the thread shows the
+       * operator what the bot looked at. A bot that says "here is the design" means this image.
+       */
+      const keepOpenedImage = (runtime: BotRuntime, botId: BotId, stepId: string, path: unknown) =>
+        Effect.gen(function* () {
+          const mediaType = typeof path === "string" ? SHOWN_IMAGE_TYPES[extname(path).toLowerCase()] : undefined;
+          if (typeof path !== "string" || mediaType === undefined) return;
+
+          const bot = yield* repository.find(botId);
+          if (bot === undefined) return;
+
+          // The file can be gone, or too large to keep. Then the step shows no image.
+          yield* Effect.try(() => {
+            const size = statSync(path).size;
+            if (size > MAX_UPLOAD_BYTES) return;
+
+            const id = crypto.randomUUID();
+            const directory = join(bot.workingDirectory, "attachments");
+            mkdirSync(directory, { recursive: true });
+            copyFileSync(path, join(directory, `${id}-${basename(path).replaceAll(/[^\w.-]+/g, "_")}`));
+            runtime.stepImages.set(stepId, { id, name: basename(path), mediaType, size });
+          }).pipe(Effect.ignore);
         });
 
       /** Keeps the files of a message in the bot's notes directory, where the bot can also read them. */
@@ -773,6 +814,8 @@ export class BotSessions extends Context.Service<
           // The finished tool call carries a short description of what the bot does.
           for (const block of message.message.content) {
             if (block.type !== "tool_use") continue;
+
+            if (block.name === "Read") yield* keepOpenedImage(runtime, botId, block.id, (block.input as { file_path?: unknown }).file_path);
 
             const description = (block.input as { description?: unknown }).description;
 
