@@ -1,5 +1,5 @@
 import { BROWSER_STREAM_PATH, type BotId } from "@clots/contracts";
-import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type MouseEvent } from "react";
+import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type MouseEvent, type WheelEvent } from "react";
 
 import { EyeOffIcon, SquareIcon } from "lucide-react";
 
@@ -183,6 +183,20 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
     });
   };
 
+  /** Scrolls the page under the pointer, as the wheel or the trackpad does in a browser. */
+  const sendWheel = (event: WheelEvent<HTMLImageElement>) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+
+    send({
+      type: "input_mouse",
+      eventType: "mouseWheel",
+      x: Math.round(((event.clientX - bounds.left) / bounds.width) * pageWidth),
+      y: Math.round(((event.clientY - bounds.top) / bounds.height) * (pageWidth / frameRatio)),
+      deltaX: event.deltaX,
+      deltaY: event.deltaY,
+    });
+  };
+
   const sendKey = (eventType: string) => (event: KeyboardEvent) => {
     if (!takeOver) return;
 
@@ -287,10 +301,12 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
                   onMouseDown={sendMouse("mousePressed")}
                   onMouseUp={sendMouse("mouseReleased")}
                   onMouseMove={sendMouse("mouseMoved")}
+                  onWheel={sendWheel}
                   onKeyDown={sendKey("keyDown")}
                   onKeyUp={sendKey("keyUp")}
                   onPaste={pasteText}
-                  className="block w-full cursor-default outline-none"
+                  // The page fits the window by its width, or by its height when it is tall.
+                  className="block max-h-(--page-max-height) max-w-full cursor-default outline-none"
                 />
               )}
             </BrowserViewport>

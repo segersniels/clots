@@ -1,7 +1,7 @@
 import { Character } from "@clots/character";
 import type { BotSummary } from "@clots/contracts";
 import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, CopyIcon, ExternalLinkIcon, LockIcon, RotateCwIcon, XIcon } from "lucide-react";
-import { useEffect, useState, type KeyboardEvent, type ReactNode, type RefObject } from "react";
+import { useEffect, useState, type CSSProperties, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -22,6 +22,9 @@ export interface BrowserTab {
 const TAB_STRIP_HEIGHT = 40;
 const TOOLBAR_HEIGHT = 52;
 const VIEWPORT_MARGIN = 10;
+
+/** The narrowest window, so the toolbar fits. A tall page then fits by its height, in the middle of the window. */
+const MIN_WINDOW_WIDTH = 520;
 
 /** How long the copy button shows its check after a copy. */
 const COPIED_MS = 1500;
@@ -72,6 +75,8 @@ export function BrowserWindow({
   children: ReactNode;
 }) {
   const chrome = (withTabs ? TAB_STRIP_HEIGHT : 0) + TOOLBAR_HEIGHT + 2 * VIEWPORT_MARGIN;
+  // The page may take the height that is left 44 px from the top and the bottom of the app window.
+  const pageMaxHeight = `calc(100dvh - 5.5rem - ${chrome}px)`;
 
   return (
     <Dialog
@@ -94,11 +99,14 @@ export function BrowserWindow({
         initialFocus={initialFocus}
         overlayClassName="supports-backdrop-filter:backdrop-blur-[3px]"
         // The largest window that fits 44 px from the top and 40 px from the sides and keeps the page's shape, so a click maps to the right spot.
-        style={{
-          width: `min(calc(100vw - 5rem), calc((100dvh - 5.5rem - ${chrome}px) * ${frameRatio} + ${2 * VIEWPORT_MARGIN}px))`,
-        }}
+        style={
+          {
+            "--page-max-height": pageMaxHeight,
+            width: `min(calc(100vw - 5rem), max(${MIN_WINDOW_WIDTH}px, calc(${pageMaxHeight} * ${frameRatio} + ${2 * VIEWPORT_MARGIN}px)))`,
+          } as CSSProperties
+        }
         // A new page shape eases the width, so the window does not jump when the first frame arrives.
-        className="max-w-none gap-0 overflow-hidden rounded-2xl bg-popover p-0 sm:max-w-none motion-safe:[transition:width_200ms_var(--ease-out)]"
+        className="flex max-w-none flex-col gap-0 overflow-hidden rounded-2xl bg-popover p-0 sm:max-w-none motion-safe:[transition:width_200ms_var(--ease-out)]"
       >
         <DialogTitle className="sr-only">{botName}'s screen</DialogTitle>
         {children}
@@ -265,7 +273,7 @@ export function GiveBackButton({ bot }: { bot: BotSummary }) {
           variant="ghost"
           aria-label={`Give the screen back to ${bot.name}`}
           title={`Give the screen back to ${bot.name}`}
-          className="h-[34px] gap-1.5 rounded-full bg-muted/60 pr-3.5 pl-2 font-medium hover:bg-muted"
+          className="h-[34px] shrink-0 gap-1.5 rounded-full bg-muted/60 pr-3.5 pl-2 font-medium hover:bg-muted"
         />
       }
     >
@@ -289,16 +297,22 @@ export function BrowserViewport({
   children: ReactNode | null;
 }) {
   return (
-    <div
-      className={`mx-2.5 mb-2.5 overflow-hidden rounded-[10px] transition-[box-shadow] duration-200 ease-out ${live ? "ring-2 ring-attention" : "ring-1 ring-border"}`}
-    >
-      {/* Before the first frame, the window shows that it connects instead of an empty box. */}
-      {children ?? (
-        <div className="flex items-center justify-center gap-2 text-muted-foreground" style={{ aspectRatio: frameRatio }}>
-          <Spinner />
-          Connecting to {botName}'s screen
-        </div>
-      )}
+    // The frame hugs the page, so a tall page sits in the middle of the window with the ring around it.
+    <div className="mx-2.5 mb-2.5 flex justify-center">
+      <div
+        className={`max-w-full overflow-hidden rounded-[10px] transition-[box-shadow] duration-200 ease-out ${live ? "ring-2 ring-attention" : "w-full ring-1 ring-border"}`}
+      >
+        {/* Before the first frame, the window shows that it connects instead of an empty box. */}
+        {children ?? (
+          <div
+            className="flex max-h-(--page-max-height) w-full items-center justify-center gap-2 text-muted-foreground"
+            style={{ aspectRatio: frameRatio }}
+          >
+            <Spinner />
+            Connecting to {botName}'s screen
+          </div>
+        )}
+      </div>
     </div>
   );
 }
