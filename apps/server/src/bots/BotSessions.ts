@@ -933,6 +933,8 @@ export class BotSessions extends Context.Service<
               },
               model: bot.model,
               settingSources: ["user", "project", "local"],
+              // clots shows the bot's name, so Claude Code does not need a request to name the session.
+              title: bot.name,
               settings: {
                 // Claude Code keeps its memory per working directory, so all bots in a project would share it. Each bot keeps its own.
                 autoMemoryDirectory: join(bot.workingDirectory, "memory"),
