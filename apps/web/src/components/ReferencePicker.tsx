@@ -1,3 +1,4 @@
+import { cn } from "cn";
 import { useEffect, useRef, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,7 @@ export function ReferencePicker({
   emptyText,
   onPick,
   onHover,
+  className,
 }: {
   open: boolean;
   label: string;
@@ -29,6 +31,7 @@ export function ReferencePicker({
   emptyText: string;
   onPick: (item: PickerItem) => void;
   onHover: (index: number) => void;
+  className?: string | undefined;
 }) {
   const list = useRef<HTMLDivElement>(null);
 
@@ -43,7 +46,10 @@ export function ReferencePicker({
       role="listbox"
       aria-label={label}
       data-open={open}
-      className="absolute inset-x-0 bottom-full mb-2 max-h-72 overflow-y-auto rounded-xl border bg-popover p-1 text-popover-foreground shadow-md transition-[opacity,translate] duration-150 ease-out data-[open=false]:pointer-events-none data-[open=false]:translate-y-1 data-[open=false]:opacity-0 motion-reduce:data-[open=false]:translate-y-0"
+      className={cn(
+        "absolute inset-x-0 bottom-full mb-2 max-h-72 overflow-y-auto rounded-xl border bg-popover p-1 text-popover-foreground shadow-md transition-[opacity,translate] duration-150 ease-out data-[open=false]:pointer-events-none data-[open=false]:translate-y-1 data-[open=false]:opacity-0 motion-reduce:data-[open=false]:translate-y-0",
+        className,
+      )}
     >
       {items.length === 0 && <p className="px-2.5 py-2 text-[0.8125rem] text-muted-foreground">{emptyText}</p>}
       {items.map((item, index) => (

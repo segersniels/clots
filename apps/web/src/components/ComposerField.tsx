@@ -5,7 +5,7 @@ import { Placeholder } from "@tiptap/extensions";
 import { EditorContent, NodeViewWrapper, ReactNodeViewRenderer, useEditor, type NodeViewProps } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { BoxIcon } from "lucide-react";
-import { useImperativeHandle, useRef, useState, type Ref } from "react";
+import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
 
 import { client, useStore } from "../client.ts";
 import { findReferenceQuery, knownNames, matchItems, splitReferences, type KnownNames, type ReferenceKind } from "../references.ts";
@@ -90,25 +90,40 @@ const queryAt = (editor: Editor) => {
 };
 
 /**
- * The text field of the composer. It shows each skill or bot reference as a chip, and opens a
- * picker when the operator types `$` or `/` for a skill, or `@` for a bot.
+ * A text field that shows each skill or bot reference as a chip, and opens a picker when the
+ * operator types `$` or `/` for a skill, or `@` for a bot. The composer sends on Enter and takes
+ * files. A form field, such as the instructions, leaves those out: Enter makes a new line there.
+ * The picker opens above the nearest positioned ancestor.
  */
 export function ComposerField({
   botId,
   placeholder,
+  label = placeholder,
   initialText,
   onTextChange,
   onEnter,
   onFiles,
+  onBlur,
+  onEscape,
+  autoFocus = true,
+  className = "max-h-40 min-h-8 min-w-0 flex-1 overflow-y-auto",
+  pickerClassName,
   ref,
 }: {
   botId: BotId;
   placeholder: string;
+  label?: string;
   initialText: string;
   onTextChange: (text: string) => void;
-  onEnter: () => void;
-  onFiles: (files: FileList) => void;
-  ref: Ref<ComposerFieldHandle>;
+  onEnter?: () => void;
+  onFiles?: (files: FileList) => void;
+  onBlur?: () => void;
+  /** Runs on Escape when the picker is closed. The editor uses Escape itself otherwise. */
+  onEscape?: () => void;
+  autoFocus?: boolean;
+  className?: string;
+  pickerClassName?: string;
+  ref?: Ref<ComposerFieldHandle>;
 }) {
   const skills = useStore(client.skills(botId));
   // A bot does not mention itself.
@@ -134,8 +149,8 @@ export function ComposerField({
   const matchingItems = pickerOpen ? matchItems(pickerSource, query.query).slice(0, MAX_LISTED_ITEMS) : [];
 
   // The editor keeps its first handlers, so they read the current ones through these refs.
-  const latest = useRef({ onTextChange, onEnter, onFiles, placeholder, handleKey: (_event: KeyboardEvent): boolean => false });
-  latest.current = { onTextChange, onEnter, onFiles, placeholder, handleKey: (event) => handleKey(event) };
+  const latest = useRef({ onTextChange, onEnter, onFiles, onBlur, onEscape, placeholder, handleKey: (_event: KeyboardEvent): boolean => false });
+  latest.current = { onTextChange, onEnter, onFiles, onBlur, onEscape, placeholder, handleKey: (event) => handleKey(event) };
 
   const editor = useEditor({
     extensions: [
@@ -164,10 +179,10 @@ export function ComposerField({
     ],
     content: toContent(initialText, known),
     // Opening a bot is to talk to it. A touch screen would open its keyboard over the thread, so it waits for a tap there.
-    autofocus: matchMedia("(pointer: coarse)").matches ? false : "end",
+    autofocus: !autoFocus || matchMedia("(pointer: coarse)").matches ? false : "end",
     editorProps: {
       attributes: {
-        "aria-label": placeholder,
+        "aria-label": label,
         "aria-multiline": "true",
         role: "textbox",
         class:
@@ -176,20 +191,22 @@ export function ComposerField({
       handleKeyDown: (_view, event) => latest.current.handleKey(event),
       handlePaste: (_view, event) => {
         const files = event.clipboardData?.files;
+        const { onFiles: takeFiles } = latest.current;
 
-        if (files === undefined || files.length === 0) return false;
+        if (takeFiles === undefined || files === undefined || files.length === 0) return false;
 
-        latest.current.onFiles(files);
+        takeFiles(files);
 
         return true;
       },
       handleDrop: (_view, event) => {
         const files = event.dataTransfer?.files;
+        const { onFiles: takeFiles } = latest.current;
 
-        if (files === undefined || files.length === 0) return false;
+        if (takeFiles === undefined || files === undefined || files.length === 0) return false;
 
         event.preventDefault();
-        latest.current.onFiles(files);
+        takeFiles(files);
 
         return true;
       },
@@ -200,7 +217,17 @@ export function ComposerField({
       setActiveItem(0);
     },
     onSelectionUpdate: ({ editor: updated }) => setQuery(queryAt(updated)),
+    onBlur: () => latest.current.onBlur?.(),
   });
+
+  // Skills load after the field opens, so a known reference in the first text becomes a chip once they are there.
+  const knownKey = [...skills.map((skill) => skill.name), ...otherBots.map((bot) => bot.name)].join("\n");
+
+  useEffect(() => {
+    if (editor === null || editor.isFocused) return;
+
+    editor.commands.setContent(toContent(editor.getText({ blockSeparator: "\n" }), known), { emitUpdate: false });
+  }, [editor, knownKey]);
 
   useImperativeHandle(ref, () => ({
     clear: () => editor?.commands.clearContent(true),
@@ -244,10 +271,20 @@ export function ComposerField({
       return true;
     }
 
-    // Shift+Enter makes a new line. Enter alone sends.
-    if (event.key !== "Enter" || event.shiftKey) return false;
+    const { onEscape: escape } = latest.current;
 
-    latest.current.onEnter();
+    if (escape !== undefined && event.key === "Escape") {
+      escape();
+
+      return true;
+    }
+
+    // Shift+Enter makes a new line. Enter alone sends, in a field that sends.
+    const { onEnter: send } = latest.current;
+
+    if (send === undefined || event.key !== "Enter" || event.shiftKey) return false;
+
+    send();
 
     return true;
   };
@@ -262,8 +299,9 @@ export function ComposerField({
         emptyText={emptyPickerText(query?.kind ?? "skill", skills.length === 0)}
         onPick={insertReference}
         onHover={setActiveItem}
+        className={pickerClassName}
       />
-      <EditorContent editor={editor} className="max-h-40 min-h-8 min-w-0 flex-1 overflow-y-auto" />
+      <EditorContent editor={editor} className={className} />
     </>
   );
 }
