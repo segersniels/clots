@@ -1,0 +1,105 @@
+name: Release
+
+# A maintainer starts a release by hand from the Actions tab. Only people with
+# write access to the repository can run it.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, such as 0.2.0"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+
+env:
+  VERSION: ${{ inputs.version }}
+
+jobs:
+  # The server reads its version from the root package.json, so the release commit sets it there.
+  prepare:
+    # Release only from main, so a release never contains unmerged work.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check the version
+        run: |
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Use a version such as 1.2.3, without a v or a prerelease suffix."
+            exit 1
+          fi
+      - uses: actions/checkout@v5
+      - name: Commit the version and tag it
+        run: |
+          jq --arg version "$VERSION" '.version = $version' package.json > package.json.next
+          mv package.json.next package.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # The first release can match the version that package.json already has.
+          if ! git diff --quiet; then
+            git commit -am "chore(release): $VERSION"
+            git push origin HEAD:main
+          fi
+          git tag "v$VERSION"
+          git push origin "v$VERSION"
+
+  build:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Apple Silicon only. The app and the server bundle come from the same runner.
+          - runner: macos-15
+            app: true
+          - runner: ubuntu-24.04
+          - runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: v${{ inputs.version }}
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: apps/sidecar/go.mod
+      - run: bun install --frozen-lockfile
+      - run: bun run build:cli
+      # `clots update` downloads this archive and expects one folder named after the platform inside it.
+      - name: Pack the clots bundle
+        run: |
+          bundle=$(ls dist)
+          tar -czf "$bundle.tar.gz" -C dist "$bundle"
+      - name: Build the Clots app
+        if: matrix.app
+        run: |
+          bun run --cwd apps/desktop build
+          cd apps/desktop
+          bunx electron-builder --mac --publish never -c.extraMetadata.version="$VERSION"
+          mv release/Clots.dmg ../../Clots.dmg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.runner }}
+          path: |
+            *.tar.gz
+            *.dmg
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          path: assets
+          merge-multiple: true
+      - name: Create the GitHub release
+        run: gh release create "v$VERSION" assets/* --title "v$VERSION" --generate-notes --repo "$GITHUB_REPOSITORY"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
