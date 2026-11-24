@@ -872,6 +872,8 @@ export class BotSessions extends Context.Service<
               },
               model: bot.model,
               settingSources: ["user", "project", "local"],
+              // Claude Code keeps its memory per working directory, so all bots in a project would share it. Each bot keeps its own.
+              settings: { autoMemoryDirectory: join(bot.workingDirectory, "memory") },
               // A recorded prompt survives a resume, so a restart for new settings would keep the old name and instructions.
               systemPrompt: { type: "preset", preset: "claude_code", append: systemPrompt, snapshot: false },
               // The thread shows whole replies, but a partial message tells it at once that a tool call starts.
