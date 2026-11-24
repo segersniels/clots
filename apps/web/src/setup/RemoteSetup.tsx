@@ -77,11 +77,11 @@ export function RemoteSetup({ onBack }: { onBack: () => void }) {
 
       {connection.name === "failed" && (
         <div className="mt-5 flex gap-3 animate-in fade-in duration-150 motion-reduce:animate-none">
-          <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-red-500 text-white">
+          <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-destructive text-white">
             <XIcon className="size-3.5" strokeWidth={3} />
           </span>
           <div className="min-w-0">
-            <p className="font-medium text-red-500">Could not reach {connection.host}</p>
+            <p className="font-medium text-destructive">Could not reach {connection.host}</p>
             <p className="mt-1 text-sm text-muted-foreground">Check that the clots server runs, and that this Mac is signed in to Tailscale.</p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <Button variant="secondary" size="sm" onClick={() => void connect()}>

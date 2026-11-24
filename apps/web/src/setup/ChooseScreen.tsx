@@ -40,13 +40,13 @@ export function ChooseScreen({ onChoose }: { onChoose: (where: "local" | "remote
       <ScreenDescription className="text-center">clots runs your bots on a server that you own.</ScreenDescription>
       <ItemGroup className="mt-8 gap-2">
         <Choice
-          icon={<LaptopIcon />}
+          icon={<LaptopIcon className="size-5" />}
           title="On this Mac"
           description="Runs in the background, also when the window is closed."
           onSelect={() => onChoose("local")}
         />
         <Choice
-          icon={<ServerIcon />}
+          icon={<ServerIcon className="size-5" />}
           title="On another machine"
           description="Connect to your server at home or on a VPS, over Tailscale."
           onSelect={() => onChoose("remote")}

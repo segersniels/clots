@@ -50,7 +50,7 @@ function StatusGlyph({ status }: { status: RowStatus }) {
 
   if (status === "error") {
     return (
-      <span className="flex size-5 items-center justify-center rounded-full bg-red-500 text-white">
+      <span className="flex size-5 items-center justify-center rounded-full bg-destructive text-white">
         <XIcon className="size-3.5" strokeWidth={3} />
       </span>
     );
