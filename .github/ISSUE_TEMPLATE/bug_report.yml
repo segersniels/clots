@@ -1,0 +1,52 @@
+name: Bug report
+description: Report something in clots that does not work as expected.
+labels: [bug]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: Describe what you saw. Add the exact error message, the server output or a screenshot if you have one.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Create a bot with ...
+        2. Send ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: clots version
+      description: The output of `clots --version` on the server.
+    validations:
+      required: true
+  - type: dropdown
+    id: setup
+    attributes:
+      label: Setup
+      description: Where the server runs and how you talk to it.
+      options:
+        - The Clots app with "On this Mac"
+        - The Clots app with a server on another machine
+        - A server on Linux, from a browser or a phone
+        - A server on macOS, from a browser or a phone
+        - A build from source
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: The OS of the server and of the client, and the Claude Code version (`claude --version`).
+      placeholder: Ubuntu 24.04 server, iPhone Safari, Claude Code 3.1.0
