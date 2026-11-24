@@ -1,12 +1,27 @@
-<p align="center"><strong>clots</strong> runs always-on Claude bots on your own machine. You talk to them from the web, your phone or a desktop app, over your Tailscale network.</p>
+<p align="center">
+  <img src="./apps/desktop/resources/icon.png" width="96" height="96" alt="The clots app icon" />
+</p>
+
+<h1 align="center">clots</h1>
+
+<p align="center">Always-on Claude bots on your own machine.</p>
+
+<p align="center">
+  <a href="https://github.com/segersniels/clots/actions/workflows/ci.yml"><img src="https://github.com/segersniels/clots/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/segersniels/clots/releases/latest"><img src="https://img.shields.io/github/v/release/segersniels/clots" alt="Latest release"></a>
+  <a href="https://github.com/segersniels/clots/blob/main/LICENSE"><img src="https://img.shields.io/github/license/segersniels/clots" alt="MIT license"></a>
+</p>
+
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="./docs/assets/clots-dark.png" />
-    <img src="./docs/assets/clots-light.png" alt="The clots web client: bots grouped by project in the sidebar, a chat with a morning briefing and a bot mention, and the bot's details with its screen, project, model, routines and instructions" width="90%" />
+    <img src="./docs/assets/clots-light.png" alt="The clots web client: bots grouped by project in the sidebar, a chat with a morning briefing and a bot mention, and the bot's details with its screen, project, model, routines and instructions" width="100%" />
   </picture>
 </p>
-</br>
-Each bot is <a href="https://code.claude.com/docs/en/overview">Claude Code</a>, run through the Claude Agent SDK with your Claude subscription login. clots has no hosted service, no accounts and no API key support.
+
+clots runs Claude bots that never stop: each one has its own instructions, memory, browser and routines, and keeps working while you are away. You talk to them from the Mac app, a browser or your phone, over your Tailscale network.
+
+Each bot is [Claude Code](https://code.claude.com/docs/en/overview), run through the Claude Agent SDK with your Claude subscription login. clots has no hosted service, no accounts and no API key support.
 
 ---
 
