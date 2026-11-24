@@ -1,0 +1,5 @@
+#!/usr/bin/env bun
+// clots puts this file first in a bot's PATH. It starts the bot's Chrome, then runs the real agent-browser, which attaches to it.
+import { runAgentBrowserCommand } from "../src/browser/BotChrome.ts";
+
+process.exit(await runAgentBrowserCommand(process.argv.slice(2)));

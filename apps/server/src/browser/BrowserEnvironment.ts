@@ -1,12 +1,19 @@
 import type { BrowserCookie } from "@clots/contracts";
 import { Effect } from "effect";
 import { rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import type { StoredBot } from "../bots/BotRepository.ts";
+import { closeChrome, realAgentBrowser } from "./BotChrome.ts";
 
 /** The directory that holds the `agent-browser` CLI, which clots installs as a dependency. */
 const agentBrowserBin = join(import.meta.dir, "../../node_modules/.bin");
+
+/** The directory of the `agent-browser` wrapper that starts the bot's own Chrome before each command. */
+const clotsBin = join(import.meta.dir, "../../bin");
+
+/** The distance from a bot's stream port to the DevTools port of its Chrome. */
+const DEVTOOLS_PORT_OFFSET = 1000;
 
 /** The Chrome that clots gives to a bot when no executable is set. agent-browser downloads its own only after `agent-browser install`. */
 const systemBrowser = Bun.which("chromium") ?? Bun.which("google-chrome");
@@ -33,32 +40,56 @@ const normalUserAgent = (executable: string | undefined) => {
   return `Mozilla/5.0 (${platform}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${major}.0.0.0 Safari/537.36`;
 };
 
+/** The Chrome that clots starts for each bot. Without one, agent-browser launches its own Chrome. */
+const executable = process.env.AGENT_BROWSER_EXECUTABLE_PATH ?? systemBrowser ?? undefined;
+
 /** The user agent of every bot browser. The server reads the Chrome version once, when it starts. */
-const userAgent = normalUserAgent(process.env.AGENT_BROWSER_EXECUTABLE_PATH ?? systemBrowser ?? undefined);
+const userAgent = normalUserAgent(executable);
+
+/** The DevTools port of the bot's own Chrome. */
+const devToolsPort = (bot: StoredBot) => bot.browserStreamPort + DEVTOOLS_PORT_OFFSET;
 
 /**
  * Builds the variables that give a bot its own browser: one agent-browser session, one persistent
  * profile for logins, and one fixed stream port that the clots server can find.
  */
-export const makeBrowserEnvironment = (bot: StoredBot): Record<string, string> => ({
-  PATH: `${agentBrowserBin}:${process.env.PATH ?? ""}`,
-  AGENT_BROWSER_SESSION: bot.id,
-  AGENT_BROWSER_PROFILE: join(bot.workingDirectory, ".browser-profile"),
-  AGENT_BROWSER_STREAM_PORT: String(bot.browserStreamPort),
-  // A real 2x scale gives sharp retina frames. The frame caps default to the CSS page size, so they must allow 2x.
-  AGENT_BROWSER_ARGS: "--force-device-scale-factor=2",
-  AGENT_BROWSER_STREAM_MAX_WIDTH: "2560",
-  AGENT_BROWSER_STREAM_MAX_HEIGHT: "1600",
-  ...(process.env.AGENT_BROWSER_EXECUTABLE_PATH === undefined && systemBrowser !== null
-    ? { AGENT_BROWSER_EXECUTABLE_PATH: systemBrowser }
-    : {}),
-  ...(userAgent === undefined ? {} : { AGENT_BROWSER_USER_AGENT: userAgent }),
-});
+export const makeBrowserEnvironment = (bot: StoredBot): Record<string, string> => {
+  const profile = join(bot.workingDirectory, ".browser-profile");
+  const shared = {
+    AGENT_BROWSER_SESSION: bot.id,
+    AGENT_BROWSER_STREAM_PORT: String(bot.browserStreamPort),
+    // The frame caps default to the CSS page size, so they must allow the 2x scale of the browser.
+    AGENT_BROWSER_STREAM_MAX_WIDTH: "2560",
+    AGENT_BROWSER_STREAM_MAX_HEIGHT: "1600",
+  };
+
+  // Without a Chrome on the host, agent-browser launches its own, which sites can tell is automated.
+  if (executable === undefined) {
+    return {
+      ...shared,
+      PATH: `${agentBrowserBin}:${process.env.PATH ?? ""}`,
+      AGENT_BROWSER_PROFILE: profile,
+      AGENT_BROWSER_ARGS: "--force-device-scale-factor=2",
+    };
+  }
+
+  // The wrapper comes first in PATH, so each agent-browser command starts the bot's Chrome and attaches to it.
+  return {
+    ...shared,
+    PATH: `${clotsBin}:${dirname(process.execPath)}:${process.env.PATH ?? ""}`,
+    AGENT_BROWSER_CDP: String(devToolsPort(bot)),
+    CLOTS_BROWSER_PORT: String(devToolsPort(bot)),
+    CLOTS_BROWSER_EXECUTABLE: executable,
+    CLOTS_BROWSER_PROFILE: profile,
+    ...(userAgent === undefined ? {} : { CLOTS_BROWSER_USER_AGENT: userAgent }),
+  };
+};
 
 /** Runs one agent-browser command in the bot's browser session and returns its exit code. */
 const runAgentBrowser = (bot: StoredBot, args: ReadonlyArray<string>) =>
   Effect.promise(async () => {
-    const running = Bun.spawn([join(agentBrowserBin, "agent-browser"), ...args], {
+    // Through the wrapper, the command starts the bot's Chrome first.
+    const running = Bun.spawn([executable === undefined ? realAgentBrowser : join(clotsBin, "agent-browser"), ...args], {
       env: { ...process.env, ...makeBrowserEnvironment(bot) },
       stdout: "ignore",
       stderr: "ignore",
@@ -72,7 +103,16 @@ const runAgentBrowser = (bot: StoredBot, args: ReadonlyArray<string>) =>
  * writing to the bot's profile. A browser that hangs does not block the caller for long.
  */
 export const closeBrowser = (bot: StoredBot) =>
-  runAgentBrowser(bot, ["close"]).pipe(Effect.timeout("15 seconds"), Effect.ignore);
+  Effect.promise(async () => {
+    // agent-browser only lets go of a Chrome that it did not launch, so clots closes the bot's Chrome itself.
+    const detaching = Bun.spawn([realAgentBrowser, "close"], {
+      env: { ...process.env, ...makeBrowserEnvironment(bot) },
+      stdout: "ignore",
+      stderr: "ignore",
+    });
+    await detaching.exited;
+    await closeChrome(devToolsPort(bot));
+  }).pipe(Effect.timeout("15 seconds"), Effect.ignore);
 
 /**
  * Loads the cookies of a site that the operator signed in to on their own machine into the bot's
