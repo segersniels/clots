@@ -133,7 +133,6 @@ export function BrowserWindow({
       <DialogContent
         showCloseButton={false}
         initialFocus={initialFocus}
-        overlayClassName="supports-backdrop-filter:backdrop-blur-[3px]"
         // The largest window that fits 44 px from the top and 40 px from the sides and keeps the page's shape, so a click maps to the right spot.
         style={
           {

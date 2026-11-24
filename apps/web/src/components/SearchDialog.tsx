@@ -432,7 +432,7 @@ export function SearchDialog({
       }}
     >
       <DialogPortal>
-        <DialogOverlay className={cn("supports-backdrop-filter:backdrop-blur-none", instant && "data-open:animate-none data-closed:animate-none")} />
+        <DialogOverlay className={cn(instant && "data-open:animate-none data-closed:animate-none")} />
         <DialogPrimitive.Popup data-instant={instant || undefined} className={POPUP}>
           <DialogTitle className="sr-only">Search</DialogTitle>
           <SearchPanel commands={commands} onSelect={select} />
@@ -484,7 +484,7 @@ export function NewDialog({ open, onOpenChange, commands }: { open: boolean; onO
       }}
     >
       <DialogPortal>
-        <DialogOverlay className="supports-backdrop-filter:backdrop-blur-none" />
+        <DialogOverlay />
         <DialogPrimitive.Popup className={POPUP} onKeyDown={moveHighlight}>
           <DialogTitle className="sr-only">New</DialogTitle>
           <div role="listbox" aria-label="New" className="p-2">
