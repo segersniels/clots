@@ -1,5 +1,5 @@
 import { pointer, prefersReducedMotion, type Animated } from "./frameLoop.ts";
-import { MAX_LOBES, SHAPE_GEOMETRY, type CharacterShape, type Lobe } from "./traits.ts";
+import { MAX_LOBES, NO_FIT, SHAPE_GEOMETRY, shapeFit, type CharacterShape, type Lobe, type ShapeFit } from "./traits.ts";
 
 /** States what the character does now. The motion shows it, so a list needs no spinner. */
 export type CharacterMood = "idle" | "working" | "waiting";
@@ -15,6 +15,8 @@ export interface MotionProps {
   shape: CharacterShape;
   mood: CharacterMood;
   gaze: Gaze | undefined;
+  /** Scales the art to fill its box. A character that can be selected keeps room for its ring instead. */
+  fitted: boolean;
 }
 
 const MORPH_MS = 720;
@@ -23,9 +25,6 @@ const BLINK_MS = 160;
 
 /** How far the pupils move from the center of the eye position, in box units. */
 const EYE_REACH = { x: 3.4, y: 3 };
-
-/** The squash and the hop pivot on the bottom of the body, so the character stands on the ground. */
-const GROUND_Y = 88;
 
 /** Pads a shape to the same lobe count as the others. The extra lobes hide inside the body. */
 export function paddedLobes(shape: CharacterShape): Lobe[] {
@@ -66,6 +65,8 @@ export class CharacterMotion implements Animated {
   private toLobes: Lobe[];
   private fromEyes: readonly number[];
   private toEyes: readonly number[];
+  private fromFit: ShapeFit;
+  private toFit: ShapeFit;
   private morphStart = -Infinity;
   private hopStart = -Infinity;
   private blinkStart = -Infinity;
@@ -93,6 +94,7 @@ export class CharacterMotion implements Animated {
     this.shape = props().shape;
     this.fromLobes = this.toLobes = paddedLobes(this.shape);
     this.fromEyes = this.toEyes = SHAPE_GEOMETRY[this.shape].eyes;
+    this.fromFit = this.toFit = this.fitOf(this.shape);
   }
 
   measure() {
@@ -135,8 +137,14 @@ export class CharacterMotion implements Animated {
       });
     }
 
+    // The squash and the hop pivot on the bottom of the art, so the character stands on the ground.
+    const fit = this.fitAt(now);
     const { scaleX, scaleY, lift } = reduced ? { scaleX: 1, scaleY: 1, lift: 0 } : this.bounce(now, mood);
-    this.root.setAttribute("transform", `translate(50 ${GROUND_Y - lift}) scale(${scaleX} ${scaleY}) translate(-50 -${GROUND_Y})`);
+    this.root.setAttribute(
+      "transform",
+      `translate(50 ${fit.bottom - lift}) scale(${scaleX} ${scaleY}) translate(-50 -${fit.bottom}) ` +
+        `translate(50 50) scale(${fit.scale}) translate(${-fit.x} ${-fit.y})`,
+    );
 
     const sheenX = bodyX - bodyR * 0.42;
     const sheenY = bodyY - bodyR * 0.48;
@@ -154,6 +162,8 @@ export class CharacterMotion implements Animated {
     this.fromEyes = this.eyesAt(now);
     this.toLobes = paddedLobes(shape);
     this.toEyes = SHAPE_GEOMETRY[shape].eyes;
+    this.fromFit = this.fitAt(now);
+    this.toFit = this.fitOf(shape);
     this.shape = shape;
 
     if (reduced) return;
@@ -176,6 +186,21 @@ export class CharacterMotion implements Animated {
 
       return [lerp(fromX, cx, progress), lerp(fromY, cy, progress), Math.max(0, lerp(fromR, r, progress))];
     });
+  }
+
+  private fitOf(shape: CharacterShape) {
+    return this.props().fitted ? shapeFit(shape) : NO_FIT;
+  }
+
+  private fitAt(now: number): ShapeFit {
+    const progress = this.morphProgress(now);
+
+    return {
+      x: lerp(this.fromFit.x, this.toFit.x, progress),
+      y: lerp(this.fromFit.y, this.toFit.y, progress),
+      scale: lerp(this.fromFit.scale, this.toFit.scale, progress),
+      bottom: lerp(this.fromFit.bottom, this.toFit.bottom, progress),
+    };
   }
 
   private eyesAt(now: number) {

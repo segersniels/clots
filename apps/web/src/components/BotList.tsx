@@ -203,7 +203,7 @@ function BotRow({ bot }: { bot: BotSummary }) {
         }`}
         activeProps={{ className: "bg-sidebar-accent" }}
       >
-        <Character shape={bot.shape} color={bot.color} mood={bot.status} size={32} gaze={glancing ? DRAFT_GAZE : undefined} />
+        <Character shape={bot.shape} color={bot.color} mood={bot.status} size={36} gaze={glancing ? DRAFT_GAZE : undefined} />
         <span className="min-w-0 flex-1">
           <span className="flex items-baseline gap-2">
             {renaming ? (

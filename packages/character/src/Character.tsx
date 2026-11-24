@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 
 import { CharacterMotion, gooMatrix, paddedLobes, type CharacterMood, type Gaze, type MotionProps } from "./CharacterMotion.ts";
 import { animate } from "./frameLoop.ts";
-import { COLOR_HEX, MAX_LOBES, SHAPE_GEOMETRY, type CharacterColor, type CharacterShape } from "./traits.ts";
+import { COLOR_HEX, MAX_LOBES, NO_FIT, SHAPE_GEOMETRY, shapeFit, type CharacterColor, type CharacterShape } from "./traits.ts";
 
 /** The lobes plus one slot for the droplet of a working character. */
 const CIRCLES = MAX_LOBES + 1;
@@ -37,15 +37,18 @@ export function Character({
 }) {
   const id = useId().replace(/[^\w-]/g, "");
   const svg = useRef<SVGSVGElement>(null);
-  const props = useRef<MotionProps>({ shape, mood, gaze });
+  // Without a selection ring, the art can fill its box.
+  const fitted = selected === undefined;
+  const props = useRef<MotionProps>({ shape, mood, gaze, fitted });
 
   // React draws the first shape only. After that, the motion owns the geometry, so a new shape can morph.
   const [firstShape] = useState(shape);
   const lobes = paddedLobes(firstShape);
   const [eyeX, eyeY, eyeGap] = SHAPE_GEOMETRY[firstShape].eyes;
+  const fit = fitted ? shapeFit(firstShape) : NO_FIT;
 
   useEffect(() => {
-    props.current = { shape, mood, gaze };
+    props.current = { shape, mood, gaze, fitted };
   });
 
   useEffect(() => animate(new CharacterMotion(svg.current!, () => props.current)), []);
@@ -79,7 +82,7 @@ export function Character({
         )}
       </defs>
 
-      <g data-root="">
+      <g data-root="" transform={`translate(50 50) scale(${fit.scale}) translate(${-fit.x} ${-fit.y})`}>
         {selected !== undefined && (
           <rect
             x="-20"

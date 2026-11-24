@@ -38,6 +38,41 @@ export const SHAPE_GEOMETRY: Record<CharacterShape, ShapeGeometry> = {
   puddle: { lobes: [[50, 58, 23], [29, 63, 17], [72, 63, 17]], eyes: [50, 54, 12] },
 };
 
+/** The longest side that fitted art may take, in box units. It keeps a little room for the hop and the droplet. */
+const FIT_LONGEST = 94;
+
+/**
+ * The visual size that fitted art aims for: the square root of its bounding area, in box units. A
+ * flat shape then grows more than a round one, so all shapes look equally heavy in a list.
+ */
+const FIT_AREA = 78;
+
+/** Places a shape in its box: the point that goes to the box center, the scale, and the fitted bottom edge. */
+export interface ShapeFit {
+  readonly x: number;
+  readonly y: number;
+  readonly scale: number;
+  /** The lowest point of the art after the fit. The squash and the hop pivot on it. */
+  readonly bottom: number;
+}
+
+/** Leaves the art as drawn, with room for the selection ring. */
+export const NO_FIT: ShapeFit = { x: 50, y: 50, scale: 1, bottom: 88 };
+
+/** Works out how to center and scale a shape so that it fills its box with the same visual weight as the others. */
+export function shapeFit(shape: CharacterShape): ShapeFit {
+  const { lobes } = SHAPE_GEOMETRY[shape];
+  const left = Math.min(...lobes.map(([x, , r]) => x - r));
+  const right = Math.max(...lobes.map(([x, , r]) => x + r));
+  const top = Math.min(...lobes.map(([, y, r]) => y - r));
+  const bottom = Math.max(...lobes.map(([, y, r]) => y + r));
+  const width = right - left;
+  const height = bottom - top;
+  const scale = Math.min(FIT_LONGEST / Math.max(width, height), FIT_AREA / Math.sqrt(width * height));
+
+  return { x: (left + right) / 2, y: (top + bottom) / 2, scale, bottom: 50 + (height / 2) * scale };
+}
+
 /** The colors that a character can have, in the order that a picker shows them. */
 export const CHARACTER_COLORS = [
   "brown", "red", "orange", "amber", "green", "teal", "blue", "purple", "pink", "gray",
