@@ -250,6 +250,8 @@ export class BotSessions extends Context.Service<
       const claudeOptions = {
         env: makeClaudeEnvironment(process.env),
         pathToClaudeCodeExecutable: config.claudePath,
+        // One effort for every model, so the operator's own Claude Code settings do not decide how much a bot thinks.
+        effort: "medium" as const,
       };
 
       const runtimeFor = (botId: BotId): BotRuntime => {
