@@ -31,6 +31,23 @@ export function takeCreatedBot(botId: BotId) {
   return true;
 }
 
+/**
+ * Waits until the bot list has the new bot. The server answers before the list does, and the page
+ * of a bot that is not in the list takes it for a deleted bot and goes home.
+ */
+const untilListed = (botId: BotId) =>
+  new Promise<void>((resolve) => {
+    const check = () => {
+      if (!client.bots.get().some((bot) => bot.id === botId)) return;
+
+      stop();
+      resolve();
+    };
+    const stop = client.bots.subscribe(check);
+
+    check();
+  });
+
 /** Makes the preview look down at the caret, so it reads along while the operator types its name. */
 function gazeAtCaret(event: SyntheticEvent<HTMLInputElement>): Gaze {
   const field = event.currentTarget;
@@ -191,6 +208,7 @@ function NewBotForm({
 
     try {
       const bot = await client.createBot({ name: name.trim(), instructions: "", color, shape, projectId });
+      await untilListed(bot.id);
       createdBot = bot.id;
       onCreated();
       await navigate({ to: "/bots/$botId", params: { botId: bot.id } });
