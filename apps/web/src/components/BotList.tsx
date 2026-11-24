@@ -582,7 +582,7 @@ export function BotList() {
       setCreating("bot");
     },
     newProject: () => setCreating("project"),
-    checkForUpdates: updates.check,
+    checkForUpdates: () => void updates.checkNow(),
     openAccount: () => setAccountOpen(true),
   };
 

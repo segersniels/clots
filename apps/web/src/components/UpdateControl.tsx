@@ -16,6 +16,9 @@ const CHECK_INTERVAL_MS = 60 * 60_000;
 /** How long the done pill stays before it goes. */
 const DONE_MS = 4000;
 
+/** How long the pill says "Up to date" after the operator asked and nothing was new. */
+const UP_TO_DATE_MS = 2000;
+
 /** How long the restart fill takes to slow down near its end. */
 const FILL_MS = 14_000;
 
@@ -31,8 +34,14 @@ const RESTART_TIMEOUT_MS = 90_000;
 /** The Clots app's version, which the app adds to the user agent. A browser has none. */
 const DESKTOP_VERSION = /clots-desktop\/\w+\/([\d.]+)/.exec(navigator.userAgent)?.[1];
 
+/** Checks whether the latest release is newer than this Clots app. A browser has no app to update. */
+const hasAppUpdate = (info: UpdateInfo | undefined) =>
+  info?.latest !== undefined && DESKTOP_VERSION !== undefined && isNewerVersion(info.latest.version, DESKTOP_VERSION);
+
 type UpdatePhase =
   | { readonly name: "idle" }
+  | { readonly name: "checking" }
+  | { readonly name: "current" }
   | { readonly name: "downloading"; readonly target: string }
   | { readonly name: "restarting"; readonly target: string; readonly since: number }
   | { readonly name: "done"; readonly target: string }
@@ -47,12 +56,11 @@ export function useUpdates() {
   const [info, setInfo] = useState<UpdateInfo>();
   const [phase, setPhase] = useState<UpdatePhase>({ name: "idle" });
 
-  const check = () => void client.getUpdateInfo().then(setInfo, () => undefined);
-
   // A new connection can mean a new server version, so the client asks again on each one.
   useEffect(() => {
     if (connection !== "connected") return;
 
+    const check = () => void client.getUpdateInfo().then(setInfo, () => undefined);
     check();
     const timer = setInterval(check, CHECK_INTERVAL_MS);
 
@@ -78,15 +86,30 @@ export function useUpdates() {
   }, [phase, connection, info?.current]);
 
   useEffect(() => {
-    if (phase.name !== "done") return;
+    if (phase.name !== "done" && phase.name !== "current") return;
 
-    const timer = setTimeout(() => setPhase({ name: "idle" }), DONE_MS);
+    const timer = setTimeout(() => setPhase({ name: "idle" }), phase.name === "done" ? DONE_MS : UP_TO_DATE_MS);
 
     return () => clearTimeout(timer);
   }, [phase.name]);
 
   const latest = info?.latest;
-  const appUpdate = latest !== undefined && DESKTOP_VERSION !== undefined && isNewerVersion(latest.version, DESKTOP_VERSION);
+  const appUpdate = hasAppUpdate(info);
+
+  /**
+   * Asks for the latest release because the operator asked, so the pill shows the check. Without
+   * anything new, it says so for a moment. An update in progress keeps its own pill.
+   */
+  const checkNow = async () => {
+    if (phase.name !== "idle") return;
+
+    setPhase({ name: "checking" });
+    const found = await client.getUpdateInfo().catch(() => undefined);
+
+    if (found !== undefined) setInfo(found);
+
+    setPhase(found !== undefined && (found.serverUpdate || hasAppUpdate(found)) ? { name: "idle" } : { name: "current" });
+  };
 
   const updateServer = async () => {
     if (latest === undefined) return;
@@ -102,7 +125,7 @@ export function useUpdates() {
     }
   };
 
-  return { info, phase, appUpdate, serverUpdate: info?.serverUpdate === true, updateServer, check, restarting: phase.name === "restarting" };
+  return { info, phase, appUpdate, serverUpdate: info?.serverUpdate === true, updateServer, checkNow, restarting: phase.name === "restarting" };
 }
 
 type Updates = ReturnType<typeof useUpdates>;
@@ -215,11 +238,13 @@ function AppItem({ info }: { info: UpdateInfo }) {
   );
 }
 
-type PillView = "available" | "downloading" | "restarting" | "done" | "failed";
+type PillView = "available" | "checking" | "current" | "downloading" | "restarting" | "done" | "failed";
 
 /** The look of each pill: its dot, its label, and whether a click opens the popover. */
 const PILL: Record<PillView, { dot: string; icon: ReactNode; label: string; opens: boolean }> = {
   available: { dot: "bg-attention text-white", icon: <ArrowUpIcon className="size-3" strokeWidth={2.75} />, label: "Update", opens: true },
+  checking: { dot: "bg-muted", icon: <Spinner className="size-3" />, label: "Checking…", opens: false },
+  current: { dot: "bg-emerald-500 text-white dark:bg-emerald-400", icon: <CheckIcon className="size-3" strokeWidth={3} />, label: "Up to date", opens: false },
   downloading: { dot: "bg-muted", icon: <Spinner className="size-3" />, label: "Downloading…", opens: false },
   restarting: { dot: "bg-muted", icon: <Spinner className="size-3" />, label: "Restarting…", opens: false },
   done: { dot: "bg-emerald-500 text-white dark:bg-emerald-400", icon: <CheckIcon className="size-3" strokeWidth={3} />, label: "Updated", opens: false },
