@@ -328,7 +328,7 @@ export function UpdatePill({ updates }: { updates: Updates }) {
               disabled={!look.opens}
               title={shown.current.view === "available" ? `Update clots to ${info?.latest?.version}` : undefined}
               style={{ width: labelWidth === undefined ? undefined : labelWidth + PILL_PADDING_PX }}
-              className="relative flex h-8 items-center overflow-hidden rounded-full bg-sidebar-accent/80 pr-3 pl-[5px] text-[13px] font-medium whitespace-nowrap [transition:background-color_150ms_var(--ease-out),scale_150ms_var(--ease-out),width_200ms_var(--ease-out)] enabled:hover:bg-sidebar-accent enabled:active:scale-[0.97] data-popup-open:bg-sidebar-accent motion-reduce:[transition:background-color_150ms_var(--ease-out)] motion-reduce:active:scale-100"
+              className="relative flex h-8 items-center overflow-hidden rounded-full bg-sidebar-accent/80 pr-3 pl-[5px] text-[13px] font-medium whitespace-nowrap outline-none focus-visible:ring-1 focus-visible:ring-ring/40 [transition:background-color_150ms_var(--ease-out),scale_150ms_var(--ease-out),width_200ms_var(--ease-out)] enabled:hover:bg-sidebar-accent enabled:active:scale-[0.97] data-popup-open:bg-sidebar-accent motion-reduce:[transition:background-color_150ms_var(--ease-out)] motion-reduce:active:scale-100"
             />
           }
         >

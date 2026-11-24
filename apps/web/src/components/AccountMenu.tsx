@@ -164,7 +164,7 @@ function ThemeToggle() {
             setTheme(value);
             setShownTheme(value);
           }}
-          className="flex h-6 w-7 items-center justify-center rounded-md text-muted-foreground transition-[background-color,color,box-shadow] duration-150 hover:text-foreground aria-checked:bg-popover aria-checked:text-foreground aria-checked:shadow-sm"
+          className="flex h-6 w-7 items-center justify-center rounded-md text-muted-foreground outline-none transition-[background-color,color,box-shadow] duration-150 hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring/40 aria-checked:bg-popover aria-checked:text-foreground aria-checked:shadow-sm"
         >
           <Icon className="size-3.5" />
         </button>
@@ -186,7 +186,7 @@ function UsageRow({ account }: { account: Account | undefined }) {
         aria-expanded={open}
         disabled={highest === undefined}
         onClick={() => setOpen(!open)}
-        className="flex min-h-9 items-center gap-2.5 rounded-[10px] px-2.5 text-left transition-colors duration-150 enabled:hover:bg-muted"
+        className="flex min-h-9 items-center gap-2.5 rounded-[10px] px-2.5 text-left outline-none transition-[background-color,box-shadow] duration-150 enabled:hover:bg-muted focus-visible:bg-muted focus-visible:ring-1 focus-visible:ring-ring/40"
       >
         <GaugeIcon className="size-4 shrink-0 text-muted-foreground" />
         {account === undefined ? <Skeleton className="h-3.5 w-14" /> : <span className="truncate">{account.plan}</span>}
@@ -228,13 +228,20 @@ export function AccountMenu({ connected, connecting }: { connected: boolean; con
               type="button"
               aria-label="Account"
               title={highest === undefined ? undefined : `${Math.round(highest.percent)}% used · ${shortLabel(highest)}`}
-              className="flex rounded-full transition-[scale] duration-150 ease-out active:scale-[0.96] motion-reduce:active:scale-100"
+              className="flex rounded-full outline-none transition-[scale,box-shadow] duration-150 ease-out focus-visible:ring-1 focus-visible:ring-ring/40 active:scale-[0.96] motion-reduce:active:scale-100"
             />
           }
         >
           <UsageGauge initials={initialsOf(account)} window={highest} dimmed={connecting} />
         </PopoverTrigger>
-        <PopoverContent side="top" align="start" sideOffset={8} className="w-64 gap-0.5 rounded-2xl p-1.5 shadow-lg">
+        {/* Only a keyboard open moves focus to the first row. A pointer open leaves every row unhighlighted. */}
+        <PopoverContent
+          side="top"
+          align="start"
+          sideOffset={8}
+          initialFocus={(openType) => openType === "keyboard"}
+          className="w-64 gap-0.5 rounded-2xl p-1.5 shadow-lg"
+        >
           <div className="min-w-0 px-2.5 pt-1.5 pb-2">
             {account === undefined ? (
               <Skeleton className="h-4 w-32" />
