@@ -20,6 +20,7 @@ spikes/        throwaway scripts and end-to-end scripts
 ```
 client ──WebSocket /rpc──▶ server ──Agent SDK──▶ claude (one process per active bot)
 client ──WebSocket /browser/<bot>──▶ server ──▶ agent-browser stream of that bot
+client ──HTTP /attachments/<bot>/<file>──▶ server ──▶ the bot's attachments/ folder
 phone  ──HTTPS on the tailnet──▶ sidecar ──▶ server on 127.0.0.1
 ```
 
@@ -32,7 +33,7 @@ phone  ──HTTPS on the tailnet──▶ sidecar ──▶ server on 127.0.0.1
 - **Persistence** (`persistence/`, `bots/BotRepository.ts`, `schedules/ScheduleRepository.ts`): SQLite through `@effect/sql-sqlite-bun`, with the Effect migrator. The tables are `bots`, `threads`, `messages`, `schedules` and `projects`.
 - **Bot sessions** (`bots/BotSessions.ts`): one long-lived `query()` per active bot. A queue feeds the prompts as streaming input, so a new message steers the running session. The session id goes to the `threads` table, and the next start resumes it. A session starts with the first message, not with the server.
 - **Approvals**: sessions run in the `auto` permission mode. When its classifier cannot decide, the SDK's `canUseTool` callback puts a request in the live state of the thread and waits for the operator's decision.
-- **Handoff**: an in-process MCP tool, `request_handoff`, pauses the bot until the operator is done in the browser.
+- **clots tools**: each session gets an in-process MCP server, `clots`. `request_handoff` pauses the bot until the operator is done in the browser. `list_bots`, `read_bot_thread` and `send_bot_message` let a bot see and message other bots. `clone_bot` and `delete_bot` let a bot make clones for a task and remove them.
 - **Scheduler** (`schedules/Scheduler.ts`): checks each 15 seconds for due routines and sends their prompts.
 - **Browser** (`browser/`): each bot gets its own agent-browser session, profile and stream port through environment variables. `BrowserProxy.ts` relays the stream WebSocket, because agent-browser accepts loopback clients only.
 - **Claude environment** (`bots/ClaudeEnvironment.ts`): removes API credentials and the variables of a parent Claude Code session, and sets `CLAUDE_CODE_ENTRYPOINT=clots`.
@@ -59,4 +60,4 @@ Stored messages are the durable log. The live state is in memory only. After a d
 
 ## Web client
 
-`apps/web` is a Vite app with file-based TanStack Router routes. All controls are [shadcn](https://ui.shadcn.com) components (Base UI variant) in `src/components/ui`. The thread uses the shadcn chat parts: `MessageScroller`, `Message`, `Bubble` and `InputGroup`. The theme is the set of shadcn CSS variables in `src/styles.css`.
+`apps/web` is a Vite app with file-based TanStack Router routes. All controls are [shadcn](https://ui.shadcn.com) components (Base UI variant) in `src/components/ui`. The thread uses the shadcn chat parts: `MessageScroller`, `Message`, `Bubble` and `InputGroup`. The message field is a [TipTap](https://tiptap.dev) editor, so skills and bot mentions show as chips. The theme is the set of shadcn CSS variables in `src/styles.css`.

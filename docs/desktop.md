@@ -37,3 +37,4 @@ codesign --force --deep -s - clots.app
 - It stores the server address in the app's user data directory (`config.json`).
 - It shows only the clots server. Other links open in your default browser.
 - It adds `clots-desktop/<platform>` to the user agent, so the web client can make room for the window buttons on macOS.
+- It can open a sign-in window for a bot's browser. After you sign in and close the window, the app gives only that site's cookies to the bot's browser.

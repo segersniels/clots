@@ -44,6 +44,7 @@ A bot has a name, a character, instructions, a model and its own working directo
 - **Routines** send a prompt on a schedule, such as "Morning briefing, every day at 8:00".
 - **Approvals** ask you before a bot runs a risky tool.
 - **The bot's screen** shows its browser live. You can take over for a login or a captcha.
+- **Teamwork**: a bot can message other bots, and clone a bot to split a task.
 
 ## Docs
 
@@ -57,7 +58,7 @@ A bot has a name, a character, instructions, a model and its own working directo
 
 ## Status
 
-clots is new. These parts work and are tested on Linux: bots, chat with streaming, session resume, approvals, routines, the bot browser with take-over, and models per bot.
+clots is new. These parts work and are tested on Linux: bots, chat, session resume, approvals, routines, the bot browser with take-over, and models per bot.
 
 These parts are written but not yet verified end to end:
 

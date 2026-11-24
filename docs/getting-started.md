@@ -35,9 +35,33 @@ The sidebar shows each project as a section that you can collapse. Bots without 
 
 A bot has one ongoing thread. Write a message and press Enter. Shift+Enter adds a line.
 
-- The reply shows when the bot finishes it. While the bot works, the thread shows its tool calls.
+- The reply shows when the bot finishes it.
+- While a bot works, a closed line in the thread shows its current tool call. Click it to see all steps. When the bot finishes, the steps stay in the thread as a closed "Worked for …" line.
 - The square button stops the current turn.
 - After a server restart, the history is there and the bot continues the same session.
+- Type `/` or `$` to pick one of the bot's skills, and `@` to mention another bot. The pick shows as a chip in the field.
+
+When you start the app, it opens the bot that was open last.
+
+## Bots that work together
+
+Each bot can list the other bots, read their threads and send them a message. Mention a bot with `@` to tell your bot which one you mean. A message from a bot starts a turn of the other bot, and the answer stays in that bot's own thread.
+
+A bot can also clone a bot and give the clone a task, for example one clone per pull request. The clone works in its own thread and reports back to the bot that made it.
+
+- The sidebar shows clones under the bot that made them.
+- A bot can have 10 clones at most. A clone cannot make clones.
+- The bot that made a clone can delete it. A clone deletes itself only when you ask it to in your own message.
+
+## The sidebar menu
+
+Right-click a bot in the sidebar to:
+
+- **Mark as unread** or **Mark as read**. An unread bot shows a dot.
+- **Move to** another project, or to **Personal**.
+- **Rename** the bot.
+- **Clone** the bot. The copy gets the same instructions, character, model and project, and an empty thread.
+- **Delete** the bot, with its thread, notes and browser profile.
 
 ## Files and images
 
@@ -46,8 +70,6 @@ Paste a file or an image into the message field, drop it there, or click **+** n
 - The bot sees an image at once (PNG, JPEG, GIF, WebP).
 - For each file, the bot also gets the path of the stored copy, so it can read or use the file.
 - The server keeps the files in the bot's notes directory, under `attachments/`. A file can be 10 MB at most.
-
-While a bot works, a closed line in the thread shows its current tool call. Click it to see all steps. When the bot finishes, the steps stay in the thread as a closed "Worked for …" line.
 
 ## Approvals
 
@@ -63,11 +85,14 @@ A bot that waits for you shows "Needs you" and a blue dot in the sidebar.
 
 The details pane on the right shows the bot's browser live, when the bot has one open. Use the monitor icon in the chat header to open or close the pane.
 
-- Click the screen to **take over**. Your mouse and keyboard then go to the page.
+- Click the screen to **take over**. Your mouse and keyboard then go to the page. The paste shortcut types your own clipboard into the page.
 - Click **Give back** to return control.
+- Click **Stop** to close the bot's browser.
 - When a page needs you (a login, a captcha, a payment), the bot asks for a handoff in the thread. Take over, do the step, and click **I am done**.
 
 Each bot has its own browser profile, so its logins stay.
+
+Some sites block a login in the bot's browser. In the desktop app, click **Sign in on this machine**. A window opens on the site that the bot shows. Sign in there as usual and close the window. The app then gives that site's login to the bot's browser.
 
 ## Model
 
