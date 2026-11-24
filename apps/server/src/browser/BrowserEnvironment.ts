@@ -1,4 +1,5 @@
 import { Effect } from "effect";
+import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import type { StoredBot } from "../bots/BotRepository.ts";
@@ -13,8 +14,14 @@ const clotsBin = join(import.meta.dir, "../../bin");
 /** The distance from a bot's stream port to the DevTools port of its Chrome. */
 const DEVTOOLS_PORT_OFFSET = 1000;
 
+/** The app bundles where macOS keeps Chrome and Chromium. Neither puts a command on PATH. */
+const MAC_BROWSERS = [
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  "/Applications/Chromium.app/Contents/MacOS/Chromium",
+];
+
 /** The Chrome that clots gives to a bot when no executable is set. agent-browser downloads its own only after `agent-browser install`. */
-const systemBrowser = Bun.which("chromium") ?? Bun.which("google-chrome");
+const systemBrowser = Bun.which("chromium") ?? Bun.which("google-chrome") ?? MAC_BROWSERS.find((path) => existsSync(path));
 
 /** The platform part of a normal Chrome user agent on each host system. */
 const PLATFORM_TOKENS: Partial<Record<NodeJS.Platform, string>> = {
