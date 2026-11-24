@@ -70,6 +70,17 @@ function FromBot({ children }: { children: ReactNode }) {
  * shimmers while a step runs.
  */
 function Steps({ steps, title, running }: { steps: ReadonlyArray<TraceStep>; title: string; running: boolean }) {
+  // Before the first tool call, such as while the bot thinks, there is nothing to open.
+  if (steps.length === 0) {
+    return (
+      <Trace>
+        <TraceLine {...(running ? { status: "running" as const } : {})}>
+          <TraceTitle>{title}</TraceTitle>
+        </TraceLine>
+      </Trace>
+    );
+  }
+
   return (
     <Trace>
       <TraceCollapsible>
@@ -164,6 +175,7 @@ export function Chat({ botId, botName }: { botId: BotId; botName: string }) {
     bots.map((bot) => bot.name),
   );
   const runningStep = live.steps.findLast((step) => step.status === "running");
+  const thinking = live.status === "working" && runningStep === undefined;
   // The line keeps the last tasks while it closes, so it does not go blank before it is gone.
   const shownTasks = useRef(live.tasks);
   if (live.tasks.length > 0) shownTasks.current = live.tasks;
@@ -252,10 +264,14 @@ export function Chat({ botId, botName }: { botId: BotId; botName: string }) {
                 );
               })}
 
-              {/* The tool calls of the running turn. The finished ones move into the thread as a trace. */}
-              {live.steps.length > 0 && (
+              {/* The tool calls of the running turn. The finished ones move into the thread as a trace. Between them the bot thinks. */}
+              {(live.steps.length > 0 || thinking) && (
                 <MessageScrollerItem messageId="steps" className={`px-1 pt-2 ${ENTER}`}>
-                  <Steps steps={live.steps} title={(runningStep ?? live.steps.at(-1)!).title} running={runningStep !== undefined} />
+                  <Steps
+                    steps={live.steps}
+                    title={runningStep?.title ?? (thinking ? "Thinking" : live.steps.at(-1)!.title)}
+                    running={runningStep !== undefined || thinking}
+                  />
                 </MessageScrollerItem>
               )}
 
@@ -277,11 +293,6 @@ export function Chat({ botId, botName }: { botId: BotId; botName: string }) {
                 </MessageScrollerItem>
               )}
 
-              {live.status === "working" && runningStep === undefined && (
-                <p className={`animate-pulse px-1 pt-2 text-[0.8125rem] text-muted-foreground motion-reduce:animate-none ${ENTER}`}>
-                  Thinking
-                </p>
-              )}
             </MessageScrollerContent>
           </MessageScrollerViewport>
           <MessageScrollerButton />
