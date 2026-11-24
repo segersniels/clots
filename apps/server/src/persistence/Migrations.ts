@@ -137,6 +137,34 @@ const resume = Effect.gen(function* () {
   yield* sql`ALTER TABLE threads ADD COLUMN synced_uuid TEXT`;
 });
 
+const search = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient;
+
+  /*
+   * The search finds the words of a conversation: the operator's, the bots' and the routines'. Tool
+   * steps and dividers stay out. A row shares its rowid with its message, which keeps a delete fast.
+   * A VACUUM could number the messages again, so clots must not run one.
+   */
+  yield* sql`CREATE VIRTUAL TABLE message_search USING fts5(text)`;
+  yield* sql`
+    CREATE TRIGGER message_search_insert AFTER INSERT ON messages
+    WHEN new.role IN ('user', 'assistant', 'bot', 'routine')
+    BEGIN
+      INSERT INTO message_search (rowid, text) VALUES (new.rowid, new.text);
+    END
+  `;
+  yield* sql`
+    CREATE TRIGGER message_search_delete AFTER DELETE ON messages
+    BEGIN
+      DELETE FROM message_search WHERE rowid = old.rowid;
+    END
+  `;
+  yield* sql`
+    INSERT INTO message_search (rowid, text)
+    SELECT rowid, text FROM messages WHERE role IN ('user', 'assistant', 'bot', 'routine')
+  `;
+});
+
 /** Runs the pending migrations when the server starts. */
 export const MigrationsLayer = SqliteMigrator.layer({
   loader: SqliteMigrator.fromRecord({
@@ -150,5 +178,6 @@ export const MigrationsLayer = SqliteMigrator.layer({
     "0008_clones": clones,
     "0009_sort_order": sortOrder,
     "0010_resume": resume,
+    "0011_search": search,
   }),
 });

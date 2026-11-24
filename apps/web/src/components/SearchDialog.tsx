@@ -1,7 +1,7 @@
 import { Autocomplete } from "@base-ui/react/autocomplete";
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import { Character, type Gaze } from "@clots/character";
-import type { BotSummary } from "@clots/contracts";
+import type { BotSummary, MessageHit } from "@clots/contracts";
 import { useNavigate } from "@tanstack/react-router";
 import { cn } from "cn";
 import { ArrowUpIcon, FolderPlusIcon, GaugeIcon, MonitorIcon, MoonIcon, PlusIcon, SearchIcon, SunIcon, type LucideIcon } from "lucide-react";
@@ -10,11 +10,26 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import { client, useStore } from "@/client.ts";
 import { Dialog, DialogOverlay, DialogPortal, DialogTitle } from "@/components/ui/dialog";
 import { setTheme } from "@/lib/color-scheme.ts";
+import { formatRecent } from "@/time.ts";
 
 /** The shortcuts use Command on a Mac and Control elsewhere. */
 const ON_MAC = navigator.userAgent.includes("Mac");
 
 const MODIFIER = ON_MAC ? "⌘" : "Ctrl ";
+
+/** The thread search starts from this many characters, and shows at most this many lines. */
+const THREAD_QUERY_MIN = 2;
+
+const THREAD_HITS = 4;
+
+/** How long the thread search waits for the typing to pause. */
+const THREAD_SEARCH_DELAY_MS = 150;
+
+/** How far into a line a match may start before the line loses its beginning. */
+const LINE_LEAD = 36;
+
+/** How many characters before the match a cut line keeps. */
+const LINE_CONTEXT = 24;
 
 /** How many bots have a shortcut: ⌘1 to ⌘9. */
 const SHORTCUT_COUNT = 9;
@@ -47,6 +62,7 @@ interface SearchAction {
 
 type SearchItem =
   | { readonly kind: "bot"; readonly id: string; readonly bot: BotSummary; readonly shortcut: number | undefined }
+  | { readonly kind: "message"; readonly id: string; readonly hit: MessageHit; readonly bot: BotSummary }
   | { readonly kind: "action"; readonly id: string; readonly action: SearchAction };
 
 interface SearchGroup {
@@ -103,6 +119,46 @@ export function useSearchShortcuts({ onToggle, onBotOpened }: { onToggle: () => 
     return () => window.removeEventListener("keydown", onKeyDown);
   });
 }
+
+/**
+ * Asks the server for thread messages that match the query once the typing pauses. The last
+ * results stay until the new ones arrive, so the list does not flicker.
+ */
+function useMessageHits(query: string) {
+  const [hits, setHits] = useState<ReadonlyArray<MessageHit>>([]);
+  const searchable = query.length >= THREAD_QUERY_MIN;
+
+  useEffect(() => {
+    if (!searchable) return;
+
+    let current = true;
+    const timer = setTimeout(
+      () => void client.searchMessages(query, THREAD_HITS).then((found) => current && setHits(found), () => undefined),
+      THREAD_SEARCH_DELAY_MS,
+    );
+
+    return () => {
+      current = false;
+      clearTimeout(timer);
+    };
+  }, [query]);
+
+  return searchable ? hits : [];
+}
+
+/** Picks the line of a message that holds the match, as plain text, and cuts its start so the match stays in view. */
+const matchLine = (text: string, term: string) => {
+  const lines = text.split("\n");
+  const line = (lines.find((candidate) => candidate.toLowerCase().includes(term)) ?? lines[0] ?? "")
+    .replaceAll(/[#*_`>]+/g, "")
+    .replaceAll(/\s+/g, " ")
+    .trim();
+  const start = line.toLowerCase().indexOf(term);
+
+  if (start <= LINE_LEAD) return line;
+
+  return `…${line.slice(start - LINE_CONTEXT)}`;
+};
 
 /** Shows the part of a text that matches the query in a stronger weight. */
 function Highlight({ text, query }: { text: string; query: string }) {
@@ -172,6 +228,27 @@ function BotResult({ item, query, projectName, highlighted }: { item: Extract<Se
   );
 }
 
+/** One thread message: the bot's small clot and name, the line with the match, and when it was sent. */
+function MessageResult({ item, query }: { item: Extract<SearchItem, { kind: "message" }>; query: string }) {
+  // The server matches each word as a word start, so a query of several words may not be in the text as a whole.
+  const term = item.hit.text.toLowerCase().includes(query) ? query : (query.split(" ")[0] ?? query);
+
+  return (
+    <>
+      <span className="flex size-[34px] shrink-0 items-center justify-center">
+        <Character shape={item.bot.shape} color={item.bot.color} size={26} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate font-medium">{item.bot.name}</span>
+        <span className="block truncate text-[13px] text-muted-foreground">
+          <Highlight text={matchLine(item.hit.text, term)} query={term} />
+        </span>
+      </span>
+      <span className="shrink-0 text-[12.5px] text-muted-foreground">{formatRecent(item.hit.createdAt)}</span>
+    </>
+  );
+}
+
 /** One action: its icon in a round chip and its label. */
 function ActionResult({ action }: { action: SearchAction }) {
   const Icon = action.icon;
@@ -197,6 +274,8 @@ function SearchPanel({ commands, onSelect }: { commands: SearchCommands; onSelec
   const projectNames = new Map(projects.map((project) => [project.id, project.name]));
   const projectOf = (bot: BotSummary) => (bot.projectId === null ? undefined : projectNames.get(bot.projectId));
   const matches = (text: string | undefined) => text !== undefined && text.toLowerCase().includes(needle);
+  const botsById = new Map(bots.map((bot) => [bot.id, bot]));
+  const hits = useMessageHits(needle);
 
   const botItems: ReadonlyArray<SearchItem> = byRecent(bots)
     .filter((bot) => needle === "" || matches(bot.name) || matches(projectOf(bot)))
@@ -206,6 +285,12 @@ function SearchPanel({ commands, onSelect }: { commands: SearchCommands; onSelec
       bot,
       shortcut: needle === "" && index < SHORTCUT_COUNT ? index + 1 : undefined,
     }));
+
+  const messageItems: ReadonlyArray<SearchItem> = hits.flatMap((hit) => {
+    const bot = botsById.get(hit.botId);
+
+    return bot === undefined ? [] : [{ kind: "message", id: `message-${hit.messageId}`, hit, bot }];
+  });
 
   // Actions show only for a query, so the empty search is a plain list of bots.
   const actionItems: ReadonlyArray<SearchItem> =
@@ -217,6 +302,7 @@ function SearchPanel({ commands, onSelect }: { commands: SearchCommands; onSelec
 
   const groups: ReadonlyArray<SearchGroup> = [
     { value: "Bots", items: botItems },
+    { value: "In threads", items: messageItems },
     { value: "Actions", items: actionItems },
   ].filter((group) => group.items.length > 0);
   const empty = groups.length === 0;
@@ -278,6 +364,7 @@ function SearchPanel({ commands, onSelect }: { commands: SearchCommands; onSelec
                     {item.kind === "bot" && (
                       <BotResult item={item} query={needle} projectName={projectOf(item.bot)} highlighted={item.id === highlightedId} />
                     )}
+                    {item.kind === "message" && <MessageResult item={item} query={needle} />}
                     {item.kind === "action" && <ActionResult action={item.action} />}
                   </Autocomplete.Item>
                 )}
@@ -311,7 +398,7 @@ export function SearchDialog({
 
   const select = (item: SearchItem) => {
     if (item.kind === "action") pendingAction.current = item.action.run;
-    else void navigate({ to: "/bots/$botId", params: { botId: item.bot.id } });
+    else void navigate({ to: "/bots/$botId", params: { botId: item.bot.id }, search: item.kind === "message" ? { message: item.hit.messageId } : {} });
 
     onOpenChange(false);
   };

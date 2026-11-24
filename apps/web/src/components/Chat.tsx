@@ -12,6 +12,7 @@ import {
   MessageScrollerItem,
   MessageScrollerProvider,
   MessageScrollerViewport,
+  useMessageScroller,
   useMessageScrollerScrollable,
 } from "@/components/ui/message-scroller";
 import {
@@ -161,7 +162,40 @@ function OlderMessagesLoader({ hasOlder, onLoad }: { hasOlder: boolean; onLoad: 
   return null;
 }
 
-export function Chat({ botId, botName, autoFocus = true }: { botId: BotId; botName: string; autoFocus?: boolean }) {
+/** How long a message that the search opened stays highlighted. */
+const JUMP_HIGHLIGHT_MS = 1200;
+
+/** Scrolls the thread to a message as soon as the scroller has it, then reports that it did. */
+function ScrollToMessage({ messageId, onScrolled }: { messageId: string; onScrolled: () => void }) {
+  const { scrollToMessage } = useMessageScroller();
+
+  useEffect(() => {
+    let frame = requestAnimationFrame(function scrollWhenReady() {
+      if (scrollToMessage(messageId, { align: "center" })) onScrolled();
+      else frame = requestAnimationFrame(scrollWhenReady);
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [messageId]);
+
+  return null;
+}
+
+export function Chat({
+  botId,
+  botName,
+  autoFocus = true,
+  jumpTo,
+  onJumped,
+}: {
+  botId: BotId;
+  botName: string;
+  autoFocus?: boolean;
+  /** A message to scroll to, such as one that the search found. */
+  jumpTo?: string | undefined;
+  /** Reports that the thread scrolled to `jumpTo`, so the page can forget it. */
+  onJumped?: () => void;
+}) {
   // The operator reads a bot only while its conversation is on screen. A hidden window lets go of the thread, so the bot can turn unread.
   const visible = usePageVisible();
   const thread = useStore(client.thread(botId), visible);
@@ -188,6 +222,26 @@ export function Chat({ botId, botName, autoFocus = true }: { botId: BotId; botNa
   }, [botId, thread.synced, thread.messages]);
   // A stable callback, so that one visit to the top loads one page and not one per render.
   const showOlder = useCallback(() => setShownCount((count) => count + MESSAGES_PER_PAGE), []);
+  const [highlightedId, setHighlightedId] = useState<string>();
+
+  const jumpIndex = jumpTo === undefined || !thread.synced ? -1 : messages.findIndex((message) => message.id === jumpTo);
+
+  // A search result opens the thread at its message. An older message first needs enough pages on screen.
+  useEffect(() => {
+    if (jumpIndex < 0) return;
+
+    const pagesNeeded = Math.ceil((messages.length - jumpIndex) / MESSAGES_PER_PAGE);
+
+    if (pagesNeeded * MESSAGES_PER_PAGE > shownCount) setShownCount(pagesNeeded * MESSAGES_PER_PAGE);
+  }, [jumpIndex]);
+
+  useEffect(() => {
+    if (highlightedId === undefined) return;
+
+    const timer = setTimeout(() => setHighlightedId(undefined), JUMP_HIGHLIGHT_MS);
+
+    return () => clearTimeout(timer);
+  }, [highlightedId]);
   const skills = useStore(client.skills(botId));
   const bots = useStore(client.bots);
   const known = knownNames(
@@ -223,6 +277,15 @@ export function Chat({ botId, botName, autoFocus = true }: { botId: BotId; botNa
           className={`flex-1 ${loadsLate ? "transition-opacity duration-150 ease-out" : ""} ${thread.synced || cached !== null ? "" : "opacity-0"}`}
         >
           <OlderMessagesLoader hasOlder={firstShown > 0} onLoad={showOlder} />
+          {jumpTo !== undefined && jumpIndex >= firstShown && (
+            <ScrollToMessage
+              messageId={jumpTo}
+              onScrolled={() => {
+                setHighlightedId(jumpTo);
+                onJumped?.();
+              }}
+            />
+          )}
           {/* The thread runs under the floating header and fades out there. The top padding clears the header. */}
           <MessageScrollerViewport preserveScrollOnPrepend className="[mask-image:linear-gradient(to_bottom,transparent,black_4rem)]">
             <MessageScrollerContent className="gap-1.5 px-4 pt-16 pb-3">
@@ -273,7 +336,7 @@ export function Chat({ botId, botName, autoFocus = true }: { botId: BotId; botNa
                   <MessageScrollerItem
                     key={message.id}
                     messageId={message.id}
-                    className={`${changesSide && !showsTime ? "pt-3" : ""} ${enter?.className ?? ""}`}
+                    className={`rounded-2xl transition-[background-color] duration-700 ease-out ${highlightedId === message.id ? "bg-attention/10" : ""} ${changesSide && !showsTime ? "pt-3" : ""} ${enter?.className ?? ""}`}
                     style={enter?.style}
                   >
                     {showsTime && (

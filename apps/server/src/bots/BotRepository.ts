@@ -1,4 +1,4 @@
-import type { Attachment, Bot, BotId, BotModel, Message, MessageRole, Skill, TraceStep } from "@clots/contracts";
+import type { Attachment, Bot, BotId, BotModel, Message, MessageHit, MessageRole, Skill, TraceStep } from "@clots/contracts";
 
 /** The fields that the operator chooses for a new bot. */
 export type NewBot = Pick<Bot, "name" | "instructions" | "color" | "shape">;
@@ -85,6 +85,8 @@ export class BotRepository extends Context.Service<
       steps?: ReadonlyArray<TraceStep>,
     ): Effect.Effect<Message>;
     messagesAfter(botId: BotId, afterSequence: number): Effect.Effect<ReadonlyArray<Message>>;
+    /** Finds the messages of every thread that hold each word of the query as a word or the start of one, best match first. */
+    searchMessages(query: string, limit: number): Effect.Effect<ReadonlyArray<MessageHit>>;
     skills(botId: BotId): Effect.Effect<ReadonlyArray<Skill>>;
     /** Keeps the skills that the bot's session reported, so the composer can offer them while no session runs. */
     setSkills(botId: BotId, skills: ReadonlyArray<Skill>): Effect.Effect<void>;
@@ -281,6 +283,27 @@ export class BotRepository extends Context.Service<
           Effect.orDie,
         );
 
+      const searchMessages = (query: string, limit: number) => {
+        // Each word is a quoted prefix, so the operator's quotes and operators are plain text. Punctuation alone finds nothing.
+        const match = query
+          .split(/\s+/)
+          .filter((word) => /[\p{L}\p{N}]/u.test(word))
+          .map((word) => `"${word.replaceAll('"', '""')}"*`)
+          .join(" ");
+
+        if (match === "") return Effect.succeed([]);
+
+        return sql<MessageHit>`
+          SELECT threads.bot_id AS botId, messages.id AS messageId, messages.text, messages.created_at AS createdAt
+          FROM message_search
+          JOIN messages ON messages.rowid = message_search.rowid
+          JOIN threads ON threads.id = messages.thread_id
+          WHERE message_search MATCH ${match}
+          ORDER BY rank
+          LIMIT ${limit}
+        `.pipe(Effect.orDie);
+      };
+
       const skills = (botId: BotId) =>
         sql<{ readonly skills: string }>`SELECT skills FROM threads WHERE bot_id = ${botId}`.pipe(
           Effect.map((rows): ReadonlyArray<Skill> => (rows[0] === undefined ? [] : JSON.parse(rows[0].skills))),
@@ -305,6 +328,7 @@ export class BotRepository extends Context.Service<
         reorder,
         appendMessage,
         messagesAfter,
+        searchMessages,
         skills,
         setSkills,
       });

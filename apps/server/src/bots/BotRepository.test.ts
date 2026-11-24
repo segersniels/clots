@@ -62,6 +62,29 @@ test("messages get rising sequences per bot, and the cursor skips what a client 
   expect(afterFirst.map((message) => [message.sequence, message.text])).toEqual([[2, "two"]]);
 });
 
+test("the message search finds word starts in conversation messages only, and forgets a deleted bot", async () => {
+  const [found, afterDelete] = await run(
+    Effect.gen(function* () {
+      const bots = yield* BotRepository;
+      const scout = yield* bots.create(newScout);
+      const atlas = yield* bots.create(newAtlas);
+
+      yield* bots.appendMessage(scout.id, "assistant", "Engine warnings are gone.");
+      yield* bots.appendMessage(scout.id, "settings", "Engine settings changed");
+      yield* bots.appendMessage(atlas.id, "user", "Check the \"engine\" again");
+      yield* bots.appendMessage(atlas.id, "user", "Nothing here");
+      const found = yield* bots.searchMessages("ENG \"", 10);
+
+      yield* bots.remove(atlas);
+
+      return [found, yield* bots.searchMessages("eng", 10)] as const;
+    }),
+  );
+
+  expect(found.map((hit) => hit.text).toSorted()).toEqual(['Check the "engine" again', "Engine warnings are gone."]);
+  expect(afterDelete.map((hit) => hit.text)).toEqual(["Engine warnings are gone."]);
+});
+
 test("a trace keeps its steps, and the bot list shows the last message before it", async () => {
   const [messages, bot] = await run(
     Effect.gen(function* () {

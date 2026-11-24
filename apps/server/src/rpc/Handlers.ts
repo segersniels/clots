@@ -246,6 +246,8 @@ export const HandlersLayer = ClotsRpcs.toLayer(
 
       GetAccount: () => Effect.promise(() => readAccount(config.claudePath, config.home)),
 
+      SearchMessages: ({ query, limit }) => bots.searchMessages(query, limit),
+
       UpdateServer: () =>
         Effect.tryPromise({
           try: async () => {

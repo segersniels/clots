@@ -73,6 +73,15 @@ export const Account = Schema.Struct({
 });
 export type Account = typeof Account.Type;
 
+/** A message that matches a search of the threads. */
+export const MessageHit = Schema.Struct({
+  botId: BotId,
+  messageId: Schema.String,
+  text: Schema.String,
+  createdAt: Schema.Number,
+});
+export type MessageHit = typeof MessageHit.Type;
+
 export class ProjectDirectoryNotFound extends Schema.TaggedError<ProjectDirectoryNotFound>()(
   "ProjectDirectoryNotFound",
   { directory: Schema.String },
@@ -219,6 +228,11 @@ export class ClotsRpcs extends RpcGroup.make(
   Rpc.make("DeleteSchedule", { payload: { id: Schema.String } }),
   Rpc.make("GetUpdateInfo", { success: UpdateInfo }),
   Rpc.make("GetAccount", { success: Account }),
+  /** Finds the messages of every thread that hold all words of the query, as words or word starts, best match first. */
+  Rpc.make("SearchMessages", {
+    payload: { query: Schema.String, limit: Schema.Number },
+    success: Schema.Array(MessageHit),
+  }),
   /** Installs the latest release and restarts the server. The connection drops, and the client connects again. */
   Rpc.make("UpdateServer", { error: UpdateFailed }),
 ) {}

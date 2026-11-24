@@ -22,7 +22,12 @@ import { takeCreatedBot } from "../components/CreateDialog.tsx";
 import { ProjectPicker } from "../components/ProjectPicker.tsx";
 import { Routines } from "../components/Routines.tsx";
 
-export const Route = createFileRoute("/bots/$botId")({ component: BotPage });
+export const Route = createFileRoute("/bots/$botId")({
+  component: BotPage,
+  // A search result names the message to open the thread at.
+  validateSearch: (search: Record<string, unknown>): { message?: string } =>
+    typeof search.message === "string" ? { message: search.message } : {},
+});
 
 /** The width of the details pane in pixels until the operator drags its divider. */
 const DEFAULT_DETAILS_WIDTH = 288;
@@ -41,6 +46,7 @@ const SLIDE_TRANSITIONS = ["translate", "opacity"];
 
 function BotPage() {
   const botId = Route.useParams().botId as BotId;
+  const { message: jumpTo } = Route.useSearch();
   const navigate = useNavigate();
   const bots = useStore(client.bots);
   const bot = bots.find((candidate) => candidate.id === botId);
@@ -164,7 +170,14 @@ function BotPage() {
       </header>
 
       {/* The key gives each bot its own chat state, such as the draft. */}
-      <Chat key={botId} botId={botId} botName={bot.name} autoFocus={createdBotId.current !== botId} />
+      <Chat
+        key={botId}
+        botId={botId}
+        botName={bot.name}
+        autoFocus={createdBotId.current !== botId}
+        jumpTo={jumpTo}
+        onJumped={() => void navigate({ to: "/bots/$botId", params: { botId }, search: {}, replace: true })}
+      />
     </section>
   );
 

@@ -13,6 +13,7 @@ import {
   type Skill,
   type UpdateInfo,
   type Account,
+  type MessageHit,
 } from "@clots/contracts";
 import { Context, Effect, Fiber, Layer, ManagedRuntime, Schedule as RetrySchedule, Stream } from "effect";
 import { RpcClient, RpcClientError, RpcSerialization } from "effect/rpc";
@@ -59,6 +60,7 @@ export interface ClotsClient {
   deleteSchedule(id: string): Promise<void>;
   getUpdateInfo(): Promise<UpdateInfo>;
   getAccount(): Promise<Account>;
+  searchMessages(query: string, limit: number): Promise<ReadonlyArray<MessageHit>>;
   /** Installs the latest release on the server, which then restarts. */
   updateServer(): Promise<void>;
   dispose(): Promise<void>;
@@ -216,6 +218,7 @@ export const makeClotsClient = (origin: string): ClotsClient => {
     deleteSchedule: (id) => call((rpc) => rpc.DeleteSchedule({ id })),
     getUpdateInfo: () => call((rpc) => rpc.GetUpdateInfo()),
     getAccount: () => call((rpc) => rpc.GetAccount()),
+    searchMessages: (query, limit) => call((rpc) => rpc.SearchMessages({ query, limit })),
     updateServer: () => call((rpc) => rpc.UpdateServer()),
     dispose: () => runtime.dispose(),
   };
