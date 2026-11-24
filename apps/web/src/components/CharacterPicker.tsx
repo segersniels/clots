@@ -9,15 +9,22 @@ export function CharacterPicker({
   shape,
   onColorChange,
   onShapeChange,
+  compact = false,
 }: {
   color: BotColor;
   shape: BotShape;
   onColorChange: (color: BotColor) => void;
   onShapeChange: (shape: BotShape) => void;
+  /** Sets the shapes and the colors in narrow centered blocks, for a dialog. */
+  compact?: boolean;
 }) {
   return (
-    <div className="flex flex-col gap-5">
-      <div className="grid grid-cols-6 justify-items-center gap-1" role="radiogroup" aria-label="Shape">
+    <div className={`flex flex-col ${compact ? "gap-6" : "gap-5"}`}>
+      <div
+        className={`grid grid-cols-6 justify-items-center ${compact ? "mx-auto w-full max-w-[312px] gap-y-2.5" : "gap-1"}`}
+        role="radiogroup"
+        aria-label="Shape"
+      >
         {BotShape.literals.map((option) => (
           <Button
             key={option}
@@ -27,15 +34,24 @@ export function CharacterPicker({
             aria-checked={option === shape}
             aria-label={option}
             onClick={() => onShapeChange(option)}
-            className="size-12 rounded-xl hover:bg-transparent dark:hover:bg-transparent"
+            className={`${compact ? "size-[38px]" : "size-12"} rounded-xl hover:bg-transparent dark:hover:bg-transparent`}
           >
-            <Character shape={option} color={color} selected={option === shape} className="size-9 text-foreground" />
+            <Character
+              shape={option}
+              color={color}
+              selected={option === shape}
+              className={`${compact ? "size-[38px]" : "size-9"} text-foreground`}
+            />
           </Button>
         ))}
       </div>
 
-      {/* The circles wrap onto centered rows, with room between them for the ring around the chosen color. */}
-      <div className="flex flex-wrap justify-center gap-x-4 gap-y-3" role="radiogroup" aria-label="Color">
+      {/* The circles wrap onto centered rows, or two rows of five when compact, with room for the ring around the chosen color. */}
+      <div
+        className={compact ? "mx-auto grid w-[216px] grid-cols-[repeat(5,1.5rem)] justify-between gap-y-3.5" : "flex flex-wrap justify-center gap-x-4 gap-y-3"}
+        role="radiogroup"
+        aria-label="Color"
+      >
         {BotColor.literals.map((option) => (
           <button
             key={option}
@@ -44,7 +60,7 @@ export function CharacterPicker({
             aria-checked={option === color}
             aria-label={option}
             onClick={() => onColorChange(option)}
-            className="size-7 rounded-full outline-[1.5px] outline-offset-[3px] transition-[outline-color,scale] duration-150 ease-out active:scale-90 motion-reduce:active:scale-100"
+            className={`${compact ? "size-6" : "size-7"} rounded-full outline-[1.5px] outline-offset-[3px] transition-[outline-color,scale] duration-150 ease-out active:scale-90 motion-reduce:active:scale-100`}
             style={{
               background: COLOR_HEX[option],
               outlineStyle: "solid",

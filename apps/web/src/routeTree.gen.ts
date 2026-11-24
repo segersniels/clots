@@ -11,7 +11,6 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as BotsBotIdRouteImport } from './routes/bots.$botId'
-import { Route as ProjectsNewRouteImport } from './routes/projects.new'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -23,40 +22,31 @@ const BotsBotIdRoute = BotsBotIdRouteImport.update({
   path: '/bots/$botId',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ProjectsNewRoute = ProjectsNewRouteImport.update({
-  id: '/projects/new',
-  path: '/projects/new',
-  getParentRoute: () => rootRouteImport,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/bots/$botId': typeof BotsBotIdRoute
-  '/projects/new': typeof ProjectsNewRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/bots/$botId': typeof BotsBotIdRoute
-  '/projects/new': typeof ProjectsNewRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/bots/$botId': typeof BotsBotIdRoute
-  '/projects/new': typeof ProjectsNewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/bots/$botId' | '/projects/new'
+  fullPaths: '/' | '/bots/$botId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/bots/$botId' | '/projects/new'
-  id: '__root__' | '/' | '/bots/$botId' | '/projects/new'
+  to: '/' | '/bots/$botId'
+  id: '__root__' | '/' | '/bots/$botId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BotsBotIdRoute: typeof BotsBotIdRoute
-  ProjectsNewRoute: typeof ProjectsNewRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -75,20 +65,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BotsBotIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/projects/new': {
-      id: '/projects/new'
-      path: '/projects/new'
-      fullPath: '/projects/new'
-      preLoaderRoute: typeof ProjectsNewRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BotsBotIdRoute: BotsBotIdRoute,
-  ProjectsNewRoute: ProjectsNewRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

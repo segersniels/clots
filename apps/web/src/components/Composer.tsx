@@ -48,7 +48,18 @@ const toUpload = async (file: File): Promise<Upload> => {
 };
 
 /** The message field of a thread. It takes text, and files by paste, by drop or from the file dialog. */
-export function Composer({ botId, botName, status }: { botId: BotId; botName: string; status: BotStatus }) {
+export function Composer({
+  botId,
+  botName,
+  status,
+  autoFocus = true,
+}: {
+  botId: BotId;
+  botName: string;
+  status: BotStatus;
+  /** Gives the field the focus when the bot opens. A new bot leaves it to its instructions. */
+  autoFocus?: boolean;
+}) {
   const [draft, setDraft] = useState(() => drafts.get().get(botId)?.text ?? "");
   const [files, setFiles] = useState(() => draftFiles.get(botId) ?? []);
   const [tooLarge, setTooLarge] = useState(false);
@@ -182,6 +193,7 @@ export function Composer({ botId, botName, status }: { botId: BotId; botName: st
             onTextChange={setDraft}
             onEnter={() => void send()}
             onFiles={addFiles}
+            autoFocus={autoFocus}
           />
           <InputGroupAddon align="inline-end" className="py-0.5">
             {status === "idle" ? (

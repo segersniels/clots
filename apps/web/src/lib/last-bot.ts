@@ -12,13 +12,13 @@ export function saveLastBot(botId: BotId | null) {
     if (botId === null) localStorage.removeItem(LAST_BOT_KEY);
     else localStorage.setItem(LAST_BOT_KEY, botId);
   } catch {
-    // The app opens the new bot page next time.
+    // The app opens the first bot next time.
   }
 }
 
 /**
- * Gives the bot that was open last, on the first page of the app only. A later visit to the new
- * bot page, such as from the + menu, gets `null` and stays there.
+ * Gives the bot that was open last, on the first page of the app only. A later visit home, such as
+ * on a phone, gets `null` and stays there.
  */
 export function takeStartupBot(): BotId | null {
   if (!starting) return null;

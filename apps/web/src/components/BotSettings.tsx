@@ -57,7 +57,7 @@ export function BotIdentity({ bot }: { bot: BotSummary }) {
 }
 
 /** Lets the operator edit the instructions of a bot. The bot reads them when its next session starts. */
-export function BotInstructions({ bot }: { bot: BotSummary }) {
+export function BotInstructions({ bot, autoFocus = false }: { bot: BotSummary; autoFocus?: boolean }) {
   const [instructions, setInstructions] = useState(bot.instructions);
 
   const saveInstructions = () => {
@@ -75,7 +75,7 @@ export function BotInstructions({ bot }: { bot: BotSummary }) {
           initialText={bot.instructions}
           onTextChange={setInstructions}
           onBlur={saveInstructions}
-          autoFocus={false}
+          autoFocus={autoFocus}
           className={`${CHIP_FIELD_CLASSES} min-h-24`}
           pickerClassName={CHIP_PICKER_CLASSES}
         />

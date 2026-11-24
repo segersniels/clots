@@ -16,6 +16,7 @@ import { BotIdentity, BotInstructions } from "../components/BotSettings.tsx";
 import { BrowserPane } from "../components/BrowserPane.tsx";
 import { Chat } from "../components/Chat.tsx";
 import { ModelPicker } from "../components/ModelPicker.tsx";
+import { takeCreatedBot } from "../components/CreateDialog.tsx";
 import { ProjectPicker } from "../components/ProjectPicker.tsx";
 import { Routines } from "../components/Routines.tsx";
 
@@ -59,7 +60,7 @@ function BotPage() {
     saveLastBot(botId);
   }, [botId]);
 
-  // The bot is gone, for example deleted on another device, so the app forgets it and opens the new bot page.
+  // The bot is gone, for example deleted on another device, so the app forgets it and goes home.
   const missing = bots.length > 0 && bot === undefined;
   useEffect(() => {
     if (!missing) return;
@@ -68,8 +69,13 @@ function BotPage() {
     void navigate({ to: "/", replace: true });
   }, [missing, navigate]);
 
-  // The bot list arrives a moment after the page opens.
-  if (bot === undefined) return null;
+  // A bot that the operator just created opens with its details, so the operator writes its instructions next.
+  const createdBotId = useRef<BotId | null>(null);
+  const opensDetails = useRef(false);
+  if (takeCreatedBot(botId)) {
+    createdBotId.current = botId;
+    opensDetails.current = true;
+  }
 
   const toggleDetails = () => {
     const open = !detailsOpen;
@@ -87,6 +93,16 @@ function BotPage() {
     if (open) details.current?.resize(detailsWidth.current);
     else details.current?.collapse();
   };
+
+  useEffect(() => {
+    if (!opensDetails.current || bot === undefined) return;
+
+    opensDetails.current = false;
+    if (!detailsOpen) toggleDetails();
+  });
+
+  // The bot list arrives a moment after the page opens.
+  if (bot === undefined) return null;
 
   /** Brings the pane back to its default width, as a double-click on the divider does in most apps. */
   const resetDetailsWidth = () => {
@@ -145,7 +161,7 @@ function BotPage() {
       </header>
 
       {/* The key gives each bot its own chat state, such as the draft. */}
-      <Chat key={botId} botId={botId} botName={bot.name} />
+      <Chat key={botId} botId={botId} botName={bot.name} autoFocus={createdBotId.current !== botId} />
     </section>
   );
 
@@ -161,10 +177,13 @@ function BotPage() {
         <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-3 pb-4">
           <BotIdentity key={botId} bot={bot} />
           <BrowserPane key={`browser-${botId}`} botId={botId} botName={bot.name} />
-          <ProjectPicker bot={bot} />
+          <section className="flex flex-col gap-2">
+            <h2 className="px-1 text-[0.8125rem] text-muted-foreground">Project</h2>
+            <ProjectPicker projectId={bot.projectId} onChange={(projectId) => client.setBotProject(bot.id, projectId)} />
+          </section>
           <ModelPicker bot={bot} />
           <Routines botId={botId} />
-          <BotInstructions key={`instructions-${botId}`} bot={bot} />
+          <BotInstructions key={`instructions-${botId}`} bot={bot} autoFocus={createdBotId.current === botId} />
         </div>
       )}
     </>

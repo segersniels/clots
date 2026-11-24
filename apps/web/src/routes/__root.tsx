@@ -11,7 +11,7 @@ import { BotList } from "../components/BotList.tsx";
 
 export const Route = createRootRoute({
   component: Layout,
-  // The app opens where the operator left off. Only its first page does this, so the + menu still opens the new bot page.
+  // The app opens where the operator left off. Only its first page does this, so a later visit home on a phone shows the bot list.
   beforeLoad: ({ location }) => {
     const lastBot = takeStartupBot();
 
@@ -46,7 +46,7 @@ function Layout() {
     </main>
   );
 
-  // A phone has no sidebar. The home page shows the bot list under the form instead.
+  // A phone has no sidebar. The home page shows the bot list instead.
   if (!wide) return <div className="h-full text-sm">{main}</div>;
 
   return (

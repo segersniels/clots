@@ -162,7 +162,7 @@ function OlderMessagesLoader({ hasOlder, onLoad }: { hasOlder: boolean; onLoad: 
   return null;
 }
 
-export function Chat({ botId, botName }: { botId: BotId; botName: string }) {
+export function Chat({ botId, botName, autoFocus = true }: { botId: BotId; botName: string; autoFocus?: boolean }) {
   const thread = useStore(client.thread(botId));
   // The messages that the thread shows first stay still. Later ones, live or from the update of a cached thread, ease in.
   const shownThrough = useRef(thread.synced ? thread.lastSequence : null);
@@ -346,7 +346,7 @@ export function Chat({ botId, botName }: { botId: BotId; botName: string }) {
         </div>
 
         {/* The composer sits inside the provider, so that sending can make the thread follow its end again. */}
-        <Composer botId={botId} botName={botName} status={live.status} />
+        <Composer botId={botId} botName={botName} status={live.status} autoFocus={autoFocus} />
       </MessageScrollerProvider>
     </>
   );

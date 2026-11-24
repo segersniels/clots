@@ -19,7 +19,7 @@ import {
 } from "@dnd-kit/core";
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Link, useNavigate, useParams } from "@tanstack/react-router";
+import { Link, useParams } from "@tanstack/react-router";
 import { ChevronDownIcon, FolderPlusIcon, PencilLineIcon, PlusIcon, SearchIcon, UserRoundPlusIcon } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 
@@ -34,10 +34,14 @@ import { hasContent, useDraft, type Draft } from "../drafts.ts";
 import { formatRecent } from "../time.ts";
 import { BotMenu } from "./BotMenu.tsx";
 import { Collapse } from "./Collapse.tsx";
+import { NewBotDialog, NewProjectDialog, NoBots } from "./CreateDialog.tsx";
 import { UpdateFooter, useUpdates } from "./UpdateControl.tsx";
 import { ProjectMenu } from "./ProjectMenu.tsx";
 
 const EMPTY_HINT = "px-2.5 py-1.5 text-[0.8125rem] text-muted-foreground/70";
+
+/** The window width from which the sidebar shows beside the main area. It matches the Tailwind `md` breakpoint. */
+const WIDE_WINDOW = "(min-width: 48rem)";
 
 /** Keeps the bot rows apart from each other and from the heading above them. */
 const BOT_ROWS = "flex flex-col gap-1 pt-1";
@@ -515,8 +519,11 @@ function ProjectSection({
 }
 
 export function BotList() {
-  const navigate = useNavigate();
   const bots = useStore(client.bots);
+  const openBotId = useParams({ strict: false }).botId;
+  const [creating, setCreating] = useState<"bot" | "project" | null>(null);
+  /** Closes the create dialog when it reports that it closed. */
+  const closeCreate = (open: boolean) => open || setCreating(null);
   const projects = useStore(client.projects);
   const connection = useStore(client.connection);
   const updates = useUpdates();
@@ -525,6 +532,7 @@ export function BotList() {
   const [personalOpen, togglePersonal] = useGroupOpen(PERSONAL);
   const searchField = useRef<HTMLInputElement>(null);
   const reduceMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const wide = useMediaQuery(WIDE_WINDOW);
   const shown = bots.filter((bot) => bot.name.toLowerCase().includes(search.trim().toLowerCase()));
   const shownById = new Map(shown.map((bot) => [bot.id, bot]));
   const groupOfBot = (bot: BotSummary) => bot.projectId ?? PERSONAL;
@@ -586,16 +594,24 @@ export function BotList() {
             <PlusIcon />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-40">
-            <DropdownMenuItem onClick={() => navigate({ to: "/" })}>
+            <DropdownMenuItem onClick={() => setCreating("bot")}>
               <UserRoundPlusIcon className="text-muted-foreground" />
               New bot
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => navigate({ to: "/projects/new" })}>
+            <DropdownMenuItem onClick={() => setCreating("project")}>
               <FolderPlusIcon className="text-muted-foreground" />
               New project
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {/* A new bot joins the project of the bot that is open, unless the operator picks another. */}
+        <NewBotDialog
+          open={creating === "bot"}
+          onOpenChange={closeCreate}
+          projectId={bots.find((bot) => bot.id === openBotId)?.projectId ?? null}
+        />
+        <NewProjectDialog open={creating === "project"} onOpenChange={closeCreate} />
       </header>
 
       <div className="px-3">
@@ -635,7 +651,12 @@ export function BotList() {
             </Collapse>
           </BotDropZone>
 
-          {bots.length === 0 && <p className="pt-24 text-center text-muted-foreground">No chats yet</p>}
+          {/* A wide window shows the empty state in the main area. On a phone the list is the home page, so it shows it here. */}
+          {bots.length === 0 && !wide && (
+            <div className="pt-24">
+              <NoBots />
+            </div>
+          )}
           {bots.length > 0 && shown.length === 0 && <p className="pt-8 text-center text-muted-foreground">No bot matches</p>}
         </div>
 
