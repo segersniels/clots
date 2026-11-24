@@ -1,12 +1,14 @@
 #!/usr/bin/env bun
 import { BunRuntime } from "@effect/platform-bun";
-import { Layer } from "effect";
+import { Effect, Layer } from "effect";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { renderUnicodeCompact } from "uqr";
 
 import { runAgentBrowserCommand } from "./browser/BotChrome.ts";
+import { browserExecutable, ensureBrowser } from "./browser/BrowserEnvironment.ts";
+import { browserHostProblems } from "./browser/BrowserInstall.ts";
 import { makeClaudeEnvironment } from "./bots/ClaudeEnvironment.ts";
 import { runsInstalled, runtimePaths } from "./paths.ts";
 import { ServerLayer } from "./server.ts";
@@ -75,6 +77,41 @@ const ensureClaudeLogin = (): boolean => {
   return true;
 };
 
+/**
+ * Gives the bots a Chrome: the host's own, or a Chrome for Testing that clots downloads. Prints
+ * what the host must still fix with root. A failed download does not stop `clots up`, because the
+ * server tries again when it starts.
+ */
+const setUpBrowser = async () => {
+  if (browserExecutable() === undefined) {
+    console.log("Downloading Chrome for the bots…");
+    await Effect.runPromise(ensureBrowser);
+  }
+
+  const executable = browserExecutable();
+
+  // Chrome for Testing has no build for Linux on ARM, so only a system Chromium works there.
+  if (executable === undefined && process.platform === "linux" && process.arch === "arm64") {
+    console.log("! Chrome has no download for Linux on ARM. Install Chromium with your package manager, for example:\n  sudo apt install chromium");
+    return;
+  }
+
+  if (executable === undefined) {
+    console.log("! Chrome for the bots did not download. The server tries again when it starts.");
+    return;
+  }
+
+  const problems = browserHostProblems(executable);
+  if (problems.length === 0) {
+    console.log("✓ Browser for the bots");
+    return;
+  }
+
+  for (const { problem, fix } of problems) {
+    console.log(`! ${problem} To fix it, run:\n  ${fix}`);
+  }
+};
+
 /** Starts the background service. A local server stays off the tailnet, so it needs no Tailscale login. */
 const up = async (local: boolean) => {
   if (!ensureClaudeLogin()) process.exit(1);
@@ -83,6 +120,8 @@ const up = async (local: boolean) => {
     console.log("✗ The web client or the sidecar is not built. Run `bun run build` in the clots checkout.");
     process.exit(1);
   }
+
+  await setUpBrowser();
 
   // The service keeps this variable, and the server reads it when it starts.
   if (local) {
@@ -198,6 +237,8 @@ if (command === "serve") {
   await up(process.argv.includes("--local"));
 } else if (command === "install") {
   install();
+} else if (command === "browser") {
+  await setUpBrowser();
 } else if (command === "agent-browser") {
   // The installed `bin/agent-browser` wrapper calls this, so a bot's browser needs no Bun.
   process.exit(await runAgentBrowserCommand(process.argv.slice(3)));
@@ -217,6 +258,7 @@ if (command === "serve") {
       "  install  Copy this build to ~/.local/share/clots and add the `clots` command",
       "  up       Check the Claude login, install the background service, join the tailnet",
       "           With --local, the server stays on this machine and needs no Tailscale",
+      "  browser  Download Chrome for the bots when the host has none, and check the host",
       "  stop     Stop the background service. With --force, also remove it",
       "  status   Show the state of the service and the tailnet",
       "  update   Install the latest release and restart the background service",

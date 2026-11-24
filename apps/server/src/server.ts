@@ -10,6 +10,7 @@ import { join } from "node:path";
 import { AttachmentRouteLayer } from "./bots/AttachmentRoute.ts";
 import { BotRepository } from "./bots/BotRepository.ts";
 import { BotSessions } from "./bots/BotSessions.ts";
+import { ensureBrowser } from "./browser/BrowserEnvironment.ts";
 import { BrowserProxyLayer } from "./browser/BrowserProxy.ts";
 import { ClotsConfig } from "./config.ts";
 import { MigrationsLayer } from "./persistence/Migrations.ts";
@@ -55,6 +56,9 @@ const WebLayer = Layer.unwrap(
 export const ServerLayer = Layer.unwrap(
   Effect.gen(function* () {
     const config = yield* ClotsConfig;
+
+    // The download runs in the background, so the server answers at once.
+    yield* Effect.forkDetach(ensureBrowser);
 
     return HttpRouter.serve(Layer.mergeAll(RpcLayer, BrowserProxyLayer, AttachmentRouteLayer, WebLayer), { disableLogger: true }).pipe(
       Layer.provide(ServicesLayer),

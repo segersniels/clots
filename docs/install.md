@@ -10,9 +10,10 @@ clots runs on the machine where your bots work: a home server, a Mac that stays 
 | Tool | Version | Why |
 | --- | --- | --- |
 | [Claude Code](https://code.claude.com/docs/en/setup) | current | Each bot is a Claude Code session |
-| Chromium or Chrome | current | The browser that the bots use |
 | [Bun](https://bun.sh) | 1.4 or later | Only to build from source |
 | [Go](https://go.dev/dl/) | 1.27 or later | Only to build from source: the Tailscale sidecar |
+
+On Linux on ARM (arm64), install Chromium with your package manager, for example `sudo apt install chromium`. clots downloads Chrome for the bots on other systems, but Chrome has no download for Linux on ARM.
 
 To run clots from a checkout instead of the `clots` command, you also need Node.js for the bots' browser tool.
 
@@ -74,13 +75,14 @@ clots up
 `clots up` does these steps:
 
 1. It checks the Claude login and starts `claude auth login` when you are not logged in.
-2. It installs and starts the service: a systemd user service on Linux (`~/.config/systemd/user/clots.service`), a launchd agent on macOS (`~/Library/LaunchAgents/foo.clots.server.plist`).
-3. It prints a Tailscale login link with a QR code, and waits for your login.
-4. It prints the tailnet address of the server with a QR code for your phone.
+2. It gives the bots a browser. It uses Chrome or Chromium when the host has one. If not, it downloads Chrome for Testing into `~/.clots/tools`. On Linux it also checks the libraries, the fonts and the AppArmor sandbox rule that Chrome needs, and it prints the command that fixes each missing one. These fixes need root, so clots does not run them itself.
+3. It installs and starts the service: a systemd user service on Linux (`~/.config/systemd/user/clots.service`), a launchd agent on macOS (`~/Library/LaunchAgents/foo.clots.server.plist`).
+4. It prints a Tailscale login link with a QR code, and waits for your login.
+5. It prints the tailnet address of the server with a QR code for your phone.
 
 On Linux it also runs `loginctl enable-linger`, so that the service keeps running after you log out.
 
-For a server that only this machine uses, run `clots up --local`. It skips steps 3 and 4: the server stays off the tailnet and needs no Tailscale login.
+For a server that only this machine uses, run `clots up --local`. It skips steps 4 and 5: the server stays off the tailnet and needs no Tailscale login.
 
 Check the state at any time:
 

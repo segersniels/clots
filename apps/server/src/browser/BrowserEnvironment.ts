@@ -6,6 +6,7 @@ import { dirname, join } from "node:path";
 import type { StoredBot } from "../bots/BotRepository.ts";
 import { runtimePaths } from "../paths.ts";
 import { closeChrome, realAgentBrowser, stopLoading } from "./BotChrome.ts";
+import { installBrowser, installedBrowser } from "./BrowserInstall.ts";
 
 /** The directory that holds the real `agent-browser` CLI. */
 const agentBrowserBin = dirname(runtimePaths.agentBrowser);
@@ -22,7 +23,7 @@ const MAC_BROWSERS = [
   "/Applications/Chromium.app/Contents/MacOS/Chromium",
 ];
 
-/** The Chrome that clots gives to a bot when no executable is set. agent-browser downloads its own only after `agent-browser install`. */
+/** The Chrome of the host, which clots prefers to its own Chrome for Testing. */
 const systemBrowser = Bun.which("chromium") ?? Bun.which("google-chrome") ?? MAC_BROWSERS.find((path) => existsSync(path));
 
 /** The platform part of a normal Chrome user agent on each host system. */
@@ -48,10 +49,24 @@ const normalUserAgent = (executable: string | undefined) => {
 };
 
 /** The Chrome that clots starts for each bot. Without one, agent-browser launches its own Chrome. */
-const executable = process.env.AGENT_BROWSER_EXECUTABLE_PATH ?? systemBrowser ?? undefined;
+let executable = process.env.AGENT_BROWSER_EXECUTABLE_PATH ?? systemBrowser ?? installedBrowser();
 
-/** The user agent of every bot browser. The server reads the Chrome version once, when it starts. */
-const userAgent = normalUserAgent(executable);
+/** The user agent of every bot browser. The server reads the Chrome version when it finds the Chrome. */
+let userAgent = normalUserAgent(executable);
+
+/**
+ * Downloads clots's own Chrome when the host has none. `clots up` already does this, so this
+ * covers a server that started without it, such as a source checkout or an older installation.
+ */
+export const ensureBrowser = Effect.promise(async () => {
+  if (executable !== undefined) return;
+
+  executable = await installBrowser();
+  userAgent = normalUserAgent(executable);
+});
+
+/** Tells which Chrome the bots get, or `undefined` when agent-browser must launch its own. */
+export const browserExecutable = () => executable;
 
 /** The DevTools port of the bot's own Chrome. */
 export const devToolsPort = (bot: StoredBot) => bot.browserStreamPort + DEVTOOLS_PORT_OFFSET;

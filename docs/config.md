@@ -9,7 +9,7 @@ clots needs no configuration file. A few environment variables change where it k
 | `CLOTS_HOME` | `~/.clots` | The data directory |
 | `CLOTS_PORT` | `4587` | The loopback port of the server |
 | `CLAUDE_CONFIG_DIR` | `~/.claude` | The Claude Code account that the bots use |
-| `AGENT_BROWSER_EXECUTABLE_PATH` | the system Chromium or Chrome | The browser that the bots start |
+| `AGENT_BROWSER_EXECUTABLE_PATH` | the system Chromium or Chrome, else the Chrome for Testing in `~/.clots/tools` | The browser that the bots start |
 | `CLOTS_TAILNET` | `on` | `off` keeps the server off the tailnet. `clots up --local` sets it |
 
 `clots up` copies `PATH` and these variables from your shell into the background service. Run `clots up` again after you change one.
@@ -31,6 +31,7 @@ CLAUDE_CONFIG_DIR=~/.claude-work CLOTS_HOME=~/.clots-work CLOTS_PORT=4588 clots 
     attachments/      The files that you sent to the bot
     .browser-profile/ The bot's browser profile, with its logins
   tailscale/          The state of the sidecar, and status.json
+  tools/              The Chrome for Testing of the bots, when the host has no Chrome
 ```
 
 Back up the whole directory to keep your bots. The Claude Code session files are in the Claude config directory (`~/.claude/projects`), not in `~/.clots`.
