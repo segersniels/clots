@@ -115,6 +115,16 @@ See [Architecture](./architecture.md) for how the parts fit.
 - Keep one change per commit, so that a reviewer can read and revert it alone.
 - In the pull request, say what changed and why. Keep the change small and complete.
 
+## Releases
+
+Run the **Release** workflow from the Actions tab on `main`, and enter the version, such as `0.2.0`. The workflow:
+
+1. commits the version to the root `package.json` and tags `v0.2.0`,
+2. builds the `clots` archives for macOS (Apple Silicon) and Linux (x64 and arm64), and `Clots.dmg`,
+3. publishes a GitHub release with them and generated notes.
+
+Servers and apps see the new release within an hour. Each server can then update itself from its sidebar.
+
 ## Copied code
 
 If you copy code or a file from another project nearly unchanged, credit the project in a comment. When its license requires the notice to travel with the copy, put the license file next to the copy, as `apps/web/src/assets/fonts/OFL.txt` does for the Allo font.

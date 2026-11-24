@@ -14,27 +14,21 @@ Each bot is <a href="https://code.claude.com/docs/en/overview">Claude Code</a>, 
 
 ### Installing and running clots
 
-clots has no packaged release yet. You build it from source. You need [Bun](https://bun.sh) and [Go](https://go.dev/dl/) to build it, and [Claude Code](https://code.claude.com/docs/en/setup) with a Claude subscription login to run it.
+You need [Claude Code](https://code.claude.com/docs/en/setup) with a Claude subscription login.
 
-**On a Mac**, build the Clots app. It sets up everything else for you:
+**On a Mac** (Apple Silicon), download [Clots.dmg](https://github.com/segersniels/clots/releases/latest/download/Clots.dmg) and drag Clots to Applications. The app is not notarized by Apple yet, so clear the download flag once:
 
 ```shell
-git clone https://github.com/segersniels/clots.git
-cd clots
-bun install
-bun run --cwd apps/desktop package:mac
+xattr -cr /Applications/Clots.app
 ```
 
-The DMG opens when the build is done. Drag Clots to Applications, open it, and choose **On this Mac**. The [desktop app docs](./docs/desktop.md) explain each step.
+Open Clots and choose **On this Mac**. The app sets up everything else. The [desktop app docs](./docs/desktop.md) explain each step.
 
-**On a server** (Linux or macOS), build the `clots` command on the machine that runs your bots:
+**On a server** (Linux x64 or arm64, or macOS), install the `clots` command on the machine that runs your bots. Pick the archive for your platform: `clots-linux-x64`, `clots-linux-arm64` or `clots-darwin-arm64`.
 
 ```shell
-git clone https://github.com/segersniels/clots.git
-cd clots
-bun install
-bun run build:cli
-dist/clots-<platform>/clots install    # for example dist/clots-darwin-arm64
+curl -fsSL https://github.com/segersniels/clots/releases/latest/download/clots-linux-x64.tar.gz | tar -xz
+clots-linux-x64/clots install
 ```
 
 Then install clots as a background service and put it on your tailnet:
@@ -43,7 +37,9 @@ Then install clots as a background service and put it on your tailnet:
 clots up
 ```
 
-`clots up` checks your Claude login, installs the service, and prints a Tailscale login link with a QR code. After the login, it prints the address of your server, `https://clots.<your-tailnet>.ts.net`, for your phone and the desktop app. For a server that only this machine uses, run `clots up --local` and open <http://127.0.0.1:4587>. [Installing & building](./docs/install.md) has the details.
+`clots up` checks your Claude login, installs the service, and prints a Tailscale login link with a QR code. After the login, it prints the address of your server, `https://clots.<your-tailnet>.ts.net`, for your phone and the desktop app. For a server that only this machine uses, run `clots up --local` and open <http://127.0.0.1:4587>. [Installing & building](./docs/install.md) has the details, and how to build from source.
+
+clots tells you about new versions in its sidebar. One click updates the server.
 
 ### What a bot is
 
@@ -72,4 +68,4 @@ On macOS, these parts are verified: the `clots` command, the background service 
 
 These parts are written but not yet verified end to end: the Tailscale sidecar after the login, and the service install of `clots up` on Linux.
 
-Not built yet: a packaged installer (`brew`, `curl | sh`) and the iOS and Android apps.
+Not built yet: a notarized Clots app that updates itself, a `brew` formula, and the iOS and Android apps.

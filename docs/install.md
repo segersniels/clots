@@ -9,12 +9,12 @@ clots runs on the machine where your bots work: a home server, a Mac that stays 
 
 | Tool | Version | Why |
 | --- | --- | --- |
-| [Bun](https://bun.sh) | 1.4 or later | Builds clots |
-| [Go](https://go.dev/dl/) | 1.27 or later | Builds the Tailscale sidecar |
 | [Claude Code](https://code.claude.com/docs/en/setup) | current | Each bot is a Claude Code session |
 | Chromium or Chrome | current | The browser that the bots use |
+| [Bun](https://bun.sh) | 1.4 or later | Only to build from source |
+| [Go](https://go.dev/dl/) | 1.27 or later | Only to build from source: the Tailscale sidecar |
 
-The installed `clots` command needs only Claude Code and a browser. Bun and Go are build tools. To run clots from a checkout instead, you also need Node.js for the bots' browser tool.
+To run clots from a checkout instead of the `clots` command, you also need Node.js for the bots' browser tool.
 
 You also need a Claude subscription (Pro, Max, Team or Enterprise). clots supports the subscription login only.
 
@@ -28,7 +28,18 @@ claude auth login
 
 clots never reads, stores or passes your Claude tokens. It starts the `claude` binary that you installed, and that binary uses its own login.
 
-## Build and install the `clots` command
+## Install the `clots` command
+
+Each [release](https://github.com/segersniels/clots/releases/latest) has an archive per platform: `clots-linux-x64`, `clots-linux-arm64` and `clots-darwin-arm64`. Download the one for your machine and install it:
+
+```shell
+curl -fsSL https://github.com/segersniels/clots/releases/latest/download/clots-linux-x64.tar.gz | tar -xz
+clots-linux-x64/clots install
+```
+
+`clots install` copies the folder to `~/.local/share/clots` and links `~/.local/bin/clots` to it. It needs no root. If `~/.local/bin` is not on your PATH, the install tells you to add it.
+
+## Build from source
 
 ```shell
 git clone https://github.com/segersniels/clots.git
@@ -38,7 +49,7 @@ bun run build:cli
 dist/clots-$(uname -s | tr A-Z a-z)-$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/')/clots install
 ```
 
-`bun run build:cli` builds the web client, the sidecar and one `clots` binary for this machine, in `dist/clots-<platform>/`. `clots install` copies that folder to `~/.local/share/clots` and links `~/.local/bin/clots` to it. Neither step needs root. If `~/.local/bin` is not on your PATH, the install tells you to add it.
+`bun run build:cli` builds the web client, the sidecar and one `clots` binary for this machine, in `dist/clots-<platform>/`. `clots install` installs it as above.
 
 ## Run in the foreground
 
@@ -83,6 +94,16 @@ clots stop
 The service stays installed. `clots up` starts it again, and so does the next boot or login.
 
 ## Update
+
+When a new release is out, the sidebar of the web client shows **Update available**. Click it, then **Update**: the server downloads the release, installs it and restarts. Bots that were working pick up again after the restart. The server checks GitHub for a new release once an hour.
+
+On a server without a browser at hand, run:
+
+```shell
+clots update
+```
+
+Both work only for the installed `clots` command with its background service. For a build from source:
 
 ```shell
 git pull

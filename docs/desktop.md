@@ -3,7 +3,15 @@
 The desktop app (`apps/desktop`) is an Electron window around the web client. It holds no copy of the client: it shows the client that your clots server serves. A server update therefore also updates the app.
 
 > [!NOTE]
-> The macOS app is built and tested on a Mac by hand. There is no signed release yet.
+> The app is for Apple Silicon Macs. It has an ad-hoc signature and is not notarized by Apple yet.
+
+## Install
+
+Download [Clots.dmg](https://github.com/segersniels/clots/releases/latest/download/Clots.dmg) from the latest release and drag Clots to Applications. macOS blocks an app from the internet that Apple did not notarize, so clear the download flag once:
+
+```shell
+xattr -cr /Applications/Clots.app
+```
 
 ## First start
 
@@ -13,6 +21,13 @@ The app asks where clots runs:
 - **On another machine:** enter the address that `clots up` printed on that machine, for example `clots.your-tailnet.ts.net`. [Installing & building](./install.md) explains how to set up that server.
 
 To change this later, use the menu **Server → Change Server…**.
+
+## Updates
+
+The sidebar shows new versions:
+
+- **The server** updates itself when you click **Update**. This works for a server on this Mac and for one on another machine.
+- **The app** shows **Clots app** with the new version. The click opens the release page. Download the new DMG and replace the app in Applications. With **On this Mac**, the new app also brings the new server: it installs it on the next start.
 
 ## Run from source
 
@@ -31,11 +46,7 @@ bun run --cwd apps/desktop package:mac
 
 This builds the `clots` command, the app and `apps/desktop/release/Clots.dmg` for your Mac's processor, and opens the DMG. Drag Clots to Applications.
 
-The app has an ad-hoc signature. A DMG that you build on your own Mac opens without a warning, because macOS only checks apps that come from the internet. To run a build from another Mac, remove the quarantine flag first:
-
-```shell
-xattr -cr /Applications/Clots.app
-```
+A DMG that you build on your own Mac opens without a warning, because macOS only checks apps that come from the internet.
 
 ## What the app does
 
