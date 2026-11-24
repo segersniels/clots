@@ -14,7 +14,20 @@ Each bot is <a href="https://code.claude.com/docs/en/overview">Claude Code</a>, 
 
 ### Installing and running clots
 
-clots has no packaged release yet. You build the `clots` command from source on the machine that runs your bots (Linux or macOS). You need [Bun](https://bun.sh) and [Go](https://go.dev/dl/) to build it, and [Claude Code](https://code.claude.com/docs/en/setup) with a Claude subscription login to run it.
+clots has no packaged release yet. You build it from source. You need [Bun](https://bun.sh) and [Go](https://go.dev/dl/) to build it, and [Claude Code](https://code.claude.com/docs/en/setup) with a Claude subscription login to run it.
+
+**On a Mac**, build the Clots app. It sets up everything else for you:
+
+```shell
+git clone https://github.com/segersniels/clots.git
+cd clots
+bun install
+bun run --cwd apps/desktop package:mac
+```
+
+The DMG opens when the build is done. Drag Clots to Applications, open it, and choose **On this Mac**. The [desktop app docs](./docs/desktop.md) explain each step.
+
+**On a server** (Linux or macOS), build the `clots` command on the machine that runs your bots:
 
 ```shell
 git clone https://github.com/segersniels/clots.git
@@ -55,9 +68,11 @@ A bot has a name, a character, instructions, a model and its own working directo
 
 clots is new. These parts work and are tested on Linux: bots, chat, session resume, approvals, routines, the bot browser with take-over, and models per bot.
 
+On macOS, these parts are verified: the `clots` command, the background service with `clots up --local`, and the Clots app with a server on another machine.
+
 These parts are written but not yet verified end to end:
 
-- The Tailscale sidecar after the login, and the service install of `clots up`.
-- The macOS service (launchd) and the packaged macOS desktop app.
+- The Tailscale sidecar after the login, and the service install of `clots up` on Linux.
+- The **On this Mac** setup of the Clots app.
 
 Not built yet: a packaged installer (`brew`, `curl | sh`) and the iOS and Android apps.

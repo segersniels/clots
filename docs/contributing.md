@@ -47,8 +47,11 @@ bun run start
 To work on the desktop app, start the server, then:
 
 ```shell
+bun run build:cli    # "On this Mac" installs this build
 bun run --cwd apps/desktop start
 ```
+
+The app's setup page is a second Vite entry of the web client (`apps/web/setup.html`). `bun run --cwd apps/desktop build` builds it into `apps/desktop/resources/setup`. Delete the app's `config.json` in its user data directory to see the first start again.
 
 The sidecar starts with the server when its binary is built. It prints a Tailscale login link and waits. You can ignore it for work that does not touch remote access.
 

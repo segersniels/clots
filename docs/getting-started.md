@@ -1,6 +1,6 @@
 # Getting started
 
-Open the web client: `http://127.0.0.1:4587` on the host, or your tailnet address from another device.
+Open the Clots app, or the web client: `http://127.0.0.1:4587` on the host, or your tailnet address from another device.
 
 ## Create a bot
 

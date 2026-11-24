@@ -1,6 +1,9 @@
 # Installing & building
 
-clots runs on the machine where your bots work: a home server, a Mac that stays on, or a VPS. Linux is the tested platform. macOS is supported in the code but not yet verified.
+clots runs on the machine where your bots work: a home server, a Mac that stays on, or a VPS. It runs on Linux and macOS.
+
+> [!TIP]
+> To run clots on your own Mac, build the [Clots app](./desktop.md) instead. It installs the `clots` command and the background service for you. This page is for a server, or for the command by itself.
 
 ## Requirements
 

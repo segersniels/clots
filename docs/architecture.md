@@ -6,7 +6,7 @@ clots is a Bun and Turborepo monorepo. It uses [Effect](https://effect.website) 
 apps/
   server/      Bun + Effect + Claude Agent SDK + SQLite, and the clots CLI
   web/         React client (Vite, TanStack Router, Tailwind, shadcn)
-  desktop/     Electron window around the web client
+  desktop/     Electron window around the web client, with its own setup page
   sidecar/     Go tsnet proxy
 packages/
   contracts/       Effect Schema types and the RPC group
