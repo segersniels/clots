@@ -51,6 +51,13 @@ export class ProjectDirectoryNotFound extends Schema.TaggedError<ProjectDirector
   { directory: Schema.String },
 ) {}
 
+/**
+ * A navigation from the take-over toolbar. `open` takes a URL as its target, `tab` a tab id from the
+ * stream, and `stop` the target id of the page that loads.
+ */
+export const BrowserAction = Schema.Literals(["back", "forward", "reload", "stop", "open", "tab"]);
+export type BrowserAction = typeof BrowserAction.Type;
+
 export class ClotsRpcs extends RpcGroup.make(
   Rpc.make("WatchBots", { success: Schema.Array(BotSummary), stream: true }),
   /** Creates a bot in a project, or in no project when `projectId` is left out or `null`. */
@@ -81,6 +88,12 @@ export class ClotsRpcs extends RpcGroup.make(
 
   /** Closes the bot's browser. Its logins stay in the profile, and the bot opens the browser again when it needs it. */
   Rpc.make("StopBrowser", { payload: { botId: BotId }, error: BotNotFound }),
+
+  /** Navigates the bot's browser, as the buttons and the address bar of a browser do. */
+  Rpc.make("NavigateBrowser", {
+    payload: { botId: BotId, action: BrowserAction, target: Schema.optional(Schema.String) },
+    error: BotNotFound,
+  }),
 
   /** Puts the bots of one sidebar group in the given order. */
   Rpc.make("ReorderBots", { payload: { botIds: Schema.Array(BotId) } }),

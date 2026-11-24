@@ -14,7 +14,7 @@ import { resolve } from "node:path";
 
 import { BotRepository, type StoredBot } from "../bots/BotRepository.ts";
 import { BotSessions } from "../bots/BotSessions.ts";
-import { closeBrowser } from "../browser/BrowserEnvironment.ts";
+import { closeBrowser, navigateBrowser } from "../browser/BrowserEnvironment.ts";
 import { ProjectRepository } from "../projects/ProjectRepository.ts";
 import { nextRunAt, ScheduleRepository } from "../schedules/ScheduleRepository.ts";
 import { availableServerUpdate, installRelease, updateInfo } from "../service/Update.ts";
@@ -134,6 +134,9 @@ export const HandlersLayer = ClotsRpcs.toLayer(
         ),
 
       StopBrowser: ({ botId }) => requireBot(botId).pipe(Effect.flatMap(closeBrowser)),
+
+      NavigateBrowser: ({ botId, action, target }) =>
+        requireBot(botId).pipe(Effect.flatMap((bot) => navigateBrowser(bot, action, target))),
 
       ReorderBots: ({ botIds }) =>
         bots.reorder(botIds).pipe(Effect.andThen(PubSub.publish(sessions.statusChanges, undefined)), Effect.asVoid),

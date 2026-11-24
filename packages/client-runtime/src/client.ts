@@ -6,6 +6,7 @@ import {
   type BotId,
   type BotModel,
   type BotSummary,
+  type BrowserAction,
   type Project,
   type Upload,
   type Schedule,
@@ -36,6 +37,8 @@ export interface ClotsClient {
   reorderBots(botIds: ReadonlyArray<BotId>): Promise<void>;
   /** Closes the bot's browser. The bot opens it again when it needs it. */
   stopBrowser(botId: BotId): Promise<void>;
+  /** Navigates the bot's browser. `open` takes a URL, `tab` a tab id and `stop` a page's target id. */
+  navigateBrowser(botId: BotId, action: BrowserAction, target?: string): Promise<void>;
   duplicateBot(botId: BotId): Promise<Bot>;
   deleteBot(botId: BotId): Promise<void>;
   compactBot(botId: BotId): Promise<void>;
@@ -195,6 +198,8 @@ export const makeClotsClient = (origin: string): ClotsClient => {
     setBotUnread: (botId, unread) => call((rpc) => rpc.SetBotUnread({ botId, unread })),
     reorderBots: (botIds) => call((rpc) => rpc.ReorderBots({ botIds })),
     stopBrowser: (botId) => call((rpc) => rpc.StopBrowser({ botId })),
+    navigateBrowser: (botId, action, target) =>
+      call((rpc) => rpc.NavigateBrowser({ botId, action, ...(target === undefined ? {} : { target }) })),
     duplicateBot: (botId) => call((rpc) => rpc.DuplicateBot({ botId })),
     deleteBot: (botId) => call((rpc) => rpc.DeleteBot({ botId })),
     compactBot: (botId) => call((rpc) => rpc.CompactBot({ botId })),

@@ -1,10 +1,11 @@
+import type { BrowserAction } from "@clots/contracts";
 import { Effect } from "effect";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import type { StoredBot } from "../bots/BotRepository.ts";
 import { runtimePaths } from "../paths.ts";
-import { closeChrome, realAgentBrowser } from "./BotChrome.ts";
+import { closeChrome, realAgentBrowser, stopLoading } from "./BotChrome.ts";
 
 /** The directory that holds the real `agent-browser` CLI. */
 const agentBrowserBin = dirname(runtimePaths.agentBrowser);
@@ -108,3 +109,25 @@ export const closeBrowser = (bot: StoredBot) =>
     await detaching.exited;
     await closeChrome(devToolsPort(bot));
   }).pipe(Effect.timeout("15 seconds"), Effect.ignore);
+
+/** Navigates the bot's browser for the take-over toolbar. A browser that hangs does not block the caller for long. */
+export const navigateBrowser = (bot: StoredBot, action: BrowserAction, target: string | undefined) =>
+  Effect.promise(async () => {
+    // agent-browser runs one command at a time, so a stop goes to the page over DevTools, past the navigation that waits.
+    if (action === "stop") {
+      if (executable !== undefined && target !== undefined) await stopLoading(devToolsPort(bot), target);
+
+      return;
+    }
+
+    // An address or a tab without its target has nowhere to go.
+    if ((action === "open" || action === "tab") && target === undefined) return;
+
+    // The wrapper starts the bot's Chrome first, as it does for the bot's own commands.
+    const command = Bun.spawn([executable === undefined ? realAgentBrowser : join(clotsBin, "agent-browser"), action, ...(target === undefined ? [] : [target])], {
+      env: { ...process.env, ...makeBrowserEnvironment(bot) },
+      stdout: "ignore",
+      stderr: "ignore",
+    });
+    await command.exited;
+  }).pipe(Effect.timeout("60 seconds"), Effect.ignore);

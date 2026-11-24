@@ -87,6 +87,26 @@ export const closeChrome = async (port: number) => {
   });
 };
 
+/** Stops the loading of one page of the bot's Chrome, as the stop button of a browser does. */
+export const stopLoading = async (port: number, targetId: string) => {
+  const targets = await fetch(`http://127.0.0.1:${port}/json/list`)
+    .then((response) => response.json() as Promise<ReadonlyArray<{ id: string; webSocketDebuggerUrl?: string }>>)
+    .catch(() => []);
+  const address = targets.find((target) => target.id === targetId)?.webSocketDebuggerUrl;
+
+  if (address === undefined) return;
+
+  await new Promise<void>((resolve) => {
+    const socket = new WebSocket(address);
+    socket.onopen = () => socket.send(JSON.stringify({ id: 1, method: "Page.stopLoading" }));
+    socket.onmessage = () => {
+      socket.close();
+      resolve();
+    };
+    socket.onerror = () => resolve();
+  });
+};
+
 /**
  * Runs an agent-browser command for the bot whose Chrome the environment names. It starts that
  * Chrome first, so the real agent-browser can attach to it. Returns the command's exit code.
