@@ -15,3 +15,6 @@ spikes/**/*.log
 spikes/tsnet/tsnet-spike
 apps/sidecar/clots-sidecar
 apps/desktop/resources/setup
+
+# Git worktrees for parallel work. Each one is a full checkout.
+.worktrees/
