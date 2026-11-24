@@ -3,6 +3,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import { followSystemColorScheme } from "./lib/color-scheme.ts";
+import { startBotNotifications } from "./notifications.ts";
 import { routeTree } from "./routeTree.gen.ts";
 import "./styles.css";
 
@@ -19,6 +20,7 @@ const desktop = /clots-desktop\/(\w+)/.exec(navigator.userAgent);
 if (desktop !== null) document.documentElement.classList.add("desktop", `desktop-${desktop[1]}`);
 
 followSystemColorScheme();
+startBotNotifications((botId) => void router.navigate({ to: "/bots/$botId", params: { botId } }));
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
