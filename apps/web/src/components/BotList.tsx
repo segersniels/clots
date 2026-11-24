@@ -197,6 +197,11 @@ function BotRow({ bot }: { bot: BotSummary }) {
   const dotShown = bot.status === "waiting" || bot.unread;
   // An idle bot with an unread reply calls the operator, as a bot that waits for an answer does.
   const mood = bot.status === "idle" && bot.unread ? "waiting" : bot.status;
+
+  // An unread reply reads like the name above it, so it catches the eye. A working bot pulses instead.
+  let statusTone = "text-muted-foreground";
+  if (bot.status === "working" && !showDraft) statusTone = "animate-pulse motion-reduce:animate-none";
+  else if (bot.unread) statusTone = "text-foreground";
   const glancing = useGlance(showDraft && mood === "idle" && !reduceMotion);
 
   useEffect(() => {
@@ -239,9 +244,7 @@ function BotRow({ bot }: { bot: BotSummary }) {
             <span className="grid min-w-0 flex-1 text-[0.8125rem] *:col-start-1 *:row-start-1">
               <span
                 aria-hidden={showDraft}
-                className={`truncate transition-[opacity,translate] duration-200 ease-out ${
-                  bot.status === "working" && !showDraft ? "animate-pulse motion-reduce:animate-none" : "text-muted-foreground"
-                } ${showDraft ? LINE_HIDDEN : ""}`}
+                className={`truncate transition-[opacity,translate,color] duration-200 ease-out ${statusTone} ${showDraft ? LINE_HIDDEN : ""}`}
               >
                 {bot.statusLine}
               </span>
