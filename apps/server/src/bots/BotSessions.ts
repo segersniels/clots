@@ -30,6 +30,7 @@ import { basename, join } from "node:path";
 import { z } from "zod";
 
 import { ClotsConfig } from "../config.ts";
+import { HOST_TIME_ZONE, nextRunAt, ScheduleRepository } from "../schedules/ScheduleRepository.ts";
 import { BotRepository, type BotChanges, type StoredBot } from "./BotRepository.ts";
 import { closeBrowser, makeBrowserEnvironment } from "../browser/BrowserEnvironment.ts";
 import { makeClaudeEnvironment, removeClaudeTranscripts, transcriptPath } from "./ClaudeEnvironment.ts";
@@ -215,6 +216,7 @@ export class BotSessions extends Context.Service<
     Effect.gen(function* () {
       const config = yield* ClotsConfig;
       const repository = yield* BotRepository;
+      const schedules = yield* ScheduleRepository;
       const scope = yield* Effect.scope;
       const statusChanges = yield* PubSub.unbounded<void>();
       const skillChanges = yield* PubSub.unbounded<void>();
@@ -337,6 +339,10 @@ export class BotSessions extends Context.Service<
           ),
         );
 
+      /** Lists the bots whose routines belong to `self`: itself and its clones, which run routines in their own threads. */
+      const ownRoutineBots = (self: StoredBot) =>
+        repository.list.pipe(Effect.map((bots) => bots.filter((bot) => bot.id === self.id || bot.clonedFrom === self.id)));
+
       /**
        * The tools of the clots server that each bot gets: the handoff of the browser, and the tools
        * that let a bot see what other bots do and message them.
@@ -418,6 +424,92 @@ export class BotSessions extends Context.Service<
                 await Effect.runPromise(deleteBot(target));
 
                 return toolText(`Deleted @${target.name}.`);
+              },
+            ),
+            tool(
+              "create_routine",
+              `Make a clots routine: a prompt that clots sends on a schedule, such as a morning brief every day at 9:00. Use it for recurring work that must keep running across restarts. For a short check within this session, such as every 5 minutes for the next hour, use CronCreate or Monitor instead. By default the routine gets its own thread: a bot under you that runs it, so its runs do not fill this conversation, and that can read your notes and thread. Use where "here" only for reminders or tasks that belong in this conversation. The operator can pause or delete a routine in the details pane of the bot that runs it.`,
+              {
+                title: z.string().describe("A short name, such as Morning brief. It names the routine's own thread."),
+                cron: z.string().describe(`A 5-field cron expression in the host's time zone (${HOST_TIME_ZONE}), such as "0 9 * * *" for every day at 9:00.`),
+                prompt: z.string().describe("The message that each run gets. Say what to do and what to report, so it works without this conversation."),
+                where: z.enum(["own thread", "here"]).optional().describe('"own thread" (the default) or "here", this conversation.'),
+              },
+              async ({ title, cron, prompt, where = "own thread" }) => {
+                const next = nextRunAt(cron, Date.now());
+                if (next === undefined) return toolText(`"${cron}" is not a valid cron expression.`);
+
+                // A clone cannot make clones, so its routines run in its own thread.
+                if (where === "here" || self.clonedFrom !== null) {
+                  const routine = await Effect.runPromise(schedules.create(self.id, cron, prompt, next));
+
+                  return toolText(`Made routine ${routine.id} in this thread. The first run is ${new Date(next).toLocaleString()} (${HOST_TIME_ZONE}).`);
+                }
+
+                const bots = await Effect.runPromise(repository.list);
+                if (bots.filter((bot) => bot.clonedFrom === self.id).length >= MAX_CLONES) {
+                  return toolText(`You have ${MAX_CLONES} clones and routine threads already. Delete one first, or use where "here".`);
+                }
+
+                const runner = await Effect.runPromise(
+                  repository.create({
+                    name: uniqueName(title, bots),
+                    instructions: [
+                      self.instructions,
+                      `You run the clots routine "${title}" for @${self.name}. Each run arrives as a message in this thread, and the operator reads your result here.`,
+                      `When a run needs to know what @${self.name} did, read its notes directory ${self.workingDirectory} and its thread with read_bot_thread.`,
+                    ].filter((part) => part.trim() !== "").join("\n\n"),
+                    color: self.color,
+                    shape: self.shape,
+                    model: self.model,
+                    projectId: self.projectId,
+                    clonedFrom: self.id,
+                  }),
+                );
+                const routine = await Effect.runPromise(schedules.create(runner.id, cron, prompt, next));
+                // The bot list shows the routine's thread.
+                PubSub.publishUnsafe(statusChanges, undefined);
+
+                return toolText(
+                  `Made routine ${routine.id}. It runs in its own thread, @${runner.name}, under you. The first run is ${new Date(next).toLocaleString()} (${HOST_TIME_ZONE}).`,
+                );
+              },
+            ),
+            tool("list_routines", "List your clots routines, also those in their own threads, with id, thread, schedule, next run and prompt.", {}, async () => {
+              const runners = await Effect.runPromise(ownRoutineBots(self));
+              const lines = await Promise.all(
+                runners.map(async (runner) =>
+                  (await Effect.runPromise(schedules.list(runner.id))).map((routine) =>
+                    [
+                      routine.id,
+                      runner.id === self.id ? "here" : `@${runner.name}`,
+                      routine.cron,
+                      routine.paused ? "paused" : `next ${new Date(routine.nextRunAt).toLocaleString()}`,
+                      routine.prompt,
+                    ].join(" | "),
+                  ),
+                ),
+              );
+
+              return toolText(lines.flat().join("\n") || "You have no routines.");
+            }),
+            tool(
+              "delete_routine",
+              "Delete one of your clots routines, for example when the operator no longer wants it. A routine with its own thread also deletes that thread.",
+              { id: z.string().describe("The routine's id from list_routines.") },
+              async ({ id }) => {
+                for (const runner of await Effect.runPromise(ownRoutineBots(self))) {
+                  const routines = await Effect.runPromise(schedules.list(runner.id));
+                  if (!routines.some((routine) => routine.id === id)) continue;
+
+                  // The routine's own thread exists only for its runs, so it goes with its last routine.
+                  if (runner.id !== self.id && routines.length === 1) await Effect.runPromise(deleteBot(runner));
+                  else await Effect.runPromise(schedules.remove(id));
+
+                  return toolText(`Deleted routine ${id}.`);
+                }
+
+                return toolText(`You have no routine ${id}. list_routines shows yours.`);
               },
             ),
             tool("list_bots", "List the other clots bots with their id, status, project and Claude Code session.", {}, async () => {
@@ -881,8 +973,12 @@ export class BotSessions extends Context.Service<
               }));
             const paths = saved.length === 0 ? "" : `\n\nAttached files:\n${saved.map((file) => file.path).join("\n")}`;
             const note = yield* mentionNote(text, bot);
-            const origin =
-              role === "bot" ? "\n\n(This came from another clots bot. Answer with send_bot_message only when it needs an answer.)" : "";
+            const origins: Partial<Record<MessageRole, string>> = {
+              bot: "\n\n(This came from another clots bot. Answer with send_bot_message only when it needs an answer.)",
+              // Without this, a bot that gets its routine's prompt can set the routine up again instead of doing it.
+              routine: "\n\n(This is one of your clots routines firing on its schedule. Do the task now. Do not create, list or change routines unless the task asks.)",
+            };
+            const origin = origins[role] ?? "";
 
             yield* deliver(bot, runtime, {
               type: "user",

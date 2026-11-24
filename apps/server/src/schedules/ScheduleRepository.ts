@@ -3,7 +3,7 @@ import { Context, Cron, Effect, Layer, PubSub, Result } from "effect";
 import { SqlClient } from "effect/sql";
 
 /** Routines use the time zone of the host, so "every day at 8:00" means 8:00 for the operator. */
-const HOST_TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
+export const HOST_TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 /** Computes the next run of a cron expression. Returns `undefined` when the expression is not valid. */
 export const nextRunAt = (cron: string, now: number): number | undefined => {
