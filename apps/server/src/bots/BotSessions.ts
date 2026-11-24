@@ -73,7 +73,7 @@ const claudeIsRunning = (pid: number) => {
 };
 
 /** The thread size, in tokens, at which a bot compacts its conversation. */
-const AUTO_COMPACT_WINDOW = 200_000;
+const AUTO_COMPACT_WINDOW = 258_000;
 
 /** The start of the id of the step that shows a compaction while it runs. */
 const COMPACT_STEP = "compact-";
