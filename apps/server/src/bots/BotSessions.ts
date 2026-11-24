@@ -114,8 +114,10 @@ interface BotRuntime {
   live: ThreadLiveState;
   readonly events: PubSub.PubSub<ThreadEvent>;
   session: {
-    readonly prompts: Queue.Queue<SDKUserMessage>;
+    readonly prompts: Queue.Queue<SDKUserMessage, Cause.Done>;
     readonly query: Query;
+    /** The system prompt that the session started with. A bot whose settings changed since then needs a new session. */
+    readonly systemPrompt: string;
     /** Completes when the session has stopped and wrote its last message. */
     readonly ended: Deferred.Deferred<void>;
   } | null;
@@ -125,7 +127,21 @@ interface BotRuntime {
   lastPromptFrom: MessageRole | null;
   /** A session from before a server restart that still runs, and the prompts that wait until it ends. */
   leftover: { readonly pid: number; readonly prompts: Array<SDKUserMessage> } | null;
+  /** The prompts that wait while a session with an old system prompt finishes its work. */
+  restart: { readonly prompts: Array<SDKUserMessage> } | null;
 }
+
+/** Tells a bot in its first prompt after a restart that its system prompt changed. */
+const SETTINGS_CHANGED_NOTE = "(The operator changed your clots settings. Your system prompt has the current version.)";
+
+/** Adds the settings note to a prompt. A slash command such as `/compact` stays as it is. */
+const withSettingsNote = (prompt: SDKUserMessage): SDKUserMessage => {
+  const content = prompt.message.content;
+
+  if (typeof content === "string") return prompt;
+
+  return { ...prompt, message: { role: "user", content: [...content, { type: "text", text: SETTINGS_CHANGED_NOTE }] } };
+};
 
 const systemPromptFor = (bot: StoredBot) =>
   [
@@ -215,6 +231,7 @@ export class BotSessions extends Context.Service<
           finishHandoff: null,
           lastPromptFrom: null,
           leftover: null,
+          restart: null,
         };
         runtimes.set(botId, runtime);
 
@@ -732,8 +749,9 @@ export class BotSessions extends Context.Service<
 
       const startSession = (bot: StoredBot, runtime: BotRuntime) =>
         Effect.gen(function* () {
-          const prompts = yield* Queue.unbounded<SDKUserMessage>();
+          const prompts = yield* Queue.unbounded<SDKUserMessage, Cause.Done>();
           const ended = yield* Deferred.make<void>();
+          const systemPrompt = systemPromptFor(bot);
           const session = query({
             prompt: Stream.toAsyncIterable(Stream.fromQueue(prompts)),
             options: {
@@ -749,7 +767,8 @@ export class BotSessions extends Context.Service<
               },
               model: bot.model,
               settingSources: ["user", "project", "local"],
-              systemPrompt: { type: "preset", preset: "claude_code", append: systemPromptFor(bot) },
+              // A recorded prompt survives a resume, so a restart for new settings would keep the old name and instructions.
+              systemPrompt: { type: "preset", preset: "claude_code", append: systemPrompt, snapshot: false },
               // The thread shows whole replies, but a partial message tells it at once that a tool call starts.
               includePartialMessages: true,
               // A classifier allows or denies each tool call. It asks the operator through canUseTool
@@ -770,7 +789,7 @@ export class BotSessions extends Context.Service<
               },
             },
           });
-          runtime.session = { prompts, query: session, ended };
+          runtime.session = { prompts, query: session, systemPrompt, ended };
 
           // Iterate the Query itself: `return()` on the raw generator waits behind a pending read.
           const messages: AsyncIterable<SDKMessage> = { [Symbol.asyncIterator]: () => session };
@@ -869,8 +888,44 @@ export class BotSessions extends Context.Service<
             return;
           }
 
+          if (runtime.restart !== null) {
+            runtime.restart.prompts.push(prompt);
+
+            return;
+          }
+
+          // Changed settings need a new session, but the running turn must finish first.
+          if (runtime.session !== null && runtime.session.systemPrompt !== systemPromptFor(bot)) {
+            runtime.restart = { prompts: [withSettingsNote(prompt)] };
+            yield* restartAfterTurn(bot.id, runtime, runtime.session).pipe(Effect.forkIn(scope));
+
+            return;
+          }
+
           const session = runtime.session ?? (yield* startSession(bot, runtime));
           Queue.offerUnsafe(session.prompts, prompt);
+        });
+
+      /**
+       * Ends the input of a session that has an old system prompt. The SDK closes the session only
+       * after its running turn and its queued prompts finish. Then the waiting prompts resume the
+       * conversation in a new session with the current settings.
+       */
+      const restartAfterTurn = (botId: BotId, runtime: BotRuntime, session: NonNullable<BotRuntime["session"]>): Effect.Effect<void> =>
+        Effect.gen(function* () {
+          Queue.endUnsafe(session.prompts);
+          yield* Deferred.await(session.ended);
+
+          const waiting = runtime.restart?.prompts ?? [];
+          runtime.restart = null;
+
+          const current = yield* repository.find(botId);
+
+          if (current === undefined) return;
+
+          // The old session went idle when it ended, but the waiting prompts still run.
+          setLive(runtime, { status: "working" });
+          for (const prompt of waiting) yield* deliver(current, runtime, prompt);
         });
 
       const removeRuntime = (botId: BotId) => stop(botId).pipe(Effect.andThen(Effect.sync(() => runtimes.delete(botId))));

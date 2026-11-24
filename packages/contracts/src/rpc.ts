@@ -45,8 +45,8 @@ export class ClotsRpcs extends RpcGroup.make(
     success: Bot,
   }),
   /**
-   * Changes the given fields of a bot and leaves the others. A running session keeps its old name
-   * and instructions.
+   * Changes the given fields of a bot and leaves the others. A running session gets a new name or
+   * new instructions with the next message, after it finishes its current work.
    */
   Rpc.make("UpdateBot", {
     payload: {
