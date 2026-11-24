@@ -37,3 +37,18 @@ export const formatNextDay = (time: number, now = Date.now()) => {
 
   return shortWeekday.format(time);
 };
+
+/** Tells when a usage limit resets: "Resets in 3 h 10 min" within six hours, then "Resets today at 7:00 PM" or "Resets Mon at 7:00 PM". */
+export const formatReset = (time: number, now = Date.now()) => {
+  const minutes = Math.max(1, Math.round((time - now) / 60_000));
+
+  if (minutes < 6 * 60) {
+    const parts = [Math.floor(minutes / 60) > 0 ? `${Math.floor(minutes / 60)} h` : "", minutes % 60 > 0 ? `${minutes % 60} min` : ""];
+
+    return `Resets in ${parts.filter((part) => part !== "").join(" ")}`;
+  }
+
+  const day = formatNextDay(time, now);
+
+  return `Resets ${day === "Today" || day === "Tomorrow" ? day.toLowerCase() : day} at ${clock.format(time)}`;
+};

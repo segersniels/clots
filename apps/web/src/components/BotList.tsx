@@ -37,7 +37,8 @@ import { formatRecent } from "../time.ts";
 import { BotMenu } from "./BotMenu.tsx";
 import { Collapse } from "./Collapse.tsx";
 import { NewBotDialog, NewProjectDialog, NoBots } from "./CreateDialog.tsx";
-import { UpdateFooter, useUpdates } from "./UpdateControl.tsx";
+import { AccountMenu } from "./AccountMenu.tsx";
+import { UpdatePill, useUpdates } from "./UpdateControl.tsx";
 import { ProjectMenu } from "./ProjectMenu.tsx";
 
 const EMPTY_HINT = "px-2.5 py-1.5 text-[0.8125rem] text-muted-foreground/70";
@@ -680,14 +681,11 @@ export function BotList() {
         </DragOverlay>
       </DndContext>
 
-      <UpdateFooter updates={updates} />
-
-      {/* A restart that this client asked for drops the connection by design. The update row tells that story. */}
-      {connection !== "connected" && !updates.restarting && (
-        <footer className="px-5 py-3 text-xs text-muted-foreground">
-          {connection === "connecting" ? "Connecting…" : "Disconnected. Trying again…"}
-        </footer>
-      )}
+      <footer className="flex items-center gap-2 px-3 pt-1.5 pb-3">
+        {/* A restart that this client asked for drops the connection by design. The update pill tells that story. */}
+        <AccountMenu connected={connection === "connected"} connecting={connection !== "connected" && !updates.restarting} />
+        <UpdatePill updates={updates} />
+      </footer>
     </nav>
   );
 }
