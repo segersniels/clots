@@ -13,7 +13,7 @@ export function ModelPicker({ bot }: { bot: BotSummary }) {
       <Select value={bot.model} onValueChange={(model) => client.setBotModel(bot.id, model as BotModel)}>
         <SelectTrigger
           aria-label="Model"
-          className="h-auto w-full rounded-xl border-transparent bg-muted/60 py-2.5 pr-3 pl-3 text-base dark:bg-muted/60"
+          className="h-auto w-full rounded-xl border-transparent bg-muted/60 py-2.5 pr-3 pl-3 dark:bg-muted/60"
         >
           <SelectValue className="capitalize" />
         </SelectTrigger>
