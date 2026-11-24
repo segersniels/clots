@@ -151,6 +151,13 @@ const connect = async (input: string): Promise<ConnectResult> => {
   return { ok: true };
 };
 
+ipcMain.handle("app:reveal-window", () => {
+  if (window?.isMinimized()) window.restore();
+
+  window?.show();
+  app.focus({ steal: true });
+});
+
 handleSetup("setup:checks", () => runChecks());
 handleSetup("setup:login", () => loginClaude());
 handleSetup("setup:cancel-login", () => cancelLogin());

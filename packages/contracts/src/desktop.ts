@@ -34,3 +34,12 @@ export interface DesktopBridge {
   /** Tries a remote server. On success, the app remembers it and opens it. */
   connect(address: string): Promise<ConnectResult>;
 }
+
+/**
+ * The calls of the Clots app that every page may make, also the web client of a remote server.
+ * They only touch the app's own window, so they need no guard.
+ */
+export interface DesktopAppBridge {
+  /** Brings the app's window to the front, for example after a click on a notification. */
+  revealWindow(): Promise<void>;
+}
