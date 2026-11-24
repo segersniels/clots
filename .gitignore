@@ -14,3 +14,4 @@ spikes/**/state
 spikes/**/*.log
 spikes/tsnet/tsnet-spike
 apps/sidecar/clots-sidecar
+apps/desktop/resources/setup

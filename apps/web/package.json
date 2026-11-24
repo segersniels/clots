@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:setup": "vite build --config vite.setup.config.ts",
     "lint": "oxlint src",
     "typecheck": "tsc --noEmit"
   },

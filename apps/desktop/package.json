@@ -5,13 +5,14 @@
   "description": "The clots desktop app",
   "main": "dist/main.cjs",
   "scripts": {
-    "build": "bun build src/main.ts src/preload.ts --target=node --format=cjs --external electron --outdir dist --entry-naming '[name].cjs'",
+    "build": "bun run --cwd ../web build:setup && bun build src/main.ts src/preload.ts --target=node --format=cjs --external electron --outdir dist --entry-naming '[name].cjs'",
     "start": "bun run build && electron .",
     "package:mac": "bun run build && electron-builder --mac",
     "lint": "oxlint src",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "@clots/contracts": "workspace:*",
     "@types/node": "^24.0.0",
     "electron": "45.4.1",
     "electron-builder": "26.18.0",
