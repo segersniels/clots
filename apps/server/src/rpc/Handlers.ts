@@ -12,8 +12,10 @@ import { existsSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
 
+import { readAccount } from "../account/Account.ts";
 import { BotRepository, type StoredBot } from "../bots/BotRepository.ts";
 import { BotSessions } from "../bots/BotSessions.ts";
+import { ClotsConfig } from "../config.ts";
 import { closeBrowser, navigateBrowser } from "../browser/BrowserEnvironment.ts";
 import { ProjectRepository } from "../projects/ProjectRepository.ts";
 import { nextRunAt, ScheduleRepository } from "../schedules/ScheduleRepository.ts";
@@ -32,6 +34,7 @@ export const HandlersLayer = ClotsRpcs.toLayer(
     const sessions = yield* BotSessions;
     const schedules = yield* ScheduleRepository;
     const projects = yield* ProjectRepository;
+    const config = yield* ClotsConfig;
 
     const requireBot = (botId: BotId) =>
       bots
@@ -240,6 +243,8 @@ export const HandlersLayer = ClotsRpcs.toLayer(
       DeleteSchedule: ({ id }) => schedules.remove(id),
 
       GetUpdateInfo: () => Effect.promise(() => updateInfo()),
+
+      GetAccount: () => Effect.promise(() => readAccount(config.claudePath, config.home)),
 
       UpdateServer: () =>
         Effect.tryPromise({

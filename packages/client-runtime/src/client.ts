@@ -12,6 +12,7 @@ import {
   type Schedule,
   type Skill,
   type UpdateInfo,
+  type Account,
 } from "@clots/contracts";
 import { Context, Effect, Fiber, Layer, ManagedRuntime, Schedule as RetrySchedule, Stream } from "effect";
 import { RpcClient, RpcClientError, RpcSerialization } from "effect/rpc";
@@ -57,6 +58,7 @@ export interface ClotsClient {
   setSchedulePaused(id: string, paused: boolean): Promise<void>;
   deleteSchedule(id: string): Promise<void>;
   getUpdateInfo(): Promise<UpdateInfo>;
+  getAccount(): Promise<Account>;
   /** Installs the latest release on the server, which then restarts. */
   updateServer(): Promise<void>;
   dispose(): Promise<void>;
@@ -213,6 +215,7 @@ export const makeClotsClient = (origin: string): ClotsClient => {
     setSchedulePaused: (id, paused) => call((rpc) => rpc.SetSchedulePaused({ id, paused })),
     deleteSchedule: (id) => call((rpc) => rpc.DeleteSchedule({ id })),
     getUpdateInfo: () => call((rpc) => rpc.GetUpdateInfo()),
+    getAccount: () => call((rpc) => rpc.GetAccount()),
     updateServer: () => call((rpc) => rpc.UpdateServer()),
     dispose: () => runtime.dispose(),
   };

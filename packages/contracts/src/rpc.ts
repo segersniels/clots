@@ -46,6 +46,33 @@ export const UpdateInfo = Schema.Struct({
 });
 export type UpdateInfo = typeof UpdateInfo.Type;
 
+/** One usage limit of the Claude plan: the 5-hour session, the week, or the week of one model. */
+export const UsageWindow = Schema.Struct({
+  kind: Schema.Literals(["session", "weekly", "model"]),
+  /** The model's name for a `model` window, such as "Fable". */
+  model: Schema.NullOr(Schema.String),
+  /** The part of the limit that is used, 0 to 100. */
+  percent: Schema.Number,
+  resetsAt: Schema.NullOr(Schema.Number),
+  /** Claude marks the window as close to its limit. */
+  critical: Schema.Boolean,
+});
+export type UsageWindow = typeof UsageWindow.Type;
+
+/** The Claude login of the server, which every bot shares, and the usage limits of its plan. */
+export const Account = Schema.Struct({
+  /** The person's name from the Claude profile, if Claude Code has one. */
+  name: Schema.NullOr(Schema.String),
+  email: Schema.NullOr(Schema.String),
+  /** The plan for people, such as "Ultra". */
+  plan: Schema.String,
+  /** The usage limits, or `null` when Claude Code could not tell them. */
+  usage: Schema.NullOr(Schema.Array(UsageWindow)),
+  /** When the server last asked Claude Code. */
+  checkedAt: Schema.Number,
+});
+export type Account = typeof Account.Type;
+
 export class ProjectDirectoryNotFound extends Schema.TaggedError<ProjectDirectoryNotFound>()(
   "ProjectDirectoryNotFound",
   { directory: Schema.String },
@@ -191,6 +218,7 @@ export class ClotsRpcs extends RpcGroup.make(
   Rpc.make("SetSchedulePaused", { payload: { id: Schema.String, paused: Schema.Boolean } }),
   Rpc.make("DeleteSchedule", { payload: { id: Schema.String } }),
   Rpc.make("GetUpdateInfo", { success: UpdateInfo }),
+  Rpc.make("GetAccount", { success: Account }),
   /** Installs the latest release and restarts the server. The connection drops, and the client connects again. */
   Rpc.make("UpdateServer", { error: UpdateFailed }),
 ) {}
