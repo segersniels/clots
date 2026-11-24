@@ -115,6 +115,17 @@ export const removeService = (): void => {
   run(["systemctl", "--user", "daemon-reload"]);
 };
 
+/** Restarts the background service with its current settings, for example after an update. */
+export const restartService = (): void => {
+  if (process.platform === "darwin") {
+    run(["launchctl", "kickstart", "-k", `gui/${userInfo().uid}/${LAUNCHD_LABEL}`]);
+
+    return;
+  }
+
+  run(["systemctl", "--user", "restart", SYSTEMD_UNIT]);
+};
+
 /** Checks whether the background service runs. */
 export const serviceIsRunning = (): boolean => {
   if (process.platform === "darwin") {

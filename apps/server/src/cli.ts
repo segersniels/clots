@@ -11,7 +11,9 @@ import { makeClaudeEnvironment } from "./bots/ClaudeEnvironment.ts";
 import { runsInstalled, runtimePaths } from "./paths.ts";
 import { ServerLayer } from "./server.ts";
 import { installBundle } from "./service/Install.ts";
-import { installService, removeService, serviceIsRunning, stopService } from "./service/Service.ts";
+import { installService, removeService, restartService, serviceIsRunning, stopService } from "./service/Service.ts";
+import { availableServerUpdate, installRelease } from "./service/Update.ts";
+import { CLOTS_VERSION } from "./version.ts";
 import { readSidecarStatus, sidecarIsBuilt } from "./sidecar/Sidecar.ts";
 
 const HOME = process.env.CLOTS_HOME ?? join(homedir(), ".clots");
@@ -174,6 +176,20 @@ const install = () => {
   }
 };
 
+/** Installs the latest release over this installation and restarts the background service with it. */
+const update = async () => {
+  try {
+    const release = await availableServerUpdate();
+    console.log(`Updating clots ${CLOTS_VERSION} to ${release.version}…`);
+    await installRelease(release);
+    restartService();
+    console.log(`✓ clots ${release.version} runs.`);
+  } catch (error) {
+    console.log(`✗ ${error instanceof Error ? error.message : String(error)}`);
+    process.exit(1);
+  }
+};
+
 const command = process.argv[2];
 
 if (command === "serve") {
@@ -187,6 +203,10 @@ if (command === "serve") {
   process.exit(await runAgentBrowserCommand(process.argv.slice(3)));
 } else if (command === "stop") {
   stop(process.argv.includes("--force"));
+} else if (command === "update") {
+  await update();
+} else if (command === "version" || command === "--version") {
+  console.log(CLOTS_VERSION);
 } else if (command === "status") {
   await status();
 } else {
@@ -199,6 +219,8 @@ if (command === "serve") {
       "           With --local, the server stays on this machine and needs no Tailscale",
       "  stop     Stop the background service. With --force, also remove it",
       "  status   Show the state of the service and the tailnet",
+      "  update   Install the latest release and restart the background service",
+      "  version  Print the version of clots",
       "  serve    Run the server in the foreground",
     ].join("\n"),
   );

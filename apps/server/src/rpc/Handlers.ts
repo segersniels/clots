@@ -3,6 +3,7 @@ import {
   ClotsRpcs,
   InvalidCron,
   ProjectDirectoryNotFound,
+  UpdateFailed,
   type BotId,
   type BotSummary,
 } from "@clots/contracts";
@@ -16,6 +17,7 @@ import { BotSessions } from "../bots/BotSessions.ts";
 import { closeBrowser } from "../browser/BrowserEnvironment.ts";
 import { ProjectRepository } from "../projects/ProjectRepository.ts";
 import { nextRunAt, ScheduleRepository } from "../schedules/ScheduleRepository.ts";
+import { availableServerUpdate, installRelease, updateInfo } from "../service/Update.ts";
 
 /** The longest status line. The sidebar and the bot picker truncate it to their width, so this only caps what goes over the wire. */
 const STATUS_LINE_LENGTH = 300;
@@ -225,6 +227,19 @@ export const HandlersLayer = ClotsRpcs.toLayer(
       SetSchedulePaused: ({ id, paused }) => schedules.setPaused(id, paused),
 
       DeleteSchedule: ({ id }) => schedules.remove(id),
+
+      GetUpdateInfo: () => Effect.promise(() => updateInfo()),
+
+      UpdateServer: () =>
+        Effect.tryPromise({
+          try: async () => {
+            await installRelease(await availableServerUpdate());
+
+            // The service starts the new binary when this process ends. The pause lets the answer reach the client first.
+            setTimeout(() => process.exit(0), 500);
+          },
+          catch: (error) => new UpdateFailed({ message: error instanceof Error ? error.message : String(error) }),
+        }),
     };
   }),
 );

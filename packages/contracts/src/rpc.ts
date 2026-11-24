@@ -33,6 +33,19 @@ export class InvalidCron extends Schema.TaggedError<InvalidCron>()("InvalidCron"
   cron: Schema.String,
 }) {}
 
+export class UpdateFailed extends Schema.TaggedError<UpdateFailed>()("UpdateFailed", {
+  message: Schema.String,
+}) {}
+
+/** The server's version and the latest release. A client compares the desktop app's version with `latest` itself. */
+export const UpdateInfo = Schema.Struct({
+  current: Schema.String,
+  latest: Schema.optional(Schema.Struct({ version: Schema.String, url: Schema.String })),
+  /** The server can install the latest release itself: it is older and runs as an installed service. */
+  serverUpdate: Schema.Boolean,
+});
+export type UpdateInfo = typeof UpdateInfo.Type;
+
 export class ProjectDirectoryNotFound extends Schema.TaggedError<ProjectDirectoryNotFound>()(
   "ProjectDirectoryNotFound",
   { directory: Schema.String },
@@ -152,4 +165,7 @@ export class ClotsRpcs extends RpcGroup.make(
   }),
   Rpc.make("SetSchedulePaused", { payload: { id: Schema.String, paused: Schema.Boolean } }),
   Rpc.make("DeleteSchedule", { payload: { id: Schema.String } }),
+  Rpc.make("GetUpdateInfo", { success: UpdateInfo }),
+  /** Installs the latest release and restarts the server. The connection drops, and the client connects again. */
+  Rpc.make("UpdateServer", { error: UpdateFailed }),
 ) {}

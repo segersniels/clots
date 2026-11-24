@@ -9,11 +9,11 @@ export const INSTALL_DIRECTORY = join(homedir(), ".local/share/clots");
 const COMMAND_DIRECTORY = join(homedir(), ".local/bin");
 
 /**
- * Copies the bundle of the running binary to the install folder and links the `clots` command to
- * it. A new folder replaces the old one in one rename, so a running server keeps its open files.
+ * Copies a bundle, by default the one of the running binary, to the install folder and links the
+ * `clots` command to it. A new folder replaces the old one in one rename, so a running server keeps
+ * its open files.
  */
-export const installBundle = () => {
-  const bundle = dirname(process.execPath);
+export const installBundle = (bundle = dirname(process.execPath)) => {
   const staging = `${INSTALL_DIRECTORY}.new`;
 
   rmSync(staging, { recursive: true, force: true });
