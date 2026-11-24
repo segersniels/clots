@@ -12,14 +12,11 @@ export const LOCAL_SERVER_URL = "http://127.0.0.1:4587";
 /** The installed `clots` binary. `clots install` puts it there. */
 const INSTALLED_CLOTS = join(homedir(), ".local/share/clots/clots");
 
+/** How long the app waits for the download of Chrome for the bots. */
+const BROWSER_TIMEOUT_MS = 10 * 60_000;
+
 /** How long the health check waits for the new server to answer. */
 const HEALTH_TIMEOUT_MS = 20_000;
-
-/** The app bundles where macOS keeps Chrome and Chromium. */
-const MAC_BROWSERS = [
-  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-  "/Applications/Chromium.app/Contents/MacOS/Chromium",
-];
 
 const execFileAsync = promisify(execFile);
 
@@ -52,7 +49,7 @@ const which = (command: string) =>
     .map((directory) => join(directory, command))
     .find((path) => existsSync(path));
 
-const run = (command: string, args: ReadonlyArray<string>) => execFileAsync(command, [...args], { env: environment(), timeout: 60_000 });
+const run = (command: string, args: ReadonlyArray<string>, timeout = 60_000) => execFileAsync(command, [...args], { env: environment(), timeout });
 
 /** Shortens a path in the home folder to `~/…` for the checklist. */
 const tildify = (path: string) => (path.startsWith(homedir()) ? `~${path.slice(homedir().length)}` : path);
@@ -82,17 +79,6 @@ const checkLogin = async (claude: string | undefined) => {
   }
 };
 
-const checkBrowser = async () => {
-  const browser = MAC_BROWSERS.find((path) => existsSync(path)) ?? which("chromium") ?? which("google-chrome");
-
-  if (browser === undefined) return MISSING;
-
-  // Chrome prints a line such as "Google Chrome 158.0.8127.88".
-  const { stdout } = await run(browser, ["--version"]);
-
-  return ok(stdout.trim().replace(/^(.*?\d+)\..*$/, "$1"));
-};
-
 const serverAnswers = () =>
   fetch(LOCAL_SERVER_URL, { signal: AbortSignal.timeout(2000) }).then(
     () => true,
@@ -102,14 +88,9 @@ const serverAnswers = () =>
 /** Runs every check that a local clots server needs. */
 export const runChecks = async (): Promise<SetupChecks> => {
   const claude = which("claude");
-  const [claudeCheck, login, browser, server] = await Promise.all([
-    checkClaude(claude),
-    checkLogin(claude),
-    checkBrowser(),
-    serverAnswers(),
-  ]);
+  const [claudeCheck, login, server] = await Promise.all([checkClaude(claude), checkLogin(claude), serverAnswers()]);
 
-  return { claude: claudeCheck, login, browser, server: server ? ok(`Running at ${LOCAL_SERVER_URL}`) : MISSING };
+  return { claude: claudeCheck, login, server: server ? ok(`Running at ${LOCAL_SERVER_URL}`) : MISSING };
 };
 
 let login: ChildProcess | undefined;
@@ -149,15 +130,19 @@ const bundledClots = () =>
  */
 export const installServer = async (onStep: (step: InstallStep) => void): Promise<InstallResult> => {
   const log: Array<string> = [];
-  const runLogged = async (command: string, args: ReadonlyArray<string>) => {
+  const runLogged = async (command: string, args: ReadonlyArray<string>, timeout?: number) => {
     log.push(`$ ${tildify(command)} ${args.join(" ")}`);
-    const { stdout, stderr } = await run(command, args);
+    const { stdout, stderr } = await run(command, args, timeout);
     log.push(stdout.trim(), stderr.trim());
   };
 
   try {
     onStep("install");
     await runLogged(bundledClots(), ["install"]);
+
+    // The download of Chrome can take minutes on a slow network, so it is a step of its own.
+    onStep("browser");
+    await runLogged(INSTALLED_CLOTS, ["browser"], BROWSER_TIMEOUT_MS);
 
     onStep("start");
     await runLogged(INSTALLED_CLOTS, ["up", "--local"]);

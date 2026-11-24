@@ -22,6 +22,7 @@ const OPEN_DELAY_MS = 1500;
 
 const INSTALL_STEPS: ReadonlyArray<{ step: InstallStep; label: string; description: string }> = [
   { step: "install", label: "Install service", description: "Installing the background service…" },
+  { step: "browser", label: "Browser for the bots", description: "Getting a browser for the bots…" },
   { step: "start", label: "Start server", description: "Starting the server…" },
   { step: "health", label: "Health check", description: "Checking that the server answers…" },
 ];
@@ -171,7 +172,7 @@ export function LocalSetup({ onBack }: { onBack: () => void }) {
   };
 
   const serverStatus: Record<ServerPhase["name"], RowStatus> = { waiting: "waiting", installing: "busy", failed: "error", running: "ok" };
-  const readyCount = [rowStatus("claude"), rowStatus("login"), rowStatus("browser"), serverStatus[server.name]].filter((status) => status === "ok").length;
+  const readyCount = [rowStatus("claude"), rowStatus("login"), serverStatus[server.name]].filter((status) => status === "ok").length;
   const stepIndex = server.name === "installing" ? INSTALL_STEPS.findIndex(({ step }) => step === server.step) : -1;
 
   return (
@@ -213,21 +214,6 @@ export function LocalSetup({ onBack }: { onBack: () => void }) {
           )}
         </CheckRow>
 
-        <CheckRow
-          status={rowStatus("browser")}
-          title="Browser for the bots"
-          description={detail("browser") ?? "Bots open websites in their own browser. Install Google Chrome or Chromium."}
-        >
-          {rowStatus("browser") === "missing" && (
-            <>
-              <ExternalButton href="https://www.google.com/chrome/">Get Chrome</ExternalButton>
-              <Button variant="ghost" size="sm" onClick={refresh}>
-                <RotateCwIcon />
-                Check again
-              </Button>
-            </>
-          )}
-        </CheckRow>
 
         <CheckRow
           status={serverStatus[server.name]}

@@ -7,14 +7,12 @@ export interface SetupChecks {
   readonly claude: SetupCheck;
   /** Claude Code has a subscription login. */
   readonly login: SetupCheck;
-  /** Chrome or Chromium is installed for the bots' browser. The server also runs without it. */
-  readonly browser: SetupCheck;
   /** A clots server answers on this machine. */
   readonly server: SetupCheck;
 }
 
 /** The steps that the desktop app takes to start a local server, in order. */
-export type InstallStep = "install" | "start" | "health";
+export type InstallStep = "install" | "browser" | "start" | "health";
 
 export type InstallResult = { readonly ok: true } | { readonly ok: false; readonly message: string; readonly log: string };
 

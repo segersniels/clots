@@ -28,7 +28,7 @@ The app asks where clots runs:
   <img src="./assets/setup-choose-light.png" alt="The first start of the Clots app: choose On this Mac or On another machine" width="70%" />
 </picture>
 
-- **On this Mac:** the app checks that Claude Code is installed and logged in with a subscription, and that Chrome or Chromium is installed. Then it installs the `clots` command that ships inside the app and starts it as a background service with `clots up --local`. The server keeps running when you close the app, and it needs no Tailscale.
+- **On this Mac:** the app checks that Claude Code is installed and logged in with a subscription. Then it installs the `clots` command that ships inside the app, downloads a browser for the bots when the Mac has no Chrome, and starts it as a background service with `clots up --local`. The server keeps running when you close the app, and it needs no Tailscale.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./assets/setup-local-dark.png" />
