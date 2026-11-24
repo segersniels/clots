@@ -1,16 +1,17 @@
 import type { ConnectResult } from "@clots/contracts";
+import { isNewerVersion } from "@clots/contracts/version";
 import { app, BrowserWindow, ipcMain, Menu, net, shell, type IpcMainInvokeEvent } from "electron";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { cancelLogin, installServer, LOCAL_SERVER_URL, loginClaude, runChecks } from "./local.ts";
+import { cancelLogin, installedVersion, installServer, LOCAL_SERVER_URL, loginClaude, runChecks } from "./local.ts";
 
 /** Resolves a file of the app. The bundler replaces `__dirname`, so the app path is the anchor. */
 const appFile = (path: string) => join(app.getAppPath(), path);
 const configPath = () => join(app.getPath("userData"), "config.json");
 
-/** The web client reads this tag to make room for the window frame. */
-const USER_AGENT_TAG = ` clots-desktop/${process.platform === "darwin" ? "mac" : "other"}`;
+/** The web client reads this tag to make room for the window frame, and to offer a newer app. */
+const USER_AGENT_TAG = ` clots-desktop/${process.platform === "darwin" ? "mac" : "other"}/${app.getVersion()}`;
 
 /** Where the operator chose to run clots. A config from before the local mode has only a server address. */
 interface Config {
@@ -93,8 +94,25 @@ const createWindow = () => {
     return { action: "deny" };
   });
 
+  void showStart();
+};
+
+/**
+ * Opens what the operator chose. A local server older than the one in this app gets the new one
+ * first, through the setup checklist, so an app update also updates the local server.
+ */
+const showStart = async () => {
   const config = readConfig();
-  void (config === undefined ? showSetup() : showServer(config.serverUrl));
+
+  if (config === undefined) return showSetup();
+
+  if (config.mode === "local") {
+    const installed = await installedVersion();
+
+    if (installed !== undefined && isNewerVersion(app.getVersion(), installed)) return showSetup({ screen: "local", reinstall: "1" });
+  }
+
+  return showServer(config.serverUrl);
 };
 
 /**

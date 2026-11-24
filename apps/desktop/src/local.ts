@@ -130,6 +130,13 @@ export const cancelLogin = () => {
   login?.kill();
 };
 
+/** Asks the installed `clots` for its version. Returns `undefined` when none is installed. */
+export const installedVersion = () =>
+  run(INSTALLED_CLOTS, ["version"]).then(
+    ({ stdout }) => stdout.trim(),
+    () => undefined,
+  );
+
 /** The `clots` bundle that ships in the app. In development, the bundle that `bun run build:cli` writes. */
 const bundledClots = () =>
   app.isPackaged

@@ -14,6 +14,9 @@ import { Screen, ScreenDescription, ScreenFooter, ScreenTitle } from "./Screen.t
 /** How often the checks run while the window has focus, so a fix in the browser shows up without a click. */
 const CHECK_INTERVAL_MS = 2000;
 
+/** The app opens the checklist with this flag when its bundled server is newer than the installed one. */
+const REINSTALL = new URLSearchParams(location.search).has("reinstall");
+
 /** The pause on the done state before the app opens clots on its own. */
 const OPEN_DELAY_MS = 1500;
 
@@ -127,11 +130,11 @@ export function LocalSetup({ onBack }: { onBack: () => void }) {
     setServer(result.ok ? { name: "running" } : { name: "failed", message: result.message, log: result.log });
   };
 
-  // The server row waits for the rows above it. A server that already runs needs no install.
+  // The server row waits for the rows above it. A server that already runs needs no install, unless the app brings a newer one.
   useEffect(() => {
     if (!ready || server.name !== "waiting") return;
 
-    if (checks.server.status === "ok") {
+    if (checks.server.status === "ok" && !REINSTALL) {
       setServer({ name: "running" });
 
       return;
