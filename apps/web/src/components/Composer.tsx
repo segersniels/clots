@@ -1,6 +1,6 @@
 import { MAX_UPLOAD_BYTES, type BotId, type BotStatus, type Upload } from "@clots/contracts";
 import { ArrowUpIcon, FileTextIcon, PlusIcon, SquareIcon, XIcon } from "lucide-react";
-import { useEffect, useRef, useState, type DragEvent, type FormEvent } from "react";
+import { useEffect, useImperativeHandle, useRef, useState, type DragEvent, type FormEvent, type Ref } from "react";
 
 import {
   Attachment,
@@ -53,18 +53,22 @@ export function Composer({
   botName,
   status,
   autoFocus = true,
+  ref,
 }: {
   botId: BotId;
   botName: string;
   status: BotStatus;
   /** Gives the field the focus when the bot opens. A new bot leaves it to its instructions. */
   autoFocus?: boolean;
+  /** Lets the thread put the caret in the field, such as after the operator saves the instructions of a new bot. */
+  ref?: Ref<{ focus(): void }>;
 }) {
   const [draft, setDraft] = useState(() => drafts.get().get(botId)?.text ?? "");
   const [files, setFiles] = useState(() => draftFiles.get(botId) ?? []);
   const [tooLarge, setTooLarge] = useState(false);
   const fileDialog = useRef<HTMLInputElement>(null);
   const field = useRef<ComposerFieldHandle>(null);
+  useImperativeHandle(ref, () => ({ focus: () => field.current?.focus() }));
   const { scrollToEnd } = useMessageScroller();
   const canSend = draft.trim() !== "" || files.length > 0;
 

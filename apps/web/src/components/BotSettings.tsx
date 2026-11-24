@@ -1,13 +1,13 @@
 import { Character } from "@clots/character";
-import type { BotSummary } from "@clots/contracts";
-import { useState } from "react";
+import type { BotId, BotSummary } from "@clots/contracts";
+import { useEffect, useRef, useState } from "react";
 
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 import { client } from "../client.ts";
 import { CharacterPicker } from "./CharacterPicker.tsx";
-import { ComposerField } from "./ComposerField.tsx";
+import { ComposerField, type ComposerFieldHandle } from "./ComposerField.tsx";
 
 /** The look of a form field with skill and bot chips: the filled surface of the details pane. Each use adds its height. */
 export const CHIP_FIELD_CLASSES =
@@ -56,27 +56,60 @@ export function BotIdentity({ bot }: { bot: BotSummary }) {
   );
 }
 
+/** How long the instructions field shows its ring after a save from another place, such as the thread of a new bot. */
+const FLASH_MS = 900;
+
+/** The instruction fields on screen, so that a save from another place can point the operator at them. */
+const instructionFlashes = new Map<BotId, () => void>();
+
+/** Makes the instructions field of the bot, if the details pane shows it, light up once. */
+export const flashInstructions = (botId: BotId) => instructionFlashes.get(botId)?.();
+
 /** Lets the operator edit the instructions of a bot. The bot reads them when its next session starts. */
-export function BotInstructions({ bot, autoFocus = false }: { bot: BotSummary; autoFocus?: boolean }) {
+export function BotInstructions({ bot }: { bot: BotSummary }) {
   const [instructions, setInstructions] = useState(bot.instructions);
+  const [flashing, setFlashing] = useState(false);
+  const field = useRef<ComposerFieldHandle>(null);
 
   const saveInstructions = () => {
     if (instructions.trim() !== bot.instructions) void client.updateBot(bot.id, { instructions: instructions.trim() });
   };
+
+  // The instructions can change in another place, such as the thread of a new bot.
+  useEffect(() => {
+    if (bot.instructions !== instructions.trim()) field.current?.setText(bot.instructions);
+  }, [bot.instructions]);
+
+  useEffect(() => {
+    instructionFlashes.set(bot.id, () => setFlashing(true));
+
+    return () => {
+      instructionFlashes.delete(bot.id);
+    };
+  }, [bot.id]);
+
+  useEffect(() => {
+    if (!flashing) return;
+
+    const timer = setTimeout(() => setFlashing(false), FLASH_MS);
+
+    return () => clearTimeout(timer);
+  }, [flashing]);
 
   return (
     <section className="flex flex-col gap-2">
       <h2 className="px-1 text-[0.8125rem] text-muted-foreground">Instructions</h2>
       <div className="relative">
         <ComposerField
+          ref={field}
           botId={bot.id}
           label="Instructions"
           placeholder="What this bot does and how it behaves"
           initialText={bot.instructions}
           onTextChange={setInstructions}
           onBlur={saveInstructions}
-          autoFocus={autoFocus}
-          className={`${CHIP_FIELD_CLASSES} min-h-24`}
+          autoFocus={false}
+          className={`${CHIP_FIELD_CLASSES} min-h-24 ${flashing ? "ring-2 ring-attention/50" : ""}`}
           pickerClassName={CHIP_PICKER_CLASSES}
         />
       </div>

@@ -32,6 +32,7 @@ import { formatClock, formatDuration } from "../time.ts";
 import { Collapse } from "./Collapse.tsx";
 import { Composer } from "./Composer.tsx";
 import { Markdown } from "./Markdown.tsx";
+import { EmptyThread } from "./EmptyThread.tsx";
 import { MessageAttachments } from "./MessageAttachments.tsx";
 import { knownNames } from "../references.ts";
 
@@ -184,13 +185,14 @@ function ScrollToMessage({ messageId, onScrolled }: { messageId: string; onScrol
 export function Chat({
   botId,
   botName,
-  autoFocus = true,
+  justCreated = false,
   jumpTo,
   onJumped,
 }: {
   botId: BotId;
   botName: string;
-  autoFocus?: boolean;
+  /** The operator just created the bot, so the caret starts in its instructions and not in the composer. */
+  justCreated?: boolean;
   /** A message to scroll to, such as one that the search found. */
   jumpTo?: string | undefined;
   /** Reports that the thread scrolled to `jumpTo`, so the page can forget it. */
@@ -213,6 +215,12 @@ export function Chat({
   // Only a thread with nothing to show yet fades in. A thread in memory or in the cache is there at once.
   const [loadsLate] = useState(!thread.synced && cached === null);
   const { live } = thread;
+  const composer = useRef<{ focus(): void }>(null);
+  // A thread without messages asks for the instructions. The first message fades it out.
+  const empty = thread.synced && messages.length === 0;
+  const [emptyShown, setEmptyShown] = useState(false);
+  if (empty && !emptyShown) setEmptyShown(true);
+
   const [shownCount, setShownCount] = useState(MESSAGES_PER_PAGE);
   const firstShown = Math.max(0, messages.length - shownCount);
 
@@ -244,6 +252,7 @@ export function Chat({
   }, [highlightedId]);
   const skills = useStore(client.skills(botId));
   const bots = useStore(client.bots);
+  const bot = bots.find((candidate) => candidate.id === botId);
   const known = knownNames(
     skills.map((skill) => skill.name),
     bots.map((bot) => bot.name),
@@ -403,6 +412,15 @@ export function Chat({
             </MessageScrollerContent>
           </MessageScrollerViewport>
           <MessageScrollerButton />
+          {emptyShown && bot !== undefined && (
+            <div
+              inert={!empty}
+              onTransitionEnd={(event) => event.target === event.currentTarget && !empty && setEmptyShown(false)}
+              className={`absolute inset-0 flex items-center justify-center px-4 pt-16 pb-3 transition-opacity duration-200 ease-out ${empty ? "" : "opacity-0"}`}
+            >
+              <EmptyThread bot={bot} focusOnOpen={justCreated} onDone={() => composer.current?.focus()} />
+            </div>
+          )}
         </MessageScroller>
 
         {/*
@@ -422,7 +440,7 @@ export function Chat({
         </div>
 
         {/* The composer sits inside the provider, so that sending can make the thread follow its end again. */}
-        <Composer botId={botId} botName={botName} status={live.status} autoFocus={autoFocus} />
+        <Composer ref={composer} botId={botId} botName={botName} status={live.status} autoFocus={!justCreated} />
       </MessageScrollerProvider>
     </>
   );

@@ -78,13 +78,9 @@ function BotPage() {
     void navigate({ to: "/", replace: true });
   }, [missing, navigate]);
 
-  // A bot that the operator just created opens with its details, so the operator writes its instructions next.
+  // A bot that the operator just created asks for its instructions in its thread, with the caret there.
   const createdBotId = useRef<BotId | null>(null);
-  const opensDetails = useRef(false);
-  if (takeCreatedBot(botId)) {
-    createdBotId.current = botId;
-    opensDetails.current = true;
-  }
+  if (takeCreatedBot(botId)) createdBotId.current = botId;
 
   const toggleDetails = () => {
     const open = !detailsOpen;
@@ -102,13 +98,6 @@ function BotPage() {
     if (open) details.current?.resize(detailsWidth.current);
     else details.current?.collapse();
   };
-
-  useEffect(() => {
-    if (!opensDetails.current || bot === undefined) return;
-
-    opensDetails.current = false;
-    if (!detailsOpen) toggleDetails();
-  });
 
   // The bot list arrives a moment after the page opens.
   if (bot === undefined) return null;
@@ -174,7 +163,7 @@ function BotPage() {
         key={botId}
         botId={botId}
         botName={bot.name}
-        autoFocus={createdBotId.current !== botId}
+        justCreated={createdBotId.current === botId}
         jumpTo={jumpTo}
         onJumped={() => void navigate({ to: "/bots/$botId", params: { botId }, search: {}, replace: true })}
       />
@@ -200,7 +189,7 @@ function BotPage() {
             </section>
             <ModelPicker bot={bot} />
             <Routines botId={botId} />
-            <BotInstructions key={`instructions-${botId}`} bot={bot} autoFocus={createdBotId.current === botId} />
+            <BotInstructions key={`instructions-${botId}`} bot={bot} />
           </div>
         </ScrollArea>
       )}

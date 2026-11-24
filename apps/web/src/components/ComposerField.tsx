@@ -27,6 +27,8 @@ export interface ComposerFieldHandle {
   clear(): void;
   /** Puts text back in the field, for example after a failed send. Known references become chips. */
   setText(text: string): void;
+  /** Puts the caret at the end of the text. */
+  focus(): void;
 }
 
 /** The attributes of a reference chip. */
@@ -186,6 +188,7 @@ export function ComposerField({
   initialText,
   onTextChange,
   onEnter,
+  onSubmit,
   onFiles,
   onBlur,
   onEscape,
@@ -200,6 +203,8 @@ export function ComposerField({
   initialText: string;
   onTextChange: (text: string) => void;
   onEnter?: () => void;
+  /** Runs on ⌘Enter or Ctrl+Enter, in a form field where Enter alone makes a new line. */
+  onSubmit?: () => void;
   onFiles?: (files: FileList) => void;
   onBlur?: () => void;
   /** Runs on Escape when the picker is closed. The editor uses Escape itself otherwise. */
@@ -233,8 +238,8 @@ export function ComposerField({
   const matchingItems = pickerOpen ? matchItems(pickerSource, query.query).slice(0, MAX_LISTED_ITEMS) : [];
 
   // The editor keeps its first handlers, so they read the current ones through these refs.
-  const latest = useRef({ onTextChange, onEnter, onFiles, onBlur, onEscape, placeholder, handleKey: (_event: KeyboardEvent): boolean => false });
-  latest.current = { onTextChange, onEnter, onFiles, onBlur, onEscape, placeholder, handleKey: (event) => handleKey(event) };
+  const latest = useRef({ onTextChange, onEnter, onSubmit, onFiles, onBlur, onEscape, placeholder, handleKey: (_event: KeyboardEvent): boolean => false });
+  latest.current = { onTextChange, onEnter, onSubmit, onFiles, onBlur, onEscape, placeholder, handleKey: (event) => handleKey(event) };
 
   const editor = useEditor({
     extensions: [
@@ -306,6 +311,7 @@ export function ComposerField({
   useImperativeHandle(ref, () => ({
     clear: () => editor?.commands.clearContent(true),
     setText: (text) => editor?.commands.setContent(toContent(text, known), { emitUpdate: true }),
+    focus: () => editor?.commands.focus("end"),
   }));
 
   /** Puts the picked reference as a chip in place of what the operator typed, with a space after it. */
@@ -354,6 +360,14 @@ export function ComposerField({
     }
 
     if (event.key !== "Enter" || editor === null) return false;
+
+    const { onSubmit: submit } = latest.current;
+
+    if (submit !== undefined && (event.metaKey || event.ctrlKey)) {
+      submit();
+
+      return true;
+    }
 
     // In code, Enter makes a new line. Three Enters leave the code block, as the editor does on its own.
     if (editor.isActive("codeBlock")) return event.shiftKey ? editor.commands.newlineInCode() : false;

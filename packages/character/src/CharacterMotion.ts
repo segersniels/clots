@@ -17,6 +17,8 @@ export interface MotionProps {
   gaze: Gaze | undefined;
   /** Scales the art to fill its box. A character that can be selected keeps room for its ring instead. */
   fitted: boolean;
+  /** Counts the hops that the character was asked for. Each new count makes it hop once. */
+  hops: number;
 }
 
 const MORPH_MS = 720;
@@ -69,6 +71,7 @@ export class CharacterMotion implements Animated {
   private toFit: ShapeFit;
   private morphStart = -Infinity;
   private hopStart = -Infinity;
+  private hops: number;
   private blinkStart = -Infinity;
   private nextBlink = performance.now() + 1200 + Math.random() * 3000;
   private gaze = { x: 0, y: 0 };
@@ -92,6 +95,7 @@ export class CharacterMotion implements Animated {
     svg.querySelector("feColorMatrix[data-goo]")!.setAttribute("values", gooMatrix(sharpness));
 
     this.shape = props().shape;
+    this.hops = props().hops;
     this.fromLobes = this.toLobes = paddedLobes(this.shape);
     this.fromEyes = this.toEyes = SHAPE_GEOMETRY[this.shape].eyes;
     this.fromFit = this.toFit = this.fitOf(this.shape);
@@ -108,11 +112,16 @@ export class CharacterMotion implements Animated {
   }
 
   draw(now: number) {
-    const { shape, mood, gaze } = this.props();
+    const { shape, mood, gaze, hops } = this.props();
     const reduced = prefersReducedMotion();
     const t = now / 1000 + this.phase;
 
     if (shape !== this.shape) this.startMorph(shape, now, reduced);
+
+    if (hops !== this.hops) {
+      this.hops = hops;
+      if (!reduced) this.hopStart = now;
+    }
 
     const lobes = this.lobesAt(now);
     const [eyeX, eyeY, eyeGap] = this.eyesAt(now);

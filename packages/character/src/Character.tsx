@@ -23,6 +23,7 @@ export function Character({
   size = 36,
   selected,
   gaze,
+  hops = 0,
   className,
 }: {
   shape: CharacterShape;
@@ -33,13 +34,15 @@ export function Character({
   selected?: boolean;
   /** Makes the eyes look at a point instead of at the pointer. */
   gaze?: Gaze | undefined;
+  /** Counts the hops that the character was asked for, such as one for each save. Each new count makes it hop once. */
+  hops?: number;
   className?: string;
 }) {
   const id = useId().replace(/[^\w-]/g, "");
   const svg = useRef<SVGSVGElement>(null);
   // Without a selection ring, the art can fill its box.
   const fitted = selected === undefined;
-  const props = useRef<MotionProps>({ shape, mood, gaze, fitted });
+  const props = useRef<MotionProps>({ shape, mood, gaze, fitted, hops });
 
   // React draws the first shape only. After that, the motion owns the geometry, so a new shape can morph.
   const [firstShape] = useState(shape);
@@ -48,7 +51,7 @@ export function Character({
   const fit = fitted ? shapeFit(firstShape) : NO_FIT;
 
   useEffect(() => {
-    props.current = { shape, mood, gaze, fitted };
+    props.current = { shape, mood, gaze, fitted, hops };
   });
 
   useEffect(() => animate(new CharacterMotion(svg.current!, () => props.current)), []);
