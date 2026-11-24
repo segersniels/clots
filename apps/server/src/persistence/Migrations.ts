@@ -121,6 +121,14 @@ const clones = Effect.gen(function* () {
   yield* sql`ALTER TABLE bots ADD COLUMN cloned_from TEXT`;
 });
 
+const resume = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient;
+
+  // A session that outlives a server restart keeps working. The server follows it from its transcript after the last message it handled.
+  yield* sql`ALTER TABLE threads ADD COLUMN claude_pid INTEGER`;
+  yield* sql`ALTER TABLE threads ADD COLUMN synced_uuid TEXT`;
+});
+
 /** Runs the pending migrations when the server starts. */
 export const MigrationsLayer = SqliteMigrator.layer({
   loader: SqliteMigrator.fromRecord({
@@ -132,5 +140,6 @@ export const MigrationsLayer = SqliteMigrator.layer({
     "0006_unread": unread,
     "0007_skills": skills,
     "0008_clones": clones,
+    "0010_resume": resume,
   }),
 });

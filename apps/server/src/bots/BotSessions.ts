@@ -1,5 +1,6 @@
 import {
   createSdkMcpServer,
+  getSessionMessages,
   query,
   tool,
   type CanUseTool,
@@ -8,6 +9,7 @@ import {
   type SDKMessage,
   type SDKUserMessage,
   type SlashCommand,
+  type SpawnedProcess,
 } from "@anthropic-ai/claude-agent-sdk";
 import type {
   ApprovalDecision,
@@ -22,6 +24,7 @@ import type {
   Upload,
 } from "@clots/contracts";
 import { Cause, Context, Deferred, Effect, Layer, PubSub, Queue, Stream } from "effect";
+import { spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { z } from "zod";
@@ -53,6 +56,19 @@ const MAX_CLONES = 10;
 
 /** The wait before a clone that deletes itself goes, so that its tool call can end first. */
 const SELF_DELETE_DELAY_MS = 1000;
+
+/** How often the server reads the transcript of a session that a server restart cut off, while it still runs. */
+const FOLLOW_INTERVAL = "3 seconds";
+
+/**
+ * Checks whether a `claude` process still runs. A finished one can stay behind as a zombie, and
+ * after a reboot its id can belong to another program.
+ */
+const claudeIsRunning = (pid: number) => {
+  const status = Bun.spawnSync(["ps", "-o", "stat=,args=", "-p", String(pid)]).stdout.toString().trim();
+
+  return status !== "" && !status.startsWith("Z") && status.includes("stream-json");
+};
 
 /** The start of the id of the step that shows a compaction while it runs. */
 const COMPACT_STEP = "compact-";
@@ -107,6 +123,8 @@ interface BotRuntime {
   finishHandoff: (() => void) | null;
   /** Who sent the latest prompt: the operator, a routine or another bot. A clone may delete itself only after the operator's. */
   lastPromptFrom: MessageRole | null;
+  /** A session from before a server restart that still runs, and the prompts that wait until it ends. */
+  leftover: { readonly pid: number; readonly prompts: Array<SDKUserMessage> } | null;
 }
 
 const systemPromptFor = (bot: StoredBot) =>
@@ -196,6 +214,7 @@ export class BotSessions extends Context.Service<
           approvals: new Map(),
           finishHandoff: null,
           lastPromptFrom: null,
+          leftover: null,
         };
         runtimes.set(botId, runtime);
 
@@ -634,6 +653,15 @@ export class BotSessions extends Context.Service<
             if (block.type !== "tool_use") continue;
 
             const description = (block.input as { description?: unknown }).description;
+
+            // A transcript has no stream events, so after a restart the step starts here.
+            if (!runtime.live.steps.some((step) => step.id === block.id)) {
+              const title = typeof description === "string" ? description : `Using ${block.name}`;
+              setLive(runtime, { steps: [...runtime.live.steps, { id: block.id, title, status: "running" }] });
+
+              continue;
+            }
+
             if (typeof description !== "string") continue;
 
             const steps = runtime.live.steps.map((step) => (step.id === block.id ? { ...step, title: description } : step));
@@ -646,6 +674,60 @@ export class BotSessions extends Context.Service<
             yield* recordTrace(runtime, botId, false);
             yield* record(runtime, botId, "assistant", text);
           }
+
+          yield* repository.setSyncedUuid(botId, message.uuid);
+        });
+
+      /**
+       * Adds what the session wrote to its transcript after `after` to the thread, through the same
+       * handling as a live session. Returns the last entry. A transcript without `after` adds nothing.
+       */
+      const catchUp = (runtime: BotRuntime, bot: StoredBot, sessionId: string, after: string) =>
+        Effect.gen(function* () {
+          const entries = yield* Effect.promise(() =>
+            getSessionMessages(sessionId, { dir: bot.projectDirectory ?? bot.workingDirectory }),
+          );
+          const start = entries.findIndex((entry) => entry.uuid === after);
+          if (start === -1) return after;
+
+          for (const entry of entries.slice(start + 1)) {
+            yield* handle(runtime, bot.id, entry as SDKMessage);
+          }
+
+          return entries.at(-1)?.uuid ?? after;
+        });
+
+      /**
+       * Follows a session that a server restart cut off. Its `claude` process can still run its
+       * turn, so the thread gets the rest from the transcript until the process ends. Then the
+       * prompts that waited start a new session.
+       */
+      const followLeftover = (bot: StoredBot, pid: number) =>
+        Effect.gen(function* () {
+          const runtime = runtimeFor(bot.id);
+          runtime.leftover = { pid, prompts: [] };
+          setLive(runtime, { status: "working" });
+
+          let after = bot.syncedUuid;
+          for (;;) {
+            // The check comes first, so the last read sees everything that the process wrote.
+            const running = claudeIsRunning(pid);
+            if (bot.sdkSessionId !== null && after !== null) after = yield* catchUp(runtime, bot, bot.sdkSessionId, after);
+            if (!running) break;
+
+            yield* Effect.sleep(FOLLOW_INTERVAL);
+          }
+
+          yield* recordTrace(runtime, bot.id, true);
+          yield* repository.setClaudePid(bot.id, null);
+          const waiting = runtime.leftover.prompts;
+          runtime.leftover = null;
+          setLive(runtime, { status: "idle", steps: [] });
+
+          const current = yield* repository.find(bot.id);
+          if (current === undefined) return;
+
+          for (const prompt of waiting) yield* deliver(current, runtime, prompt);
         });
 
       const startSession = (bot: StoredBot, runtime: BotRuntime) =>
@@ -678,6 +760,14 @@ export class BotSessions extends Context.Service<
               // The thread has no question dialog. The bot asks in plain text.
               disallowedTools: ["AskUserQuestion"],
               ...(bot.sdkSessionId === null ? {} : { resume: bot.sdkSessionId }),
+              // The process id tells the next server whether this session outlived a restart.
+              spawnClaudeCodeProcess: ({ command, args, cwd, env, signal }) => {
+                const child = spawn(command, args, { cwd, env, signal, stdio: ["pipe", "pipe", "ignore"] });
+                if (child.pid !== undefined) Effect.runFork(repository.setClaudePid(bot.id, child.pid));
+
+                // The SDK starts the same Node child process itself. Bun's types lack its event methods.
+                return child as unknown as SpawnedProcess;
+              },
             },
           });
           runtime.session = { prompts, query: session, ended };
@@ -692,6 +782,7 @@ export class BotSessions extends Context.Service<
                 ? Effect.void
                 : record(runtime, bot.id, "assistant", `The session stopped: ${Cause.pretty(cause)}`),
             ),
+            Effect.ensuring(repository.setClaudePid(bot.id, null)),
             Effect.ensuring(
               Effect.sync(() => {
                 session.close();
@@ -710,6 +801,9 @@ export class BotSessions extends Context.Service<
 
       const stop = (botId: BotId) =>
         Effect.gen(function* () {
+          const leftover = runtimes.get(botId)?.leftover;
+          if (leftover !== undefined && leftover !== null) process.kill(leftover.pid, "SIGTERM");
+
           const session = runtimes.get(botId)?.session;
           if (session === undefined || session === null) return;
 
@@ -758,13 +852,26 @@ export class BotSessions extends Context.Service<
             const origin =
               role === "bot" ? "\n\n(This came from another clots bot. Answer with send_bot_message only when it needs an answer.)" : "";
 
-            const session = runtime.session ?? (yield* startSession(bot, runtime));
-            Queue.offerUnsafe(session.prompts, {
+            yield* deliver(bot, runtime, {
               type: "user",
               message: { role: "user", content: [...images, { type: "text", text: `${text}${paths}${note}${origin}`.trim() }] },
               parent_tool_use_id: null,
             } as SDKUserMessage);
           });
+
+      /** Gives a prompt to the bot's session, and starts or resumes the session when none runs. */
+      const deliver = (bot: StoredBot, runtime: BotRuntime, prompt: SDKUserMessage) =>
+        Effect.gen(function* () {
+          // Two processes must not write one conversation, so the session from before a restart ends first.
+          if (runtime.leftover !== null) {
+            runtime.leftover.prompts.push(prompt);
+
+            return;
+          }
+
+          const session = runtime.session ?? (yield* startSession(bot, runtime));
+          Queue.offerUnsafe(session.prompts, prompt);
+        });
 
       const removeRuntime = (botId: BotId) => stop(botId).pipe(Effect.andThen(Effect.sync(() => runtimes.delete(botId))));
 
@@ -774,8 +881,7 @@ export class BotSessions extends Context.Service<
           setLive(runtime, { status: statusWhileRunning(runtime) });
 
           // Claude Code runs its own command. The thread gets a note when it is done, not a message from the operator.
-          const session = runtime.session ?? (yield* startSession(bot, runtime));
-          Queue.offerUnsafe(session.prompts, {
+          yield* deliver(bot, runtime, {
             type: "user",
             message: { role: "user", content: "/compact" },
             parent_tool_use_id: null,
@@ -791,6 +897,11 @@ export class BotSessions extends Context.Service<
           Effect.asVoid,
         );
 
+      // A session that was running when the server stopped may still run its turn.
+      for (const bot of yield* repository.list) {
+        if (bot.claudePid !== null) yield* Effect.forkIn(followLeftover(bot, bot.claudePid), scope);
+      }
+
       return BotSessions.of({
         statusChanges,
         skillChanges,
@@ -801,7 +912,11 @@ export class BotSessions extends Context.Service<
 
         interrupt: (botId) =>
           Effect.promise(async () => {
-            await runtimeFor(botId).session?.query.interrupt();
+            const runtime = runtimeFor(botId);
+            // The session from before a restart takes no commands, so Stop ends its process.
+            if (runtime.leftover !== null) process.kill(runtime.leftover.pid, "SIGTERM");
+
+            await runtime.session?.query.interrupt();
           }),
 
         setModel: (botId, model) =>

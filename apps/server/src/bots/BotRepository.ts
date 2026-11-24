@@ -23,6 +23,10 @@ export interface StoredBot extends Bot {
   readonly workingDirectory: string;
   readonly browserStreamPort: number;
   readonly sdkSessionId: string | null;
+  /** The `claude` process of the bot's session. It stays set when a server restart cuts the session off. */
+  readonly claudePid: number | null;
+  /** The last transcript entry of the session that the thread has. */
+  readonly syncedUuid: string | null;
   readonly projectName: string | null;
   /** The directory of the bot's project. The bot works there when it is set. */
   readonly projectDirectory: string | null;
@@ -61,6 +65,8 @@ export class BotRepository extends Context.Service<
     remove(bot: StoredBot): Effect.Effect<void>;
     setUnread(botId: BotId, unread: boolean): Effect.Effect<void>;
     setSdkSessionId(botId: BotId, sdkSessionId: string): Effect.Effect<void>;
+    setClaudePid(botId: BotId, pid: number | null): Effect.Effect<void>;
+    setSyncedUuid(botId: BotId, uuid: string): Effect.Effect<void>;
     /** Changes only the given fields, so that two quick edits do not undo each other. */
     update(botId: BotId, changes: BotChanges): Effect.Effect<void>;
     setModel(botId: BotId, model: BotModel): Effect.Effect<void>;
@@ -101,6 +107,8 @@ export class BotRepository extends Context.Service<
           bots.working_directory AS workingDirectory,
           bots.browser_stream_port AS browserStreamPort,
           threads.sdk_session_id AS sdkSessionId,
+          threads.claude_pid AS claudePid,
+          threads.synced_uuid AS syncedUuid,
           threads.unread,
           (
             SELECT text FROM messages
@@ -176,6 +184,12 @@ export class BotRepository extends Context.Service<
           Effect.asVoid,
           Effect.orDie,
         );
+
+      const setClaudePid = (botId: BotId, pid: number | null) =>
+        sql`UPDATE threads SET claude_pid = ${pid} WHERE bot_id = ${botId}`.pipe(Effect.asVoid, Effect.orDie);
+
+      const setSyncedUuid = (botId: BotId, uuid: string) =>
+        sql`UPDATE threads SET synced_uuid = ${uuid} WHERE bot_id = ${botId}`.pipe(Effect.asVoid, Effect.orDie);
 
       const update = (botId: BotId, { name, instructions, color, shape }: BotChanges) =>
         sql`
@@ -258,6 +272,8 @@ export class BotRepository extends Context.Service<
         setUnread,
         update,
         setSdkSessionId,
+        setClaudePid,
+        setSyncedUuid,
         setModel,
         setProject,
         appendMessage,
