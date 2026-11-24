@@ -2,6 +2,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 const clock = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
 const weekday = new Intl.DateTimeFormat(undefined, { weekday: "long" });
+const shortWeekday = new Intl.DateTimeFormat(undefined, { weekday: "short" });
 const date = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
 
 /** Formats a time of day, for example "7:34 PM". */
@@ -24,4 +25,15 @@ export const formatRecent = (time: number, now = Date.now()) => {
   if (time >= startOfToday - 6 * DAY_MS) return weekday.format(time);
 
   return date.format(time);
+};
+
+/** Formats the day of a coming time: "Today", "Tomorrow", then a short weekday such as "Mon". */
+export const formatNextDay = (time: number, now = Date.now()) => {
+  // Rounding keeps a day that daylight saving time makes 23 or 25 hours long at one day.
+  const days = Math.round((new Date(time).setHours(0, 0, 0, 0) - new Date(now).setHours(0, 0, 0, 0)) / DAY_MS);
+
+  if (days <= 0) return "Today";
+  if (days === 1) return "Tomorrow";
+
+  return shortWeekday.format(time);
 };
