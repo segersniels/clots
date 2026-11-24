@@ -287,16 +287,21 @@ export function Chat({ botId, botName }: { botId: BotId; botName: string }) {
           <MessageScrollerButton />
         </MessageScroller>
 
-        {/* Work in the background, such as a subagent, can outlive the turn. The line stays until the work ends. */}
-        <Collapse open={live.tasks.length > 0}>
-          <div className="px-5 pb-2">
-            <Steps
-              steps={shownTasks.current.map((task) => ({ id: task.id, title: task.description, status: "running" as const }))}
-              title={backgroundTitle}
-              running
-            />
-          </div>
-        </Collapse>
+        {/*
+          Work in the background, such as a subagent, can outlive the turn. The line stays until the work ends.
+          The side padding sits outside the Collapse, because its focus ring margin would otherwise widen the panel.
+        */}
+        <div className="px-5">
+          <Collapse open={live.tasks.length > 0}>
+            <div className="pb-2">
+              <Steps
+                steps={shownTasks.current.map((task) => ({ id: task.id, title: task.description, status: "running" as const }))}
+                title={backgroundTitle}
+                running
+              />
+            </div>
+          </Collapse>
+        </div>
 
         {/* The composer sits inside the provider, so that sending can make the thread follow its end again. */}
         <Composer botId={botId} botName={botName} status={live.status} />
