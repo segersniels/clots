@@ -358,7 +358,8 @@ export function Chat({
                           {/* A message can be files only. */}
                           {message.text !== "" && (
                             <Bubble align="end" variant={SENDER_LABELS[message.role] === undefined ? "default" : "outline"}>
-                              <BubbleContent className={BUBBLE}>
+                              {/* Streamdown colors links with the primary color, which is the color of this bubble. */}
+                              <BubbleContent className={`${BUBBLE} [&_[data-streamdown=link]]:text-current`}>
                                 <Markdown references={{ known, bots }}>{message.text}</Markdown>
                               </BubbleContent>
                             </Bubble>
