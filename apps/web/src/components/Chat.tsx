@@ -31,7 +31,6 @@ import { Composer } from "./Composer.tsx";
 import { Markdown } from "./Markdown.tsx";
 import { MessageAttachments } from "./MessageAttachments.tsx";
 import { knownNames } from "../references.ts";
-import { ReferenceText } from "./ReferenceText.tsx";
 
 /** A new time label shows when this much time passed since the previous message. */
 const TIME_LABEL_GAP_MS = 30 * 60 * 1000;
@@ -52,8 +51,6 @@ const STAGGER_MS = 50;
 /** The label above a message on the operator's side that the operator did not type. */
 const SENDER_LABELS: Partial<Record<MessageRole, string>> = { routine: "Routine", bot: "Bot message" };
 
-/** What the operator typed shows as typed, with its line breaks. A bot reply is markdown. */
-const BUBBLE_TEXT = `${BUBBLE} whitespace-pre-wrap`;
 
 /** Shows something that the bot says or asks, on the bot's side of the thread. */
 function FromBot({ children }: { children: ReactNode }) {
@@ -283,8 +280,8 @@ export function Chat({ botId, botName, autoFocus = true }: { botId: BotId; botNa
                           {/* A message can be files only. */}
                           {message.text !== "" && (
                             <Bubble align="end" variant={SENDER_LABELS[message.role] === undefined ? "default" : "outline"}>
-                              <BubbleContent className={BUBBLE_TEXT}>
-                                <ReferenceText text={message.text} known={known} bots={bots} />
+                              <BubbleContent className={BUBBLE}>
+                                <Markdown references={{ known, bots }}>{message.text}</Markdown>
                               </BubbleContent>
                             </Bubble>
                           )}

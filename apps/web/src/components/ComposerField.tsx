@@ -1,7 +1,8 @@
 import { Character } from "@clots/character";
 import type { BotId } from "@clots/contracts";
-import { mergeAttributes, Node, type Editor, type JSONContent } from "@tiptap/core";
+import { mergeAttributes, Node, resolveExtensions, type Editor, type JSONContent } from "@tiptap/core";
 import { Placeholder } from "@tiptap/extensions";
+import { Markdown, MarkdownManager } from "@tiptap/markdown";
 import { EditorContent, NodeViewWrapper, ReactNodeViewRenderer, useEditor, type NodeViewProps } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { BoxIcon } from "lucide-react";
@@ -18,12 +19,24 @@ const MAX_LISTED_ITEMS = 50;
 /** The character that stands for a chip when the field reads the text before the caret. */
 const CHIP_CHARACTER = "￼";
 
+/** The character that holds the place of a chip while the field parses markdown, so the parser never reads a chip's text. */
+const CHIP_PLACEHOLDER = "\uE000";
+
 /** What the composer can ask of the field. */
 export interface ComposerFieldHandle {
   clear(): void;
   /** Puts text back in the field, for example after a failed send. Known references become chips. */
   setText(text: string): void;
 }
+
+/** The attributes of a reference chip. */
+interface ReferenceAttributes {
+  readonly kind: ReferenceKind;
+  readonly name: string;
+}
+
+/** Writes a reference the way Claude reads it: `/name` for a skill, `@Name` for a bot. */
+const referenceText = ({ kind, name }: ReferenceAttributes) => `${kind === "skill" ? "/" : "@"}${name}`;
 
 /** Draws a reference in the field as the same chip that a sent message shows. */
 function ReferenceNodeView({ node }: NodeViewProps) {
@@ -57,23 +70,95 @@ const ReferenceNode = Node.create({
     return ["span", mergeAttributes({ "data-reference": "" }, HTMLAttributes)];
   },
   renderText({ node }) {
-    return `${node.attrs.kind === "skill" ? "/" : "@"}${node.attrs.name}`;
+    return referenceText(node.attrs as ReferenceAttributes);
   },
+  renderMarkdown: (node) => referenceText(node.attrs as ReferenceAttributes),
   addNodeView() {
     return ReactNodeViewRenderer(ReferenceNodeView);
   },
 });
 
-/** Builds the field's content from plain text, such as a saved draft, with a chip for each known reference. */
-const toContent = (text: string, known: KnownNames): JSONContent => ({
-  type: "doc",
-  content: text.split("\n").map((line) => ({
-    type: "paragraph",
-    content: splitReferences(line, known).map((part) =>
-      part.reference === null ? { type: "text", text: part.text } : { type: "reference", attrs: part.reference },
-    ),
-  })),
+/**
+ * The formats that the field writes as markdown. Typing their markdown, such as `**`, a backtick or
+ * `1. `, formats the text at once. Headings, quotes and links stay off: a prompt rarely needs them.
+ */
+const FORMATS = StarterKit.configure({
+  blockquote: false,
+  dropcursor: false,
+  gapcursor: false,
+  heading: false,
+  horizontalRule: false,
+  link: false,
+  strike: false,
+  trailingNode: false,
+  underline: false,
 });
+
+/** Reads markdown into field content, before the editor exists, such as for a saved draft. */
+const markdown = new MarkdownManager({ extensions: resolveExtensions([FORMATS, ReferenceNode]) });
+
+/** The private method of the markdown package that escapes plain text. */
+type TextEncoder = (text: string, node: JSONContent, parent: JSONContent | null) => string;
+
+/**
+ * Makes the field write plain text as typed, so that the bot gets `foo_bar` and not `foo\_bar`.
+ * The package escapes every markdown character, so that a draft reads back unchanged. Text that
+ * markdown would read as formatting, such as `2*3*4`, keeps those escapes.
+ */
+const keepPlainText = (manager: MarkdownManager) => {
+  const escaping = manager as unknown as { encodeTextForMarkdown?: TextEncoder };
+  const escape = escaping.encodeTextForMarkdown?.bind(manager);
+
+  // A later version of the package can rename the method. Then the text keeps its escapes, which is safe.
+  if (escape === undefined) return;
+
+  escaping.encodeTextForMarkdown = (text, node, parent) => {
+    const escaped = escape(text, node, parent);
+    if (escaped === text) return text;
+
+    const [block] = manager.parse(text).content ?? [];
+    const [only, ...rest] = block?.content ?? [];
+    const readsAsText = block?.type === "paragraph" && rest.length === 0 && only?.type === "text" && only.text === text && only.marks === undefined;
+
+    return readsAsText ? text : escaped;
+  };
+};
+
+/**
+ * Builds the field's content from markdown, such as a saved draft, with a chip for each known
+ * reference. The chips leave the text before the parse, because a name or a path can hold
+ * characters that markdown reads as formatting.
+ */
+const toContent = (text: string, known: KnownNames): JSONContent => {
+  const parts = splitReferences(text, known);
+  const chips = parts.flatMap(({ text, reference }) => (reference === null ? [] : [{ text, reference }]));
+  const parsed = markdown.parse(parts.map((part) => (part.reference === null ? part.text : CHIP_PLACEHOLDER)).join(""));
+  let next = 0;
+
+  /** Puts the chips back in place of their placeholders. Code takes text only, so a chip there stays its text. */
+  const restore = (node: JSONContent, inCode: boolean): JSONContent[] => {
+    if (node.type !== "text") {
+      const code = inCode || node.type === "codeBlock";
+
+      return [{ ...node, ...(node.content === undefined ? {} : { content: node.content.flatMap((child) => restore(child, code)) }) }];
+    }
+
+    const pieces = (node.text ?? "").split(CHIP_PLACEHOLDER);
+    const keepText = inCode || node.marks?.some((mark) => mark.type === "code") === true;
+
+    return pieces.flatMap((piece, index) => {
+      const textNode = piece === "" ? [] : [{ ...node, text: piece }];
+      if (index === pieces.length - 1) return textNode;
+
+      const chip = chips[next++]!;
+      const restored: JSONContent = keepText ? { ...node, text: chip.text } : { type: "reference", attrs: chip.reference };
+
+      return [...textNode, restored];
+    });
+  };
+
+  return restore(parsed, false)[0]!;
+};
 
 /** Finds the reference that the operator types at the caret, with its range in the document. */
 const queryAt = (editor: Editor) => {
@@ -154,26 +239,8 @@ export function ComposerField({
 
   const editor = useEditor({
     extensions: [
-      // The field writes plain text, so every rich text feature stays off.
-      StarterKit.configure({
-        blockquote: false,
-        bold: false,
-        bulletList: false,
-        code: false,
-        codeBlock: false,
-        dropcursor: false,
-        gapcursor: false,
-        heading: false,
-        horizontalRule: false,
-        italic: false,
-        link: false,
-        listItem: false,
-        listKeymap: false,
-        orderedList: false,
-        strike: false,
-        trailingNode: false,
-        underline: false,
-      }),
+      FORMATS,
+      Markdown,
       Placeholder.configure({ placeholder: () => latest.current.placeholder }),
       ReferenceNode,
     ],
@@ -186,7 +253,7 @@ export function ComposerField({
         "aria-multiline": "true",
         role: "textbox",
         class:
-          "px-2.5 py-1.5 text-sm wrap-break-word whitespace-pre-wrap outline-none [&_p.is-editor-empty:first-child]:before:pointer-events-none [&_p.is-editor-empty:first-child]:before:float-left [&_p.is-editor-empty:first-child]:before:h-0 [&_p.is-editor-empty:first-child]:before:text-muted-foreground [&_p.is-editor-empty:first-child]:before:content-[attr(data-placeholder)]",
+          "px-2.5 py-1.5 text-sm wrap-break-word whitespace-pre-wrap outline-none [&_code]:rounded-sm [&_code]:bg-muted [&_code]:px-1 [&_code]:font-mono [&_code]:text-[0.9em] [&_li_p]:my-0 [&_ol]:list-decimal [&_ol]:pl-5 [&_pre]:my-1 [&_pre]:rounded-lg [&_pre]:bg-muted [&_pre]:p-2 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_strong]:font-semibold [&_ul]:list-disc [&_ul]:pl-5 [&_p.is-editor-empty:first-child]:before:pointer-events-none [&_p.is-editor-empty:first-child]:before:float-left [&_p.is-editor-empty:first-child]:before:h-0 [&_p.is-editor-empty:first-child]:before:text-muted-foreground [&_p.is-editor-empty:first-child]:before:content-[attr(data-placeholder)]",
       },
       handleKeyDown: (_view, event) => latest.current.handleKey(event),
       handlePaste: (_view, event) => {
@@ -211,8 +278,11 @@ export function ComposerField({
         return true;
       },
     },
+    onCreate: ({ editor: created }) => {
+      if (created.markdown !== undefined) keepPlainText(created.markdown);
+    },
     onUpdate: ({ editor: updated }) => {
-      latest.current.onTextChange(updated.getText({ blockSeparator: "\n" }));
+      latest.current.onTextChange(updated.getMarkdown());
       setQuery(queryAt(updated));
       setActiveItem(0);
     },
@@ -226,7 +296,7 @@ export function ComposerField({
   useEffect(() => {
     if (editor === null || editor.isFocused) return;
 
-    editor.commands.setContent(toContent(editor.getText({ blockSeparator: "\n" }), known), { emitUpdate: false });
+    editor.commands.setContent(toContent(editor.getMarkdown(), known), { emitUpdate: false });
   }, [editor, knownKey]);
 
   useImperativeHandle(ref, () => ({
@@ -279,10 +349,21 @@ export function ComposerField({
       return true;
     }
 
-    // Shift+Enter makes a new line. Enter alone sends, in a field that sends.
+    if (event.key !== "Enter" || editor === null) return false;
+
+    // In code, Enter makes a new line. Three Enters leave the code block, as the editor does on its own.
+    if (editor.isActive("codeBlock")) return event.shiftKey ? editor.commands.newlineInCode() : false;
+
+    // Shift+Enter in a list starts the next item, or leaves the list from an empty one.
+    if (event.shiftKey && editor.isActive("listItem")) return editor.commands.splitListItem("listItem") || editor.commands.liftListItem("listItem");
+
+    // Elsewhere it starts a new line as its own block, so that `1. ` or `- ` there can start a list.
+    if (event.shiftKey) return editor.commands.splitBlock();
+
+    // Enter alone sends, in a field that sends.
     const { onEnter: send } = latest.current;
 
-    if (send === undefined || event.key !== "Enter" || event.shiftKey) return false;
+    if (send === undefined) return false;
 
     send();
 
