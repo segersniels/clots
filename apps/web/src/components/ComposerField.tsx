@@ -80,10 +80,9 @@ const ReferenceNode = Node.create({
 
 /**
  * The formats that the field writes as markdown. Typing their markdown, such as `**`, a backtick or
- * `1. `, formats the text at once. Headings, quotes and links stay off: a prompt rarely needs them.
+ * `1. ` or `> `, formats the text at once. Headings and links stay off: a prompt rarely needs them.
  */
 const FORMATS = StarterKit.configure({
-  blockquote: false,
   dropcursor: false,
   gapcursor: false,
   heading: false,
@@ -253,7 +252,7 @@ export function ComposerField({
         "aria-multiline": "true",
         role: "textbox",
         class:
-          "px-2.5 py-1.5 text-sm wrap-break-word whitespace-pre-wrap outline-none [&_code]:rounded-sm [&_code]:bg-muted [&_code]:px-1 [&_code]:font-mono [&_code]:text-[0.9em] [&_li_p]:my-0 [&_ol]:list-decimal [&_ol]:pl-5 [&_pre]:my-1 [&_pre]:rounded-lg [&_pre]:bg-muted [&_pre]:p-2 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_strong]:font-semibold [&_ul]:list-disc [&_ul]:pl-5 [&_p.is-editor-empty:first-child]:before:pointer-events-none [&_p.is-editor-empty:first-child]:before:float-left [&_p.is-editor-empty:first-child]:before:h-0 [&_p.is-editor-empty:first-child]:before:text-muted-foreground [&_p.is-editor-empty:first-child]:before:content-[attr(data-placeholder)]",
+          "px-2.5 py-1.5 text-sm wrap-break-word whitespace-pre-wrap outline-none [&_code]:rounded-sm [&_code]:bg-muted [&_code]:px-1 [&_code]:font-mono [&_code]:text-[0.9em] [&_li_p]:my-0 [&_ol]:list-decimal [&_ol]:pl-5 [&_pre]:my-1 [&_pre]:rounded-lg [&_pre]:bg-muted [&_pre]:p-2 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_strong]:font-semibold [&_ul]:list-disc [&_ul]:pl-5 [&_blockquote]:border-l-2 [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground [&_p.is-editor-empty:first-child]:before:pointer-events-none [&_p.is-editor-empty:first-child]:before:float-left [&_p.is-editor-empty:first-child]:before:h-0 [&_p.is-editor-empty:first-child]:before:text-muted-foreground [&_p.is-editor-empty:first-child]:before:content-[attr(data-placeholder)]",
       },
       handleKeyDown: (_view, event) => latest.current.handleKey(event),
       handlePaste: (_view, event) => {
@@ -361,6 +360,9 @@ export function ComposerField({
 
     // Shift+Enter in a list starts the next item, or leaves the list from an empty one.
     if (event.shiftKey && editor.isActive("listItem")) return editor.commands.splitListItem("listItem") || editor.commands.liftListItem("listItem");
+
+    // Shift+Enter on an empty line of a quote leaves the quote. On a line with text it continues the quote.
+    if (event.shiftKey && editor.isActive("blockquote") && editor.state.selection.$from.parent.content.size === 0) return editor.commands.lift("blockquote");
 
     // Elsewhere it starts a new line as its own block, so that `1. ` or `- ` there can start a list.
     if (event.shiftKey) return editor.commands.splitBlock();
