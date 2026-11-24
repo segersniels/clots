@@ -34,6 +34,7 @@ import { hasContent, useDraft, type Draft } from "../drafts.ts";
 import { formatRecent } from "../time.ts";
 import { BotMenu } from "./BotMenu.tsx";
 import { Collapse } from "./Collapse.tsx";
+import { UpdateFooter, useUpdates } from "./UpdateControl.tsx";
 import { ProjectMenu } from "./ProjectMenu.tsx";
 
 const EMPTY_HINT = "px-2.5 py-1.5 text-[0.8125rem] text-muted-foreground/70";
@@ -516,6 +517,7 @@ export function BotList() {
   const bots = useStore(client.bots);
   const projects = useStore(client.projects);
   const connection = useStore(client.connection);
+  const updates = useUpdates();
   const [searching, setSearching] = useState(false);
   const [search, setSearch] = useState("");
   const [personalOpen, togglePersonal] = useGroupOpen(PERSONAL);
@@ -645,7 +647,10 @@ export function BotList() {
         </DragOverlay>
       </DndContext>
 
-      {connection !== "connected" && (
+      <UpdateFooter updates={updates} />
+
+      {/* A restart that this client asked for drops the connection by design. The update row tells that story. */}
+      {connection !== "connected" && !updates.restarting && (
         <footer className="px-5 py-3 text-xs text-muted-foreground">
           {connection === "connecting" ? "Connecting…" : "Disconnected. Trying again…"}
         </footer>
