@@ -26,6 +26,7 @@ import { useEffect, useRef, useState, type ReactNode, type RefObject } from "rea
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { readPaneOpen, savePaneOpen } from "@/lib/pane-width";
 
@@ -636,36 +637,38 @@ export function BotList() {
       </div>
 
       <DndContext {...drag.context}>
-        <div className="flex flex-1 flex-col gap-3 overflow-y-auto px-2 pb-3">
-          {projects.map((project) => (
-            <ProjectSection
-              key={project.id}
-              project={project}
-              rows={rowsOf(project.id)}
-              botCount={bots.filter((bot) => bot.projectId === project.id).length}
-              highlighted={drag.highlightedGroup === project.id}
-            />
-          ))}
+        <ScrollArea className="min-h-0 flex-1">
+          <div className="flex flex-col gap-3 px-2 pb-3">
+            {projects.map((project) => (
+              <ProjectSection
+                key={project.id}
+                project={project}
+                rows={rowsOf(project.id)}
+                botCount={bots.filter((bot) => bot.projectId === project.id).length}
+                highlighted={drag.highlightedGroup === project.id}
+              />
+            ))}
 
-          <BotDropZone group={PERSONAL} highlighted={drag.highlightedGroup === PERSONAL}>
-            {/* Without a project there is one plain list, so the heading would only add noise. */}
-            {projects.length > 0 && <GroupToggle name="Personal" open={personalOpen} onToggle={togglePersonal} />}
-            <Collapse open={personalOpen || projects.length === 0}>
-              <div className={BOT_ROWS}>
-                <BotRows rows={personal} />
-                {projects.length > 0 && personal.length === 0 && search === "" && <p className={EMPTY_HINT}>Drag Bots here</p>}
+            <BotDropZone group={PERSONAL} highlighted={drag.highlightedGroup === PERSONAL}>
+              {/* Without a project there is one plain list, so the heading would only add noise. */}
+              {projects.length > 0 && <GroupToggle name="Personal" open={personalOpen} onToggle={togglePersonal} />}
+              <Collapse open={personalOpen || projects.length === 0}>
+                <div className={BOT_ROWS}>
+                  <BotRows rows={personal} />
+                  {projects.length > 0 && personal.length === 0 && search === "" && <p className={EMPTY_HINT}>Drag Bots here</p>}
+                </div>
+              </Collapse>
+            </BotDropZone>
+
+            {/* A wide window shows the empty state in the main area. On a phone the list is the home page, so it shows it here. */}
+            {bots.length === 0 && !wide && (
+              <div className="pt-24">
+                <NoBots />
               </div>
-            </Collapse>
-          </BotDropZone>
-
-          {/* A wide window shows the empty state in the main area. On a phone the list is the home page, so it shows it here. */}
-          {bots.length === 0 && !wide && (
-            <div className="pt-24">
-              <NoBots />
-            </div>
-          )}
-          {bots.length > 0 && shown.length === 0 && <p className="pt-8 text-center text-muted-foreground">No bot matches</p>}
-        </div>
+            )}
+            {bots.length > 0 && shown.length === 0 && <p className="pt-8 text-center text-muted-foreground">No bot matches</p>}
+          </div>
+        </ScrollArea>
 
         {/* The copy under the pointer. Its rows do not animate, so it shows at once and stays still. */}
         <DragOverlay dropAnimation={reduceMotion ? null : { ...defaultDropAnimation, ...SLIDE }}>

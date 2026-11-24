@@ -9,7 +9,10 @@ import {
 } from "@shadcn/react/message-scroller"
 import { cn } from "cn"
 
+import { ScrollArea as ScrollAreaPrimitive } from "@base-ui/react/scroll-area"
+
 import { Button } from "@/components/ui/button"
+import { ScrollBar } from "@/components/ui/scroll-area"
 import { ArrowDownIcon } from "lucide-react"
 
 function MessageScrollerProvider(
@@ -39,14 +42,18 @@ function MessageScrollerViewport({
   ...props
 }: React.ComponentProps<typeof MessageScrollerPrimitive.Viewport>) {
   return (
-    <MessageScrollerPrimitive.Viewport
-      data-slot="message-scroller-viewport"
-      className={cn(
-        "size-full min-h-0 min-w-0 scroll-fade-b scrollbar-thin scrollbar-gutter-stable overflow-y-auto overscroll-contain contain-content data-autoscrolling:scrollbar-thumb-transparent data-autoscrolling:scrollbar-track-transparent data-pending-scroll:invisible",
-        className
-      )}
-      {...props}
-    />
+    // The thumb floats over the thread, so the thread shows no scrollbar gutter.
+    <ScrollAreaPrimitive.Root className="relative min-h-0 flex-1">
+      <ScrollAreaPrimitive.Viewport
+        render={<MessageScrollerPrimitive.Viewport data-slot="message-scroller-viewport" {...props} />}
+        className={cn(
+          "size-full min-h-0 min-w-0 scroll-fade-b overscroll-contain contain-content data-pending-scroll:invisible",
+          className
+        )}
+      />
+      {/* The thread follows its end by itself, so the thumb stays hidden while it does. */}
+      <ScrollBar className="group-data-autoscrolling/message-scroller:opacity-0!" />
+    </ScrollAreaPrimitive.Root>
   )
 }
 

@@ -7,6 +7,7 @@ import { usePanelRef, type PanelSize } from "react-resizable-panels";
 
 import { Button } from "@/components/ui/button";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { saveLastBot } from "@/lib/last-bot";
 import { readPaneOpen, readPaneWidth, savePaneOpen, savePaneWidth } from "@/lib/pane-width";
@@ -174,17 +175,19 @@ function BotPage() {
       </header>
 
       {detailsMounted && (
-        <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-3 pb-4">
-          <BotIdentity key={botId} bot={bot} />
-          <BrowserPane key={`browser-${botId}`} botId={botId} botName={bot.name} />
-          <section className="flex flex-col gap-2">
-            <h2 className="px-1 text-[0.8125rem] text-muted-foreground">Project</h2>
-            <ProjectPicker projectId={bot.projectId} onChange={(projectId) => client.setBotProject(bot.id, projectId)} />
-          </section>
-          <ModelPicker bot={bot} />
-          <Routines botId={botId} />
-          <BotInstructions key={`instructions-${botId}`} bot={bot} autoFocus={createdBotId.current === botId} />
-        </div>
+        <ScrollArea className="min-h-0 flex-1">
+          <div className="flex flex-col gap-6 px-3 pb-4">
+            <BotIdentity key={botId} bot={bot} />
+            <BrowserPane key={`browser-${botId}`} botId={botId} botName={bot.name} />
+            <section className="flex flex-col gap-2">
+              <h2 className="px-1 text-[0.8125rem] text-muted-foreground">Project</h2>
+              <ProjectPicker projectId={bot.projectId} onChange={(projectId) => client.setBotProject(bot.id, projectId)} />
+            </section>
+            <ModelPicker bot={bot} />
+            <Routines botId={botId} />
+            <BotInstructions key={`instructions-${botId}`} bot={bot} autoFocus={createdBotId.current === botId} />
+          </div>
+        </ScrollArea>
       )}
     </>
   );
