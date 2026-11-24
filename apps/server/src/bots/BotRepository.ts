@@ -70,7 +70,10 @@ export class BotRepository extends Context.Service<
     /** Changes only the given fields, so that two quick edits do not undo each other. */
     update(botId: BotId, changes: BotChanges): Effect.Effect<void>;
     setModel(botId: BotId, model: BotModel): Effect.Effect<void>;
-    /** Moves the bot to a project. A move to another directory also forgets the session, which belongs to the old one. */
+    /**
+     * Moves the bot and its clones to a project. A move to another directory also forgets their sessions,
+     * which belong to the old one.
+     */
     setProject(botId: BotId, projectId: string | null): Effect.Effect<void>;
     /** Puts the given bots in this order. Bots that the list leaves out keep their place. */
     reorder(botIds: ReadonlyArray<BotId>): Effect.Effect<void>;
@@ -214,19 +217,19 @@ export class BotRepository extends Context.Service<
           // A move between projects with the same directory, or with none, keeps the session.
           yield* sql`
             UPDATE threads SET sdk_session_id = NULL
-            WHERE bot_id = ${botId}
+            WHERE bot_id IN (SELECT id FROM bots WHERE id = ${botId} OR cloned_from = ${botId})
               AND COALESCE((SELECT directory FROM projects WHERE id = ${projectId}), '') != COALESCE(
-                (SELECT projects.directory FROM bots JOIN projects ON projects.id = bots.project_id WHERE bots.id = ${botId}),
+                (SELECT projects.directory FROM bots JOIN projects ON projects.id = bots.project_id WHERE bots.id = threads.bot_id),
                 ''
               )
           `;
-          // A bot that joins another group goes to its end.
+          // A bot that joins another group goes to its end. Its clones show under it, so they go with it.
           yield* sql`
             UPDATE bots
             SET
               sort_order = CASE WHEN project_id IS ${projectId} THEN sort_order ELSE (SELECT MAX(sort_order) + 1 FROM bots) END,
               project_id = ${projectId}
-            WHERE id = ${botId}
+            WHERE id = ${botId} OR cloned_from = ${botId}
           `;
         }).pipe(sql.withTransaction, Effect.orDie);
 

@@ -149,6 +149,25 @@ test("the unread mark comes back until the operator clears it", async () => {
   expect(marks).toEqual([false, true, false]);
 });
 
+test("the clones of a bot move with it, and a bot without that link stays", async () => {
+  const projects = await run(
+    Effect.gen(function* () {
+      const bots = yield* BotRepository;
+      const sql = yield* SqlClient.SqlClient;
+      yield* sql`INSERT INTO projects (id, name, directory, created_at) VALUES ('site', 'Site', NULL, 0)`;
+      const scout = yield* bots.create(newScout);
+      yield* bots.create({ ...newScout, name: "Scout clone", clonedFrom: scout.id });
+      yield* bots.create(newAtlas);
+
+      yield* bots.setProject(scout.id, "site");
+
+      return Object.fromEntries((yield* bots.list).map((bot) => [bot.name, bot.projectId]));
+    }).pipe(Effect.orDie),
+  );
+
+  expect(projects).toEqual({ Scout: "site", "Scout clone": "site", Atlas: null });
+});
+
 test("a removed bot leaves no rows and no notes directory, and the other bots stay", async () => {
   const [scout, remaining, orphanRows] = await run(
     Effect.gen(function* () {

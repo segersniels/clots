@@ -107,7 +107,7 @@ export class ClotsRpcs extends RpcGroup.make(
   /** Deletes a project. Its bots move to no project and keep their threads. The directory on the host stays. */
   Rpc.make("DeleteProject", { payload: { projectId: Schema.String } }),
 
-  /** Moves a bot to a project, or to no project. The bot then starts a new session in the new directory. */
+  /** Moves a bot and its clones to a project, or to no project. They then start new sessions in the new directory. */
   Rpc.make("SetBotProject", {
     payload: { botId: BotId, projectId: Schema.NullOr(Schema.String) },
     error: BotNotFound,

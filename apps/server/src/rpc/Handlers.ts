@@ -113,13 +113,15 @@ export const HandlersLayer = ClotsRpcs.toLayer(
         }),
 
       SetBotProject: ({ botId, projectId }) =>
-        requireBot(botId).pipe(
-          Effect.andThen(bots.setProject(botId, projectId)),
-          // The running session belongs to the old directory.
-          Effect.andThen(sessions.stop(botId)),
-          Effect.andThen(PubSub.publish(sessions.statusChanges, undefined)),
-          Effect.asVoid,
-        ),
+        Effect.gen(function* () {
+          yield* requireBot(botId);
+          const clones = (yield* bots.list).filter((bot) => bot.clonedFrom === botId);
+          yield* bots.setProject(botId, projectId);
+
+          // The running sessions belong to the old directory.
+          yield* Effect.forEach([botId, ...clones.map((clone) => clone.id)], (id) => sessions.stop(id));
+          yield* PubSub.publish(sessions.statusChanges, undefined);
+        }),
 
       UpdateBot: ({ botId, ...changes }) =>
         requireBot(botId).pipe(
