@@ -12,8 +12,11 @@ export function Collapse({ open, children, className = "" }: { open: boolean; ch
         open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
       }`}
     >
-      {/* The padding and the negative margin keep focus rings inside the clipped area. */}
-      <div className={`-m-1 min-h-0 overflow-hidden p-1 ${className}`}>{children}</div>
+      {/*
+        The padding and the negative margin keep focus rings inside the clipped area. A closed area
+        drops them, because the padding would still stick out of its zero height and make the page scroll.
+      */}
+      <div className={`min-h-0 overflow-hidden ${open ? "-m-1 p-1" : ""} ${className}`}>{children}</div>
     </div>
   );
 }
