@@ -1,6 +1,6 @@
 import { Character } from "@clots/character";
 import type { BotSummary } from "@clots/contracts";
-import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, CopyIcon, ExternalLinkIcon, LockIcon, RotateCwIcon, XIcon } from "lucide-react";
+import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, CopyIcon, ExternalLinkIcon, LockIcon, PlusIcon, RotateCwIcon, XIcon } from "lucide-react";
 import { useEffect, useState, type CSSProperties, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -62,7 +62,6 @@ export function BrowserWindow({
   open,
   onOpenChange,
   frameRatio,
-  withTabs,
   initialFocus,
   children,
 }: {
@@ -70,11 +69,10 @@ export function BrowserWindow({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   frameRatio: number;
-  withTabs: boolean;
   initialFocus: RefObject<HTMLElement | null>;
   children: ReactNode;
 }) {
-  const chrome = (withTabs ? TAB_STRIP_HEIGHT : 0) + TOOLBAR_HEIGHT + 2 * VIEWPORT_MARGIN;
+  const chrome = TAB_STRIP_HEIGHT + TOOLBAR_HEIGHT + 2 * VIEWPORT_MARGIN;
   // The page may take the height that is left 44 px from the top and the bottom of the app window.
   const pageMaxHeight = `calc(100dvh - 5.5rem - ${chrome}px)`;
 
@@ -116,26 +114,51 @@ export function BrowserWindow({
 }
 
 /** Lists the tabs of the bot's browser. A click switches the bot's tab. */
-export function BrowserTabStrip({ tabs, onSelect }: { tabs: ReadonlyArray<BrowserTab>; onSelect: (tab: BrowserTab) => void }) {
+export function BrowserTabStrip({
+  tabs,
+  onSelect,
+  onNew,
+  onClose,
+}: {
+  tabs: ReadonlyArray<BrowserTab>;
+  onSelect: (tab: BrowserTab) => void;
+  onNew: () => void;
+  onClose: (tab: BrowserTab) => void;
+}) {
   return (
-    <div className="flex h-10 items-end gap-1 bg-[color-mix(in_oklab,var(--muted)_55%,var(--popover))] px-2.5" role="tablist">
-      {tabs.map((tab) => (
-        <button
-          key={tab.tabId}
-          type="button"
-          role="tab"
-          aria-selected={tab.active}
-          title={tab.title || tab.url}
-          onClick={() => onSelect(tab)}
-          className={`flex h-8 max-w-[220px] min-w-0 items-center gap-2 rounded-t-[10px] px-3 text-[13px] transition-colors duration-150 ${
-            tab.active ? "bg-popover text-foreground" : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          {/* The stream sends no favicon, so a dot stands in for it. */}
-          <span className="size-2 shrink-0 rounded-full bg-muted-foreground/40" />
-          <span className="truncate">{tab.title || splitAddress(tab.url).host}</span>
-        </button>
-      ))}
+    <div className="flex h-10 items-end gap-1 bg-[color-mix(in_oklab,var(--muted)_55%,var(--popover))] px-2.5">
+      <div className="flex min-w-0 items-end gap-1" role="tablist">
+        {tabs.map((tab) => (
+          <div
+            key={tab.tabId}
+            className={`group/tab flex h-8 max-w-[220px] min-w-0 items-center rounded-t-[10px] text-[13px] transition-colors duration-150 ${
+              tab.active ? "bg-popover text-foreground" : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab.active}
+              title={tab.title || tab.url}
+              onClick={() => onSelect(tab)}
+              className="flex h-full min-w-0 items-center gap-2 pr-1 pl-3 outline-none"
+            >
+              {/* The stream sends no favicon, so a dot stands in for it. */}
+              <span className="size-2 shrink-0 rounded-full bg-muted-foreground/40" />
+              <span className="truncate">{tab.title || splitAddress(tab.url).host}</span>
+            </button>
+            {/* The last tab stays: a window without a page has nothing to take over. */}
+            {tabs.length > 1 && (
+              <Button variant="ghost" size="icon-xs" aria-label={`Close ${tab.title || "tab"}`} title="Close tab" className="mr-1 shrink-0" onClick={() => onClose(tab)}>
+                <XIcon />
+              </Button>
+            )}
+          </div>
+        ))}
+      </div>
+      <Button variant="ghost" size="icon-xs" aria-label="New tab" title="New tab" className="mb-1.5 shrink-0 text-muted-foreground" onClick={onNew}>
+        <PlusIcon />
+      </Button>
     </div>
   );
 }

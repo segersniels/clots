@@ -276,11 +276,15 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
             open={takeOver}
             onOpenChange={setTakeOver}
             frameRatio={frameRatio}
-            withTabs={tabs.length > 1}
             initialFocus={screen}
           >
-            {/* The strip shows only when the bot has more than one tab. */}
-            {tabs.length > 1 && <BrowserTabStrip tabs={tabs} onSelect={(tab) => navigate("tab", tab.tabId)} />}
+            {/* The strip is always there, so its + is in reach and the page does not move when a second tab opens. */}
+            <BrowserTabStrip
+              tabs={tabs}
+              onSelect={(tab) => navigate("tab", tab.tabId)}
+              onNew={() => navigate("newTab")}
+              onClose={(tab) => navigate("closeTab", tab.tabId)}
+            />
             <BrowserToolbar>
               <BrowserNavigation
                 loading={navigations.size > 0}

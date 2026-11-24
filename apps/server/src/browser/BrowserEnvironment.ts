@@ -110,6 +110,16 @@ export const closeBrowser = (bot: StoredBot) =>
     await closeChrome(devToolsPort(bot));
   }).pipe(Effect.timeout("15 seconds"), Effect.ignore);
 
+/** Builds the agent-browser arguments of a take-over action. The tab actions are operations of its `tab` command. */
+const commandFor = (action: BrowserAction, target: string | undefined) => {
+  const targetArgs = target === undefined ? [] : [target];
+
+  if (action === "newTab") return ["tab", "new"];
+  if (action === "closeTab") return ["tab", "close", ...targetArgs];
+
+  return [action, ...targetArgs];
+};
+
 /** Navigates the bot's browser for the take-over toolbar. A browser that hangs does not block the caller for long. */
 export const navigateBrowser = (bot: StoredBot, action: BrowserAction, target: string | undefined) =>
   Effect.promise(async () => {
@@ -120,11 +130,13 @@ export const navigateBrowser = (bot: StoredBot, action: BrowserAction, target: s
       return;
     }
 
-    // An address or a tab without its target has nowhere to go.
-    if ((action === "open" || action === "tab") && target === undefined) return;
+    // An address or a tab without its target has nowhere to go. A close without a tab would close the current one.
+    if ((action === "open" || action === "tab" || action === "closeTab") && target === undefined) return;
+
+    const args = commandFor(action, target);
 
     // The wrapper starts the bot's Chrome first, as it does for the bot's own commands.
-    const command = Bun.spawn([executable === undefined ? realAgentBrowser : join(clotsBin, "agent-browser"), action, ...(target === undefined ? [] : [target])], {
+    const command = Bun.spawn([executable === undefined ? realAgentBrowser : join(clotsBin, "agent-browser"), ...args], {
       env: { ...process.env, ...makeBrowserEnvironment(bot) },
       stdout: "ignore",
       stderr: "ignore",
