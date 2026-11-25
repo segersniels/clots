@@ -49,15 +49,10 @@ export const HandlersLayer = ClotsRpcs.toLayer(
 
     const summarize = (bot: StoredBot): BotSummary => {
       const live = sessions.live(bot.id);
-      const idleLine = bot.lastMessageText ?? "No messages yet";
-      const backgroundLine =
-        live.tasks.length === 1
-          ? `In the background: ${live.tasks[0]!.description}`
-          : `${live.tasks.length} tasks in the background`;
       const statusLine = {
-        // The list shows plain text, so the markdown marks of a reply go away. Work in the background comes first.
+        // The list shows plain text, so the markdown marks of a reply go away.
         idle: shorten(
-          (live.tasks.length > 0 ? backgroundLine : idleLine)
+          (bot.lastMessageText ?? "No messages yet")
             .replaceAll(/[#*_`>]+/g, "")
             .replaceAll(/\s+/g, " ")
             .trim(),
