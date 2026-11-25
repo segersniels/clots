@@ -1,5 +1,6 @@
 /** The result of one first-run check of the desktop app. `detail` describes what the check found. */
-export type SetupCheck = { readonly status: "ok"; readonly detail: string } | { readonly status: "missing" };
+export type SetupCheck =
+  { readonly status: "ok"; readonly detail: string } | { readonly status: "missing" };
 
 /** The checks that a local clots server needs before it can start. */
 export interface SetupChecks {
@@ -14,7 +15,8 @@ export interface SetupChecks {
 /** The steps that the desktop app takes to start a local server, in order. */
 export type InstallStep = "install" | "browser" | "start" | "health";
 
-export type InstallResult = { readonly ok: true } | { readonly ok: false; readonly message: string; readonly log: string };
+export type InstallResult =
+  { readonly ok: true } | { readonly ok: false; readonly message: string; readonly log: string };
 
 /** The answer to a connection attempt. `code` is the network error, such as `net::ERR_NAME_NOT_RESOLVED`. */
 export type ConnectResult = { readonly ok: true } | { readonly ok: false; readonly code: string };

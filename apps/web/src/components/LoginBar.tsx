@@ -28,7 +28,9 @@ const DONE_MS = 2000;
 const MAX_STACKED = 3;
 
 /** What the bar shows: the offer of the logins, or the copy of one of them. */
-type Phase = { readonly kind: "offer" } | { readonly kind: "copying" | "done" | "failed"; readonly from: LoginSource };
+type Phase =
+  | { readonly kind: "offer" }
+  | { readonly kind: "copying" | "done" | "failed"; readonly from: LoginSource };
 
 /** One look of the bar. A new key crossfades the bar from its last look. */
 interface View {
@@ -41,9 +43,13 @@ interface View {
 function namesOf(sources: ReadonlyArray<LoginSource>) {
   const names = sources.map((source) => source.name);
 
-  if (names.length <= 2) return names.join(" and ");
+  if (names.length <= 2) {
+    return names.join(" and ");
+  }
 
-  if (names.length === 3) return `${names[0]}, ${names[1]} and ${names[2]}`;
+  if (names.length === 3) {
+    return `${names[0]}, ${names[1]} and ${names[2]}`;
+  }
 
   return `${names[0]}, ${names[1]} and ${names.length - 2} more`;
 }
@@ -60,7 +66,15 @@ function hostOf(address: string) {
  * the take-over page. A click on a bot is the operator's permission for the copy. The X hides the
  * bar for the site until the take-over closes, which unmounts the bar.
  */
-export function LoginBar({ botId, botName, address }: { botId: BotId; botName: string; address: string }) {
+export function LoginBar({
+  botId,
+  botName,
+  address,
+}: {
+  botId: BotId;
+  botName: string;
+  address: string;
+}) {
   const host = hostOf(address);
   const [sources, setSources] = useState<ReadonlyArray<LoginSource>>([]);
   const [phase, setPhase] = useState<Phase>({ kind: "offer" });
@@ -71,7 +85,9 @@ export function LoginBar({ botId, botName, address }: { botId: BotId; botName: s
   useEffect(() => {
     setSources([]);
 
-    if (host === undefined) return;
+    if (host === undefined) {
+      return;
+    }
 
     let current = true;
     client
@@ -85,7 +101,9 @@ export function LoginBar({ botId, botName, address }: { botId: BotId; botName: s
   }, [botId, host, checks]);
 
   useEffect(() => {
-    if (phase.kind !== "done") return;
+    if (phase.kind !== "done") {
+      return;
+    }
 
     const timer = setTimeout(() => {
       setPhase({ kind: "offer" });
@@ -107,7 +125,9 @@ export function LoginBar({ botId, botName, address }: { botId: BotId; botName: s
   };
 
   const hide = () => {
-    if (host !== undefined) setHiddenHosts((hosts) => new Set(hosts).add(host));
+    if (host !== undefined) {
+      setHiddenHosts((hosts) => new Set(hosts).add(host));
+    }
 
     setPhase({ kind: "offer" });
   };
@@ -116,11 +136,24 @@ export function LoginBar({ botId, botName, address }: { botId: BotId; botName: s
   const view: View | null =
     phase.kind === "offer" && !offered
       ? null
-      : { key: phase.kind === "offer" ? `offer:${sources.map((source) => source.botId).join()}` : phase.kind, phase, sources };
+      : {
+          key:
+            phase.kind === "offer"
+              ? `offer:${sources.map((source) => source.botId).join()}`
+              : phase.kind,
+          phase,
+          sources,
+        };
 
   // The last look stays over the new one while it fades out.
-  const [shown, setShown] = useState<{ current: View | null; previous: View | null }>({ current: view, previous: null });
-  if (shown.current?.key !== view?.key) setShown({ current: view, previous: shown.current });
+  const [shown, setShown] = useState<{ current: View | null; previous: View | null }>({
+    current: view,
+    previous: null,
+  });
+
+  if (shown.current?.key !== view?.key) {
+    setShown({ current: view, previous: shown.current });
+  }
 
   const render = ({ phase, sources }: View) => {
     if (phase.kind === "copying") {
@@ -146,7 +179,11 @@ export function LoginBar({ botId, botName, address }: { botId: BotId; botName: s
         <>
           <CircleAlertIcon className="size-4 text-destructive" />
           <span>Could not copy {phase.from.name}'s login</span>
-          <Button variant="secondary" className="h-[30px] rounded-full px-3 text-[13px]" onClick={() => void copy(phase.from)}>
+          <Button
+            variant="secondary"
+            className="h-[30px] rounded-full px-3 text-[13px]"
+            onClick={() => void copy(phase.from)}
+          >
             Try again
           </Button>
           <HideButton onClick={hide} />
@@ -163,7 +200,11 @@ export function LoginBar({ botId, botName, address }: { botId: BotId; botName: s
             <span className="font-medium">{first.name}</span> is logged in here{" "}
             <span className="text-muted-foreground">· {formatAgo(first.updatedAt)}</span>
           </span>
-          <Button className="h-[30px] rounded-full px-3 text-[13px]" title={LOGIN_RISK} onClick={() => void copy(first)}>
+          <Button
+            className="h-[30px] rounded-full px-3 text-[13px]"
+            title={LOGIN_RISK}
+            onClick={() => void copy(first)}
+          >
             Use login
           </Button>
           <HideButton onClick={hide} />
@@ -182,7 +223,9 @@ export function LoginBar({ botId, botName, address }: { botId: BotId; botName: s
         </span>
         <span>{namesOf(sources)} are logged in here</span>
         <DropdownMenu>
-          <DropdownMenuTrigger render={<Button className="h-[30px] gap-1 rounded-full px-3 text-[13px]" />}>
+          <DropdownMenuTrigger
+            render={<Button className="h-[30px] gap-1 rounded-full px-3 text-[13px]" />}
+          >
             Use a login
             <ChevronDownIcon className="size-3.5" />
           </DropdownMenuTrigger>
@@ -190,11 +233,17 @@ export function LoginBar({ botId, botName, address }: { botId: BotId; botName: s
             <DropdownMenuGroup>
               <DropdownMenuLabel>Copy a login to {botName}</DropdownMenuLabel>
               {sources.map((source) => (
-                <DropdownMenuItem key={source.botId} className="gap-2.5 rounded-[9px] px-2 py-1.5" onClick={() => void copy(source)}>
+                <DropdownMenuItem
+                  key={source.botId}
+                  className="gap-2.5 rounded-[9px] px-2 py-1.5"
+                  onClick={() => void copy(source)}
+                >
                   <Character shape={source.shape} color={source.color} size={26} />
                   <span className="flex flex-col">
                     <span className="leading-tight font-medium">{source.name}</span>
-                    <span className="text-xs text-muted-foreground">Updated {formatAgo(source.updatedAt)}</span>
+                    <span className="text-xs text-muted-foreground">
+                      Updated {formatAgo(source.updatedAt)}
+                    </span>
                   </span>
                 </DropdownMenuItem>
               ))}
@@ -208,8 +257,10 @@ export function LoginBar({ botId, botName, address }: { botId: BotId; botName: s
     );
   };
 
-  const BAR = "col-start-1 row-start-1 flex h-10 items-center gap-2 rounded-full bg-popover pr-1 pl-2 text-[13.5px] whitespace-nowrap text-popover-foreground shadow-lg";
-  const MOTION = "transition-[opacity,translate,scale] duration-180 ease-out motion-reduce:translate-y-0 motion-reduce:scale-100 motion-reduce:starting:translate-y-0 motion-reduce:starting:scale-100";
+  const BAR =
+    "col-start-1 row-start-1 flex h-10 items-center gap-2 rounded-full bg-popover pr-1 pl-2 text-[13.5px] whitespace-nowrap text-popover-foreground shadow-lg";
+  const MOTION =
+    "transition-[opacity,translate,scale] duration-180 ease-out motion-reduce:translate-y-0 motion-reduce:scale-100 motion-reduce:starting:translate-y-0 motion-reduce:starting:scale-100";
 
   return (
     // The bar floats over the page, so the page and its frame do not move when it shows.
@@ -239,7 +290,14 @@ export function LoginBar({ botId, botName, address }: { botId: BotId; botName: s
 /** Hides the bar for the site of the page until the take-over closes. */
 function HideButton({ onClick }: { onClick: () => void }) {
   return (
-    <Button variant="ghost" size="icon" aria-label="Hide" title="Hide" className="size-[30px] rounded-full text-muted-foreground" onClick={onClick}>
+    <Button
+      variant="ghost"
+      size="icon"
+      aria-label="Hide"
+      title="Hide"
+      className="size-[30px] rounded-full text-muted-foreground"
+      onClick={onClick}
+    >
       <XIcon className="size-[15px]" />
     </Button>
   );

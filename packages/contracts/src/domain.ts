@@ -66,7 +66,15 @@ export type BotSummary = typeof BotSummary.Type;
  * Claude Code compacted the conversation. A `settings` message notes that the operator changed the
  * name or the instructions of the bot.
  */
-export const MessageRole = Schema.Literals(["user", "assistant", "routine", "trace", "bot", "compact", "settings"]);
+export const MessageRole = Schema.Literals([
+  "user",
+  "assistant",
+  "routine",
+  "trace",
+  "bot",
+  "compact",
+  "settings",
+]);
 export type MessageRole = typeof MessageRole.Type;
 
 /** A file that the operator sent with a message. The server keeps the bytes. */
@@ -82,14 +90,17 @@ export type Attachment = typeof Attachment.Type;
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
 /** Counts the bytes that a base64 text holds: 3 for every 4 characters, less one for each `=` of padding. */
-const base64Bytes = (data: string) => Math.floor((data.length * 3) / 4) - (data.length - data.replace(/=+$/, "").length);
+const base64Bytes = (data: string) =>
+  Math.floor((data.length * 3) / 4) - (data.length - data.replace(/=+$/, "").length);
 
 /** A file on its way to the server, with its bytes as base64. */
 export const Upload = Schema.Struct({
   name: Schema.String,
   mediaType: Schema.String,
   // The check runs when the server decodes a request, so a larger file never reaches the server's code.
-  data: Schema.String.check(Schema.makeFilter((data: string) => base64Bytes(data) <= MAX_UPLOAD_BYTES)),
+  data: Schema.String.check(
+    Schema.makeFilter((data: string) => base64Bytes(data) <= MAX_UPLOAD_BYTES),
+  ),
 });
 export type Upload = typeof Upload.Type;
 

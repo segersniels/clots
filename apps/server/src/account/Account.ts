@@ -31,7 +31,8 @@ interface ClaudeProfile {
   readonly plan: string | null;
 }
 
-const textOrNull = (value: unknown) => (typeof value === "string" && value.trim() !== "" ? value.trim() : null);
+const textOrNull = (value: unknown) =>
+  typeof value === "string" && value.trim() !== "" ? value.trim() : null;
 
 /**
  * Reads the name and the plan name from the profile that Claude Code keeps in its config. The file
@@ -39,12 +40,16 @@ const textOrNull = (value: unknown) => (typeof value === "string" && value.trim(
  */
 const readProfile = (): ClaudeProfile => {
   const directory = process.env.CLAUDE_CONFIG_DIR;
-  const path = directory === undefined ? join(homedir(), ".claude.json") : join(directory, ".claude.json");
+  const path =
+    directory === undefined ? join(homedir(), ".claude.json") : join(directory, ".claude.json");
 
   try {
     const profile = JSON.parse(readFileSync(path, "utf8")).oauthAccount ?? {};
 
-    return { name: textOrNull(profile.fullName) ?? textOrNull(profile.displayName), plan: textOrNull(profile.planDisplayName) };
+    return {
+      name: textOrNull(profile.fullName) ?? textOrNull(profile.displayName),
+      plan: textOrNull(profile.planDisplayName),
+    };
   } catch {
     return { name: null, plan: null };
   }
@@ -52,18 +57,34 @@ const readProfile = (): ClaudeProfile => {
 
 /** Waits for a question to Claude Code, or gives `null` when it takes too long or fails. */
 const withTimeout = <A>(question: Promise<A>) =>
-  Promise.race([question, new Promise<null>((resolve) => setTimeout(() => resolve(null), CHECK_TIMEOUT_MS))]).catch(() => null);
+  Promise.race([
+    question,
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), CHECK_TIMEOUT_MS)),
+  ]).catch(() => null);
 
 /** Turns Claude Code's usage data into the windows that the menu shows. */
-const toWindows = (limits: Record<string, unknown> | null | undefined): ReadonlyArray<UsageWindow> | null => {
-  if (limits === null || limits === undefined) return null;
+const toWindows = (
+  limits: Record<string, unknown> | null | undefined,
+): ReadonlyArray<UsageWindow> | null => {
+  if (limits === null || limits === undefined) {
+    return null;
+  }
 
   // Only the `limits` list says which windows are close to their limit.
-  const critical = ((limits.limits as ReadonlyArray<LimitEntry> | undefined) ?? []).filter((entry) => entry.severity === "critical");
+  const critical = ((limits.limits as ReadonlyArray<LimitEntry> | undefined) ?? []).filter(
+    (entry) => entry.severity === "critical",
+  );
   const isCritical = (kind: string, model: string | null) =>
-    critical.some((entry) => entry.kind === kind && (entry.scope?.model?.display_name ?? null) === model);
+    critical.some(
+      (entry) => entry.kind === kind && (entry.scope?.model?.display_name ?? null) === model,
+    );
 
-  const window = (kind: UsageWindow["kind"], rate: RateWindow | null | undefined, model: string | null, limitKind: string) =>
+  const window = (
+    kind: UsageWindow["kind"],
+    rate: RateWindow | null | undefined,
+    model: string | null,
+    limitKind: string,
+  ) =>
     rate?.utilization === null || rate?.utilization === undefined
       ? []
       : [
@@ -75,7 +96,8 @@ const toWindows = (limits: Record<string, unknown> | null | undefined): Readonly
             critical: isCritical(limitKind, model),
           },
         ];
-  const scoped = (limits.model_scoped as ReadonlyArray<RateWindow & { display_name: string }> | undefined) ?? [];
+  const scoped =
+    (limits.model_scoped as ReadonlyArray<RateWindow & { display_name: string }> | undefined) ?? [];
 
   return [
     ...window("session", limits.five_hour as RateWindow | null | undefined, null, "session"),
@@ -89,22 +111,33 @@ const toWindows = (limits: Record<string, unknown> | null | undefined): Readonly
  * Claude Code answers with its own login, so clots never reads a token, and no model runs.
  */
 const askClaudeCode = async (claudePath: string, home: string): Promise<Account> => {
-  const never: AsyncIterable<never> = { [Symbol.asyncIterator]: () => ({ next: () => new Promise<never>(() => {}) }) };
+  const never: AsyncIterable<never> = {
+    [Symbol.asyncIterator]: () => ({ next: () => new Promise<never>(() => {}) }),
+  };
   const probe = query({
     prompt: never,
-    options: { cwd: home, env: makeClaudeEnvironment(process.env), pathToClaudeCodeExecutable: claudePath, persistSession: false },
+    options: {
+      cwd: home,
+      env: makeClaudeEnvironment(process.env),
+      pathToClaudeCodeExecutable: claudePath,
+      persistSession: false,
+    },
   });
 
   try {
     const info = await withTimeout(probe.accountInfo());
 
     // Claude Code did not answer, so the menu shows the plan and its usage as unknown.
-    if (info === null) return { name: null, email: null, plan: "Claude", usage: null, checkedAt: Date.now() };
+    if (info === null) {
+      return { name: null, email: null, plan: "Claude", usage: null, checkedAt: Date.now() };
+    }
 
     const profile = readProfile();
 
     // The SDK marks this call as experimental, so a change of its name or shape shows as unknown usage, not as an error.
-    const usage = await withTimeout(probe.usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET({ skipBehaviors: true }));
+    const usage = await withTimeout(
+      probe.usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET({ skipBehaviors: true }),
+    );
 
     return {
       name: profile.name,
@@ -123,7 +156,9 @@ let cached: Account | undefined;
 
 /** Reads the server's Claude login and the usage limits of its plan, at most once a minute. */
 export const readAccount = async (claudePath: string, home: string): Promise<Account> => {
-  if (cached !== undefined && Date.now() - cached.checkedAt < CACHE_MS) return cached;
+  if (cached !== undefined && Date.now() - cached.checkedAt < CACHE_MS) {
+    return cached;
+  }
 
   cached = await askClaudeCode(claudePath, home);
 

@@ -7,7 +7,17 @@ import { runtimePaths } from "../paths.ts";
 export const realAgentBrowser = runtimePaths.agentBrowser;
 
 /** The agent-browser commands that do not use the page, so they do not start a Chrome. */
-const COMMANDS_WITHOUT_PAGE = new Set(["close", "session", "skills", "install", "doctor", "help", "--help", "-h", "--version"]);
+const COMMANDS_WITHOUT_PAGE = new Set([
+  "close",
+  "session",
+  "skills",
+  "install",
+  "doctor",
+  "help",
+  "--help",
+  "-h",
+  "--version",
+]);
 
 /** The size of each bot's browser screen, which the take-over window restores. */
 export const SCREEN_SIZE = { width: 1280, height: 800 };
@@ -36,18 +46,32 @@ export const isRunning = async (port: number) => {
  * a test server, can give the same port to one of its own bots.
  */
 const runsProfile = async (port: number, profile: string) => {
-  const version = (await (await fetch(`http://127.0.0.1:${port}/json/version`)).json()) as { webSocketDebuggerUrl: string };
+  const version = (await (await fetch(`http://127.0.0.1:${port}/json/version`)).json()) as {
+    webSocketDebuggerUrl: string;
+  };
   const socket = new WebSocket(version.webSocketDebuggerUrl);
-  const reply = await new Promise<{ result?: { processInfo: ReadonlyArray<{ type: string; id: number }> } }>((resolve, reject) => {
-    socket.onopen = () => socket.send(JSON.stringify({ id: 1, method: "SystemInfo.getProcessInfo" }));
+  const reply = await new Promise<{
+    result?: { processInfo: ReadonlyArray<{ type: string; id: number }> };
+  }>((resolve, reject) => {
+    socket.onopen = () =>
+      socket.send(JSON.stringify({ id: 1, method: "SystemInfo.getProcessInfo" }));
     socket.onmessage = ({ data }) => resolve(JSON.parse(String(data)));
     socket.onerror = () => reject(new Error(`No DevTools connection on port ${port}.`));
   }).finally(() => socket.close());
   const browser = reply.result?.processInfo.find((process) => process.type === "browser");
 
-  if (browser === undefined) return false;
+  if (browser === undefined) {
+    return false;
+  }
 
-  const commandLine = Bun.spawnSync(["ps", "-ww", "-o", "args=", "-p", String(browser.id)]).stdout.toString();
+  const commandLine = Bun.spawnSync([
+    "ps",
+    "-ww",
+    "-o",
+    "args=",
+    "-p",
+    String(browser.id),
+  ]).stdout.toString();
 
   return commandLine.includes(`--user-data-dir=${profile}`);
 };
@@ -59,7 +83,9 @@ const runsProfile = async (port: number, profile: string) => {
  */
 export const ensureChrome = async ({ executable, port, profile, userAgent }: BotChrome) => {
   if (await isRunning(port)) {
-    if (await runsProfile(port, profile)) return;
+    if (await runsProfile(port, profile)) {
+      return;
+    }
 
     throw new Error(`Port ${port} has the Chrome of another profile, so the bot does not use it.`);
   }
@@ -91,7 +117,9 @@ export const ensureChrome = async ({ executable, port, profile, userAgent }: Bot
   chrome.unref();
 
   for (let attempt = 0; attempt < 50; attempt++) {
-    if (await isRunning(port)) return;
+    if (await isRunning(port)) {
+      return;
+    }
 
     await Bun.sleep(200);
   }
@@ -105,7 +133,9 @@ export const closeChrome = async (port: number, profile: string) => {
     .then((response) => response.json() as Promise<{ webSocketDebuggerUrl: string }>)
     .catch(() => undefined);
 
-  if (version === undefined || !(await runsProfile(port, profile))) return;
+  if (version === undefined || !(await runsProfile(port, profile))) {
+    return;
+  }
 
   await new Promise<void>((resolve) => {
     const socket = new WebSocket(version.webSocketDebuggerUrl);
@@ -125,20 +155,32 @@ export interface PageInfo {
 /** Reads the title and address of each page of the bot's Chrome. Without a Chrome of its own, the bot has none. */
 export const readPages = async (port: number): Promise<ReadonlyArray<PageInfo>> => {
   const targets = await fetch(`http://127.0.0.1:${port}/json/list`)
-    .then((response) => response.json() as Promise<ReadonlyArray<{ id: string; type: string; title: string; url: string }>>)
+    .then(
+      (response) =>
+        response.json() as Promise<
+          ReadonlyArray<{ id: string; type: string; title: string; url: string }>
+        >,
+    )
     .catch(() => []);
 
-  return targets.filter((target) => target.type === "page").map(({ id, title, url }) => ({ targetId: id, title, url }));
+  return targets
+    .filter((target) => target.type === "page")
+    .map(({ id, title, url }) => ({ targetId: id, title, url }));
 };
 
 /** Stops the loading of one page of the bot's Chrome, as the stop button of a browser does. */
 export const stopLoading = async (port: number, targetId: string) => {
   const targets = await fetch(`http://127.0.0.1:${port}/json/list`)
-    .then((response) => response.json() as Promise<ReadonlyArray<{ id: string; webSocketDebuggerUrl?: string }>>)
+    .then(
+      (response) =>
+        response.json() as Promise<ReadonlyArray<{ id: string; webSocketDebuggerUrl?: string }>>,
+    )
     .catch(() => []);
   const address = targets.find((target) => target.id === targetId)?.webSocketDebuggerUrl;
 
-  if (address === undefined) return;
+  if (address === undefined) {
+    return;
+  }
 
   await new Promise<void>((resolve) => {
     const socket = new WebSocket(address);
@@ -160,11 +202,23 @@ export const runAgentBrowserCommand = async (args: ReadonlyArray<string>) => {
   const executable = process.env.CLOTS_BROWSER_EXECUTABLE;
   const profile = process.env.CLOTS_BROWSER_PROFILE;
 
-  if (Number.isInteger(port) && executable !== undefined && profile !== undefined && !COMMANDS_WITHOUT_PAGE.has(args[0] ?? "")) {
-    await ensureChrome({ executable, port, profile, userAgent: process.env.CLOTS_BROWSER_USER_AGENT });
+  if (
+    Number.isInteger(port) &&
+    executable !== undefined &&
+    profile !== undefined &&
+    !COMMANDS_WITHOUT_PAGE.has(args[0] ?? "")
+  ) {
+    await ensureChrome({
+      executable,
+      port,
+      profile,
+      userAgent: process.env.CLOTS_BROWSER_USER_AGENT,
+    });
   }
 
-  const command = Bun.spawn([realAgentBrowser, ...args], { stdio: ["inherit", "inherit", "inherit"] });
+  const command = Bun.spawn([realAgentBrowser, ...args], {
+    stdio: ["inherit", "inherit", "inherit"],
+  });
 
   return await command.exited;
 };

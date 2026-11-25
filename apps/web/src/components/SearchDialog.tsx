@@ -4,7 +4,18 @@ import { Character, type Gaze } from "@clots/character";
 import type { BotSummary, MessageHit } from "@clots/contracts";
 import { useNavigate } from "@tanstack/react-router";
 import { cn } from "cn";
-import { ArrowUpIcon, FolderPlusIcon, GaugeIcon, MonitorIcon, MoonIcon, PlusIcon, SearchIcon, SunIcon, UserRoundPlusIcon, type LucideIcon } from "lucide-react";
+import {
+  ArrowUpIcon,
+  FolderPlusIcon,
+  GaugeIcon,
+  MonitorIcon,
+  MoonIcon,
+  PlusIcon,
+  SearchIcon,
+  SunIcon,
+  UserRoundPlusIcon,
+  type LucideIcon,
+} from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 import { client, useStore } from "@/client.ts";
@@ -40,7 +51,8 @@ const LOOK_AT_FIELD: Gaze = { x: -0.18, y: -0.93 };
 /** The color of a status line that waits for the operator: the warn color of a usage limit near its end. */
 const WAITING_TEXT = "text-[#b07610] dark:text-[#f5a524]";
 
-const KBD = "shrink-0 rounded-md bg-muted px-1.5 py-0.5 font-sans text-[11.5px] text-muted-foreground";
+const KBD =
+  "shrink-0 rounded-md bg-muted px-1.5 py-0.5 font-sans text-[11.5px] text-muted-foreground";
 
 /** The floating panel of the search and of the New dialog: it scales in under the top of the window. */
 const POPUP =
@@ -69,8 +81,18 @@ interface SearchAction {
 }
 
 type SearchItem =
-  | { readonly kind: "bot"; readonly id: string; readonly bot: BotSummary; readonly shortcut: number | undefined }
-  | { readonly kind: "message"; readonly id: string; readonly hit: MessageHit; readonly bot: BotSummary }
+  | {
+      readonly kind: "bot";
+      readonly id: string;
+      readonly bot: BotSummary;
+      readonly shortcut: number | undefined;
+    }
+  | {
+      readonly kind: "message";
+      readonly id: string;
+      readonly hit: MessageHit;
+      readonly bot: BotSummary;
+    }
   | { readonly kind: "action"; readonly id: string; readonly action: SearchAction };
 
 interface SearchGroup {
@@ -80,30 +102,83 @@ interface SearchGroup {
 }
 
 /** Puts the bots in the order of their last message, which the search and the shortcuts share. */
-const byRecent = (bots: ReadonlyArray<BotSummary>) => bots.toSorted((a, b) => (b.lastMessageAt ?? 0) - (a.lastMessageAt ?? 0));
+const byRecent = (bots: ReadonlyArray<BotSummary>) =>
+  bots.toSorted((a, b) => (b.lastMessageAt ?? 0) - (a.lastMessageAt ?? 0));
 
 /** Lists the actions of the search. The theme actions also match on "mode" and "appearance". */
 const actionsFor = (commands: SearchCommands): ReadonlyArray<SearchAction> => [
-  { id: "new-bot", label: "New bot", keywords: ["create", "add"], icon: PlusIcon, run: () => commands.newBot() },
-  { id: "new-project", label: "New project", keywords: ["create", "add", "folder"], icon: FolderPlusIcon, run: commands.newProject },
-  { id: "theme-dark", label: "Theme: Dark", keywords: ["mode", "appearance"], icon: MoonIcon, run: () => setTheme("dark") },
-  { id: "theme-light", label: "Theme: Light", keywords: ["mode", "appearance"], icon: SunIcon, run: () => setTheme("light") },
-  { id: "theme-system", label: "Theme: System", keywords: ["mode", "appearance"], icon: MonitorIcon, run: () => setTheme("system") },
-  { id: "updates", label: "Check for updates", keywords: ["version", "upgrade"], icon: ArrowUpIcon, run: commands.checkForUpdates },
-  { id: "usage", label: "Usage and plan", keywords: ["limits", "account"], icon: GaugeIcon, run: commands.openAccount },
+  {
+    id: "new-bot",
+    label: "New bot",
+    keywords: ["create", "add"],
+    icon: PlusIcon,
+    run: () => commands.newBot(),
+  },
+  {
+    id: "new-project",
+    label: "New project",
+    keywords: ["create", "add", "folder"],
+    icon: FolderPlusIcon,
+    run: commands.newProject,
+  },
+  {
+    id: "theme-dark",
+    label: "Theme: Dark",
+    keywords: ["mode", "appearance"],
+    icon: MoonIcon,
+    run: () => setTheme("dark"),
+  },
+  {
+    id: "theme-light",
+    label: "Theme: Light",
+    keywords: ["mode", "appearance"],
+    icon: SunIcon,
+    run: () => setTheme("light"),
+  },
+  {
+    id: "theme-system",
+    label: "Theme: System",
+    keywords: ["mode", "appearance"],
+    icon: MonitorIcon,
+    run: () => setTheme("system"),
+  },
+  {
+    id: "updates",
+    label: "Check for updates",
+    keywords: ["version", "upgrade"],
+    icon: ArrowUpIcon,
+    run: commands.checkForUpdates,
+  },
+  {
+    id: "usage",
+    label: "Usage and plan",
+    keywords: ["limits", "account"],
+    icon: GaugeIcon,
+    run: commands.openAccount,
+  },
 ];
 
 /**
  * Opens the search with ⌘K or ⌘F, the New dialog with ⌘N, and the first nine bots of the search with
  * ⌘1 to ⌘9, in the order of their last message. The bot shortcuts work while the search is closed too.
  */
-export function useSearchShortcuts({ onToggle, onNew, onBotOpened }: { onToggle: () => void; onNew: () => void; onBotOpened: () => void }) {
+export function useSearchShortcuts({
+  onToggle,
+  onNew,
+  onBotOpened,
+}: {
+  onToggle: () => void;
+  onNew: () => void;
+  onBotOpened: () => void;
+}) {
   const navigate = useNavigate();
   const bots = useStore(client.bots);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (!(ON_MAC ? event.metaKey : event.ctrlKey) || event.shiftKey || event.altKey) return;
+      if (!(ON_MAC ? event.metaKey : event.ctrlKey) || event.shiftKey || event.altKey) {
+        return;
+      }
 
       const key = event.key.toLowerCase();
 
@@ -124,7 +199,9 @@ export function useSearchShortcuts({ onToggle, onNew, onBotOpened }: { onToggle:
       const place = Number(event.key);
       const bot = Number.isInteger(place) && place >= 1 ? byRecent(bots)[place - 1] : undefined;
 
-      if (bot === undefined) return;
+      if (bot === undefined) {
+        return;
+      }
 
       event.preventDefault();
       void navigate({ to: "/bots/$botId", params: { botId: bot.id } });
@@ -146,11 +223,17 @@ function useMessageHits(query: string) {
   const searchable = query.length >= THREAD_QUERY_MIN;
 
   useEffect(() => {
-    if (!searchable) return;
+    if (!searchable) {
+      return;
+    }
 
     let current = true;
     const timer = setTimeout(
-      () => void client.searchMessages(query, THREAD_HITS).then((found) => current && setHits(found), () => undefined),
+      () =>
+        void client.searchMessages(query, THREAD_HITS).then(
+          (found) => current && setHits(found),
+          () => undefined,
+        ),
       THREAD_SEARCH_DELAY_MS,
     );
 
@@ -172,7 +255,9 @@ const matchLine = (text: string, term: string) => {
     .trim();
   const start = line.toLowerCase().indexOf(term);
 
-  if (start <= LINE_LEAD) return line;
+  if (start <= LINE_LEAD) {
+    return line;
+  }
 
   return `…${line.slice(start - LINE_CONTEXT)}`;
 };
@@ -181,12 +266,16 @@ const matchLine = (text: string, term: string) => {
 function Highlight({ text, query }: { text: string; query: string }) {
   const start = query === "" ? -1 : text.toLowerCase().indexOf(query);
 
-  if (start < 0) return <>{text}</>;
+  if (start < 0) {
+    return <>{text}</>;
+  }
 
   return (
     <>
       {text.slice(0, start)}
-      <mark className="bg-transparent font-semibold text-foreground">{text.slice(start, start + query.length)}</mark>
+      <mark className="bg-transparent font-semibold text-foreground">
+        {text.slice(start, start + query.length)}
+      </mark>
       {text.slice(start + query.length)}
     </>
   );
@@ -216,12 +305,28 @@ function ResultsArea({ children }: { children: ReactNode }) {
 }
 
 /** One bot: its live clot, its name and project, and its status line. */
-function BotResult({ item, query, projectName, highlighted }: { item: Extract<SearchItem, { kind: "bot" }>; query: string; projectName: string | undefined; highlighted: boolean }) {
+function BotResult({
+  item,
+  query,
+  projectName,
+  highlighted,
+}: {
+  item: Extract<SearchItem, { kind: "bot" }>;
+  query: string;
+  projectName: string | undefined;
+  highlighted: boolean;
+}) {
   const { bot, shortcut } = item;
 
   return (
     <>
-      <Character shape={bot.shape} color={bot.color} mood={bot.status} size={34} gaze={highlighted && bot.status === "idle" ? LOOK_AT_FIELD : undefined} />
+      <Character
+        shape={bot.shape}
+        color={bot.color}
+        mood={bot.status}
+        size={34}
+        gaze={highlighted && bot.status === "idle" ? LOOK_AT_FIELD : undefined}
+      />
       <span className="min-w-0 flex-1">
         <span className="flex items-baseline gap-2">
           <span className="truncate font-medium">
@@ -233,7 +338,14 @@ function BotResult({ item, query, projectName, highlighted }: { item: Extract<Se
             </span>
           )}
         </span>
-        <span className={cn("block truncate text-[13px]", bot.status === "waiting" ? WAITING_TEXT : "text-muted-foreground")}>{bot.statusLine}</span>
+        <span
+          className={cn(
+            "block truncate text-[13px]",
+            bot.status === "waiting" ? WAITING_TEXT : "text-muted-foreground",
+          )}
+        >
+          {bot.statusLine}
+        </span>
       </span>
       {shortcut !== undefined && (
         <kbd className={KBD}>
@@ -246,7 +358,13 @@ function BotResult({ item, query, projectName, highlighted }: { item: Extract<Se
 }
 
 /** One thread message: the bot's small clot and name, the line with the match, and when it was sent. */
-function MessageResult({ item, query }: { item: Extract<SearchItem, { kind: "message" }>; query: string }) {
+function MessageResult({
+  item,
+  query,
+}: {
+  item: Extract<SearchItem, { kind: "message" }>;
+  query: string;
+}) {
   // The server matches each word as a word start, so a query of several words may not be in the text as a whole.
   const term = item.hit.text.toLowerCase().includes(query) ? query : (query.split(" ")[0] ?? query);
 
@@ -261,7 +379,9 @@ function MessageResult({ item, query }: { item: Extract<SearchItem, { kind: "mes
           <Highlight text={matchLine(item.hit.text, term)} query={term} />
         </span>
       </span>
-      <span className="shrink-0 text-[12.5px] text-muted-foreground">{formatRecent(item.hit.createdAt)}</span>
+      <span className="shrink-0 text-[12.5px] text-muted-foreground">
+        {formatRecent(item.hit.createdAt)}
+      </span>
     </>
   );
 }
@@ -282,15 +402,23 @@ function ActionResult({ action }: { action: SearchAction }) {
 }
 
 /** The field and the results. It mounts with the dialog, so each open starts with an empty query. */
-function SearchPanel({ commands, onSelect }: { commands: SearchCommands; onSelect: (item: SearchItem) => void }) {
+function SearchPanel({
+  commands,
+  onSelect,
+}: {
+  commands: SearchCommands;
+  onSelect: (item: SearchItem) => void;
+}) {
   const bots = useStore(client.bots);
   const projects = useStore(client.projects);
   const [query, setQuery] = useState("");
   const [highlightedId, setHighlightedId] = useState<string>();
   const needle = query.trim().toLowerCase();
   const projectNames = new Map(projects.map((project) => [project.id, project.name]));
-  const projectOf = (bot: BotSummary) => (bot.projectId === null ? undefined : projectNames.get(bot.projectId));
-  const matches = (text: string | undefined) => text !== undefined && text.toLowerCase().includes(needle);
+  const projectOf = (bot: BotSummary) =>
+    bot.projectId === null ? undefined : projectNames.get(bot.projectId);
+  const matches = (text: string | undefined) =>
+    text !== undefined && text.toLowerCase().includes(needle);
   const botsById = new Map(bots.map((bot) => [bot.id, bot]));
   const hits = useMessageHits(needle);
 
@@ -333,7 +461,9 @@ function SearchPanel({ commands, onSelect }: { commands: SearchCommands; onSelec
     run: () => commands.newBot(query.trim()),
     hint: "↵",
   };
-  const shownGroups = empty ? [{ value: "", items: [{ kind: "action", id: createRow.id, action: createRow } as const] }] : groups;
+  const shownGroups = empty
+    ? [{ value: "", items: [{ kind: "action", id: createRow.id, action: createRow } as const] }]
+    : groups;
 
   return (
     <Autocomplete.Root
@@ -368,7 +498,9 @@ function SearchPanel({ commands, onSelect }: { commands: SearchCommands; onSelec
           {(group: SearchGroup) => (
             <Autocomplete.Group key={group.value} items={group.items}>
               {group.value !== "" && (
-                <Autocomplete.GroupLabel className="px-3 pt-1.5 pb-1 text-[12.5px] text-muted-foreground">{group.value}</Autocomplete.GroupLabel>
+                <Autocomplete.GroupLabel className="px-3 pt-1.5 pb-1 text-[12.5px] text-muted-foreground">
+                  {group.value}
+                </Autocomplete.GroupLabel>
               )}
               <Autocomplete.Collection>
                 {(item: SearchItem) => (
@@ -379,7 +511,12 @@ function SearchPanel({ commands, onSelect }: { commands: SearchCommands; onSelec
                     className={ROW}
                   >
                     {item.kind === "bot" && (
-                      <BotResult item={item} query={needle} projectName={projectOf(item.bot)} highlighted={item.id === highlightedId} />
+                      <BotResult
+                        item={item}
+                        query={needle}
+                        projectName={projectOf(item.bot)}
+                        highlighted={item.id === highlightedId}
+                      />
                     )}
                     {item.kind === "message" && <MessageResult item={item} query={needle} />}
                     {item.kind === "action" && <ActionResult action={item.action} />}
@@ -414,8 +551,15 @@ export function SearchDialog({
   const pendingAction = useRef<() => void>(undefined);
 
   const select = (item: SearchItem) => {
-    if (item.kind === "action") pendingAction.current = item.action.run;
-    else void navigate({ to: "/bots/$botId", params: { botId: item.bot.id }, search: item.kind === "message" ? { message: item.hit.messageId } : {} });
+    if (item.kind === "action") {
+      pendingAction.current = item.action.run;
+    } else {
+      void navigate({
+        to: "/bots/$botId",
+        params: { botId: item.bot.id },
+        search: item.kind === "message" ? { message: item.hit.messageId } : {},
+      });
+    }
 
     onOpenChange(false);
   };
@@ -425,14 +569,18 @@ export function SearchDialog({
       open={open}
       onOpenChange={onOpenChange}
       onOpenChangeComplete={(isOpen) => {
-        if (isOpen) return;
+        if (isOpen) {
+          return;
+        }
 
         pendingAction.current?.();
         pendingAction.current = undefined;
       }}
     >
       <DialogPortal>
-        <DialogOverlay className={cn(instant && "data-open:animate-none data-closed:animate-none")} />
+        <DialogOverlay
+          className={cn(instant && "data-open:animate-none data-closed:animate-none")}
+        />
         <DialogPrimitive.Popup data-instant={instant || undefined} className={POPUP}>
           <DialogTitle className="sr-only">Search</DialogTitle>
           <SearchPanel commands={commands} onSelect={select} />
@@ -446,7 +594,15 @@ export function SearchDialog({
  * Offers what the operator can make: a bot or a project. The + in the sidebar and ⌘N open it. The
  * arrow keys move the highlight, Enter picks, and the picked dialog opens once this one has closed.
  */
-export function NewDialog({ open, onOpenChange, commands }: { open: boolean; onOpenChange: (open: boolean) => void; commands: SearchCommands }) {
+export function NewDialog({
+  open,
+  onOpenChange,
+  commands,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  commands: SearchCommands;
+}) {
   const choices = [
     { label: "New bot", icon: UserRoundPlusIcon, run: () => commands.newBot() },
     { label: "New project", icon: FolderPlusIcon, run: commands.newProject },
@@ -462,7 +618,9 @@ export function NewDialog({ open, onOpenChange, commands }: { open: boolean; onO
   const moveHighlight = (event: React.KeyboardEvent) => {
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
-      setHighlighted((index) => (index + (event.key === "ArrowDown" ? 1 : -1) + choices.length) % choices.length);
+      setHighlighted(
+        (index) => (index + (event.key === "ArrowDown" ? 1 : -1) + choices.length) % choices.length,
+      );
     }
 
     if (event.key === "Enter") {
@@ -477,7 +635,9 @@ export function NewDialog({ open, onOpenChange, commands }: { open: boolean; onO
       onOpenChange={onOpenChange}
       onOpenChangeComplete={(isOpen) => {
         // Each open starts on the first choice.
-        if (isOpen) return setHighlighted(0);
+        if (isOpen) {
+          return setHighlighted(0);
+        }
 
         picked.current?.();
         picked.current = undefined;
@@ -498,7 +658,15 @@ export function NewDialog({ open, onOpenChange, commands }: { open: boolean; onO
                 onClick={() => pick(choice.run)}
                 className={ROW}
               >
-                <ActionResult action={{ id: choice.label, label: choice.label, keywords: [], icon: choice.icon, run: choice.run }} />
+                <ActionResult
+                  action={{
+                    id: choice.label,
+                    label: choice.label,
+                    keywords: [],
+                    icon: choice.icon,
+                    run: choice.run,
+                  }}
+                />
               </div>
             ))}
           </div>

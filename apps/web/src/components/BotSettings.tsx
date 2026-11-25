@@ -30,14 +30,22 @@ export function BotIdentity({ bot }: { bot: BotSummary }) {
     const trimmed = name.trim();
 
     // A bot always has a name, so an empty field goes back to the saved one.
-    if (trimmed === "") return setName(bot.name);
-    if (trimmed !== bot.name) void client.updateBot(bot.id, { name: trimmed });
+    if (trimmed === "") {
+      return setName(bot.name);
+    }
+
+    if (trimmed !== bot.name) {
+      void client.updateBot(bot.id, { name: trimmed });
+    }
   };
 
   return (
     <section className="flex flex-col items-center gap-1.5">
       <Popover>
-        <PopoverTrigger aria-label="Edit character" className="rounded-2xl p-2 outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
+        <PopoverTrigger
+          aria-label="Edit character"
+          className="rounded-2xl p-2 outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
           <Character shape={bot.shape} color={bot.color} mood={bot.status} size={64} />
         </PopoverTrigger>
         <PopoverContent className="w-80 p-4">
@@ -78,12 +86,16 @@ export function BotInstructions({ bot }: { bot: BotSummary }) {
   const field = useRef<ComposerFieldHandle>(null);
 
   const saveInstructions = () => {
-    if (instructions.trim() !== bot.instructions) void client.updateBot(bot.id, { instructions: instructions.trim() });
+    if (instructions.trim() !== bot.instructions) {
+      void client.updateBot(bot.id, { instructions: instructions.trim() });
+    }
   };
 
   // The instructions can change in another place, such as the thread of a new bot.
   useEffect(() => {
-    if (bot.instructions !== instructions.trim()) field.current?.setText(bot.instructions);
+    if (bot.instructions !== instructions.trim()) {
+      field.current?.setText(bot.instructions);
+    }
   }, [bot.instructions]);
 
   useEffect(() => {
@@ -95,7 +107,9 @@ export function BotInstructions({ bot }: { bot: BotSummary }) {
   }, [bot.id]);
 
   useEffect(() => {
-    if (!flashing) return;
+    if (!flashing) {
+      return;
+    }
 
     const timer = setTimeout(() => setFlashing(false), FLASH_MS);
 

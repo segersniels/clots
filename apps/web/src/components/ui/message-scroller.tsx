@@ -1,24 +1,24 @@
-"use client"
+"use client";
 
-import * as React from "react"
+import * as React from "react";
 import {
   MessageScroller as MessageScrollerPrimitive,
   useMessageScroller,
   useMessageScrollerScrollable,
   useMessageScrollerVisibility,
-} from "@shadcn/react/message-scroller"
-import { cn } from "cn"
+} from "@shadcn/react/message-scroller";
+import { cn } from "cn";
 
-import { ScrollArea as ScrollAreaPrimitive } from "@base-ui/react/scroll-area"
+import { ScrollArea as ScrollAreaPrimitive } from "@base-ui/react/scroll-area";
 
-import { Button } from "@/components/ui/button"
-import { ScrollBar } from "@/components/ui/scroll-area"
-import { ArrowDownIcon } from "lucide-react"
+import { Button } from "@/components/ui/button";
+import { ScrollBar } from "@/components/ui/scroll-area";
+import { ArrowDownIcon } from "lucide-react";
 
 function MessageScrollerProvider(
-  props: React.ComponentProps<typeof MessageScrollerPrimitive.Provider>
+  props: React.ComponentProps<typeof MessageScrollerPrimitive.Provider>,
 ) {
-  return <MessageScrollerPrimitive.Provider {...props} />
+  return <MessageScrollerPrimitive.Provider {...props} />;
 }
 
 function MessageScroller({
@@ -30,11 +30,11 @@ function MessageScroller({
       data-slot="message-scroller"
       className={cn(
         "group/message-scroller relative flex size-full min-h-0 flex-col overflow-hidden",
-        className
+        className,
       )}
       {...props}
     />
-  )
+  );
 }
 
 function MessageScrollerViewport({
@@ -45,16 +45,18 @@ function MessageScrollerViewport({
     // The thumb floats over the thread, so the thread shows no scrollbar gutter.
     <ScrollAreaPrimitive.Root className="relative min-h-0 flex-1">
       <ScrollAreaPrimitive.Viewport
-        render={<MessageScrollerPrimitive.Viewport data-slot="message-scroller-viewport" {...props} />}
+        render={
+          <MessageScrollerPrimitive.Viewport data-slot="message-scroller-viewport" {...props} />
+        }
         className={cn(
           "size-full min-h-0 min-w-0 scroll-fade-b overscroll-contain contain-content data-pending-scroll:invisible",
-          className
+          className,
         )}
       />
       {/* The thread follows its end by itself, so the thumb stays hidden while it does. */}
       <ScrollBar className="group-data-autoscrolling/message-scroller:opacity-0!" />
     </ScrollAreaPrimitive.Root>
-  )
+  );
 }
 
 function MessageScrollerContent({
@@ -67,7 +69,7 @@ function MessageScrollerContent({
       className={cn("flex h-max min-h-full flex-col gap-6", className)}
       {...props}
     />
-  )
+  );
 }
 
 function MessageScrollerItem({
@@ -82,11 +84,11 @@ function MessageScrollerItem({
       className={cn(
         // No content-visibility: its guessed heights move the end of a thread after it opens, so the thread jumps.
         "min-w-0 shrink-0",
-        className
+        className,
       )}
       {...props}
     />
-  )
+  );
 }
 
 function MessageScrollerButton({
@@ -108,22 +110,21 @@ function MessageScrollerButton({
       direction={direction}
       className={cn(
         "absolute inset-s-1/2 -translate-x-1/2 border-border bg-background text-foreground transition-[translate,scale,opacity] duration-200 ease-out hover:bg-muted hover:text-foreground motion-reduce:transition-opacity data-[active=false]:pointer-events-none data-[active=false]:scale-95 data-[active=false]:opacity-0 data-[active=true]:translate-y-0 data-[active=true]:scale-100 data-[active=true]:opacity-100 data-[direction=end]:bottom-4 data-[direction=end]:data-[active=false]:translate-y-full data-[direction=start]:top-4 data-[direction=start]:data-[active=false]:-translate-y-full rtl:translate-x-1/2 data-[direction=start]:[&_svg]:rotate-180",
-        className
+        className,
       )}
       render={render ?? <Button variant={variant} size={size} />}
       {...props}
     >
       {children ?? (
         <>
-          <ArrowDownIcon
-          />
+          <ArrowDownIcon />
           <span className="sr-only">
             {direction === "end" ? "Scroll to end" : "Scroll to start"}
           </span>
         </>
       )}
     </MessageScrollerPrimitive.Button>
-  )
+  );
 }
 
 export {
@@ -136,4 +137,4 @@ export {
   useMessageScroller,
   useMessageScrollerScrollable,
   useMessageScrollerVisibility,
-}
+};

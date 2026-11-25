@@ -23,10 +23,14 @@ const run = <A>(program: Effect.Effect<A, never, BotRepository | SqlClient.SqlCl
     webDevPort: undefined,
     tailnet: false,
   });
-  const sql = MigrationsLayer.pipe(Layer.provideMerge(SqliteClient.layer({ filename: ":memory:" })));
+  const sql = MigrationsLayer.pipe(
+    Layer.provideMerge(SqliteClient.layer({ filename: ":memory:" })),
+  );
 
   return Effect.runPromise(
-    program.pipe(Effect.provide(BotRepository.layer.pipe(Layer.provideMerge(sql), Layer.provide(config)))),
+    program.pipe(
+      Effect.provide(BotRepository.layer.pipe(Layer.provideMerge(sql), Layer.provide(config))),
+    ),
   );
 };
 
@@ -35,7 +39,10 @@ test("a new bot gets a working directory, a thread and its own browser port", as
     Effect.gen(function* () {
       const bots = yield* BotRepository;
 
-      return [yield* bots.create({ ...newScout, instructions: "Be brief." }), yield* bots.create(newAtlas)] as const;
+      return [
+        yield* bots.create({ ...newScout, instructions: "Be brief." }),
+        yield* bots.create(newAtlas),
+      ] as const;
     }),
   );
 
@@ -71,9 +78,9 @@ test("the message search finds word starts in conversation messages only, and fo
 
       yield* bots.appendMessage(scout.id, "assistant", "Engine warnings are gone.");
       yield* bots.appendMessage(scout.id, "settings", "Engine settings changed");
-      yield* bots.appendMessage(atlas.id, "user", "Check the \"engine\" again");
+      yield* bots.appendMessage(atlas.id, "user", 'Check the "engine" again');
       yield* bots.appendMessage(atlas.id, "user", "Nothing here");
-      const found = yield* bots.searchMessages("ENG \"", 10);
+      const found = yield* bots.searchMessages('ENG "', 10);
 
       yield* bots.remove(atlas);
 
@@ -81,7 +88,10 @@ test("the message search finds word starts in conversation messages only, and fo
     }),
   );
 
-  expect(found.map((hit) => hit.text).toSorted()).toEqual(['Check the "engine" again', "Engine warnings are gone."]);
+  expect(found.map((hit) => hit.text).toSorted()).toEqual([
+    'Check the "engine" again',
+    "Engine warnings are gone.",
+  ]);
   expect(afterDelete.map((hit) => hit.text)).toEqual(["Engine warnings are gone."]);
 });
 
@@ -92,7 +102,13 @@ test("a trace keeps its steps, and the bot list shows the last message before it
       const scout = yield* bots.create(newScout);
 
       yield* bots.appendMessage(scout.id, "assistant", "On it.");
-      yield* bots.appendMessage(scout.id, "trace", "", [], [{ id: "tool-1", title: "Read the log", status: "done" }]);
+      yield* bots.appendMessage(
+        scout.id,
+        "trace",
+        "",
+        [],
+        [{ id: "tool-1", title: "Read the log", status: "done" }],
+      );
 
       return [yield* bots.messagesAfter(scout.id, 0), yield* bots.find(scout.id)] as const;
     }),
@@ -226,7 +242,9 @@ test("the operator's order holds, a new bot comes last, and a bot that joins a g
       const scout = yield* bots.create(newScout);
       const atlas = yield* bots.create(newAtlas);
       const nova = yield* bots.create({ ...newScout, name: "Nova" });
-      const names = Effect.map(bots.list, (list) => list.filter((bot) => bot.projectId === null).map((bot) => bot.name));
+      const names = Effect.map(bots.list, (list) =>
+        list.filter((bot) => bot.projectId === null).map((bot) => bot.name),
+      );
 
       yield* bots.reorder([nova.id, scout.id, atlas.id]);
       yield* bots.create({ ...newScout, name: "Late" });

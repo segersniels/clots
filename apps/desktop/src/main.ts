@@ -1,11 +1,33 @@
 import type { ConnectResult } from "@clots/contracts";
 import { isNewerVersion } from "@clots/contracts/version";
-import { app, BrowserWindow, ipcMain, Menu, MenuItem, net, shell, type IpcMainInvokeEvent } from "electron";
+import {
+  app,
+  BrowserWindow,
+  ipcMain,
+  Menu,
+  MenuItem,
+  net,
+  shell,
+  type IpcMainInvokeEvent,
+} from "electron";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { cancelLogin, installedVersion, installServer, LOCAL_SERVER_URL, loginClaude, runChecks } from "./local.ts";
-import { checkForUpdates, downloadUpdate, installUpdate, startUpdates, updateState } from "./updates.ts";
+import {
+  cancelLogin,
+  installedVersion,
+  installServer,
+  LOCAL_SERVER_URL,
+  loginClaude,
+  runChecks,
+} from "./local.ts";
+import {
+  checkForUpdates,
+  downloadUpdate,
+  installUpdate,
+  startUpdates,
+  updateState,
+} from "./updates.ts";
 
 // The app menu shows the name in About, Hide and Quit. The data folder stays where versions named after the package kept it.
 app.setPath("userData", app.getPath("userData"));
@@ -43,7 +65,11 @@ const writeConfig = (config: Config) => {
 const isServerPage = (url: string | undefined) => {
   const serverUrl = readConfig()?.serverUrl;
 
-  return url !== undefined && serverUrl !== undefined && new URL(url).origin === new URL(serverUrl).origin;
+  return (
+    url !== undefined &&
+    serverUrl !== undefined &&
+    new URL(url).origin === new URL(serverUrl).origin
+  );
 };
 
 let window: BrowserWindow | undefined;
@@ -52,7 +78,8 @@ let window: BrowserWindow | undefined;
 let quitting = false;
 
 /** Shows the setup page. `query` opens a given screen, such as the remote screen with its last error. */
-const showSetup = (query: Record<string, string> = {}) => window?.loadFile(appFile("resources/setup/setup.html"), { query });
+const showSetup = (query: Record<string, string> = {}) =>
+  window?.loadFile(appFile("resources/setup/setup.html"), { query });
 
 /** Shows the web client that the clots server serves. The app holds no copy of the client. */
 const showServer = (serverUrl: string) => window?.loadURL(serverUrl);
@@ -72,7 +99,9 @@ const createWindow = () => {
 
   // On macOS the app keeps running in the dock after the close button. The page stays alive, so it still sends notifications.
   window.on("close", (event) => {
-    if (process.platform !== "darwin" || quitting) return;
+    if (process.platform !== "darwin" || quitting) {
+      return;
+    }
 
     event.preventDefault();
     window?.hide();
@@ -83,7 +112,9 @@ const createWindow = () => {
     // Code -3 means that a newer navigation replaced this one.
     const replaced = code === -3;
 
-    if (!isMainFrame || replaced || !isServerPage(url)) return;
+    if (!isMainFrame || replaced || !isServerPage(url)) {
+      return;
+    }
 
     if (readConfig()?.mode === "local") {
       void showSetup({ screen: "local" });
@@ -94,11 +125,13 @@ const createWindow = () => {
     void showSetup({ screen: "remote", address: new URL(url).host, error: `net::${description}` });
   });
 
-  // Only the clots server and the setup page show in the app. Other links open in the browser.
+  /** Only the clots server and the setup page show in the app. Other links open in the browser. */
   const isInApp = (url: string) => url.startsWith("file:") || isServerPage(url);
 
   webContents.on("will-navigate", (event, url) => {
-    if (isInApp(url)) return;
+    if (isInApp(url)) {
+      return;
+    }
 
     event.preventDefault();
     void shell.openExternal(url);
@@ -120,12 +153,16 @@ const createWindow = () => {
 const showStart = async () => {
   const config = readConfig();
 
-  if (config === undefined) return showSetup();
+  if (config === undefined) {
+    return showSetup();
+  }
 
   if (config.mode === "local") {
     const installed = await installedVersion();
 
-    if (installed !== undefined && isNewerVersion(app.getVersion(), installed)) return showSetup({ screen: "local", reinstall: "1" });
+    if (installed !== undefined && isNewerVersion(app.getVersion(), installed)) {
+      return showSetup({ screen: "local", reinstall: "1" });
+    }
   }
 
   return showServer(config.serverUrl);
@@ -135,9 +172,14 @@ const showStart = async () => {
  * Registers a call of the setup page. Only the page from the app's own files may make it, so a
  * remote server's page cannot start programs on this Mac.
  */
-const handleSetup = <A extends ReadonlyArray<unknown>>(channel: string, handler: (event: IpcMainInvokeEvent, ...args: A) => unknown) =>
+const handleSetup = <A extends ReadonlyArray<unknown>>(
+  channel: string,
+  handler: (event: IpcMainInvokeEvent, ...args: A) => unknown,
+) =>
   ipcMain.handle(channel, (event, ...args) => {
-    if (!event.senderFrame?.url.startsWith("file:")) throw new Error(`${channel} is only for the setup page.`);
+    if (!event.senderFrame?.url.startsWith("file:")) {
+      throw new Error(`${channel} is only for the setup page.`);
+    }
 
     return handler(event, ...(args as unknown as A));
   });
@@ -168,7 +210,9 @@ const connect = async (input: string): Promise<ConnectResult> => {
 };
 
 ipcMain.handle("app:reveal-window", () => {
-  if (window?.isMinimized()) window.restore();
+  if (window?.isMinimized()) {
+    window.restore();
+  }
 
   window?.show();
   app.focus({ steal: true });
@@ -188,7 +232,9 @@ ipcMain.handle("app:install-update", () => {
 handleSetup("setup:checks", () => runChecks());
 handleSetup("setup:login", () => loginClaude());
 handleSetup("setup:cancel-login", () => cancelLogin());
-handleSetup("setup:install", (event) => installServer((step) => event.sender.send("setup:install-step", step)));
+handleSetup("setup:install", (event) =>
+  installServer((step) => event.sender.send("setup:install-step", step)),
+);
 handleSetup("setup:connect", (_event, address: string) => connect(address));
 
 handleSetup("setup:open-local", () => {
@@ -198,7 +244,9 @@ handleSetup("setup:open-local", () => {
 
 void app.whenReady().then(() => {
   // A packaged app takes its icon from the bundle. `electron .` would show the Electron icon instead.
-  if (!app.isPackaged) app.dock?.setIcon(appFile("resources/icon.png"));
+  if (!app.isPackaged) {
+    app.dock?.setIcon(appFile("resources/icon.png"));
+  }
 
   const defaultMenu = Menu.getApplicationMenu();
 
@@ -216,12 +264,16 @@ void app.whenReady().then(() => {
 
   createWindow();
   void startUpdates((state) => {
-    if (window?.isDestroyed() === false) window.webContents.send("app:update-changed", state);
+    if (window?.isDestroyed() === false) {
+      window.webContents.send("app:update-changed", state);
+    }
   });
 
   // On macOS the dock icon shows the hidden window again.
   app.on("activate", () => {
-    if (window === undefined || window.isDestroyed()) return createWindow();
+    if (window === undefined || window.isDestroyed()) {
+      return createWindow();
+    }
 
     window.show();
   });
@@ -232,5 +284,7 @@ app.on("before-quit", () => {
 });
 
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") app.quit();
+  if (process.platform !== "darwin") {
+    app.quit();
+  }
 });

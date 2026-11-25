@@ -8,7 +8,9 @@ export const HOST_TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
 /** Computes the next run of a cron expression. Returns `undefined` when the expression is not valid. */
 export const nextRunAt = (cron: string, now: number): number | undefined => {
   const parsed = Cron.parse(cron, HOST_TIME_ZONE);
-  if (Result.isFailure(parsed)) return undefined;
+  if (Result.isFailure(parsed)) {
+    return undefined;
+  }
 
   return Cron.next(parsed.success, now).getTime();
 };
@@ -56,15 +58,28 @@ export class ScheduleRepository extends Context.Service<
         list: (botId) =>
           sql<ScheduleRow>`
             SELECT ${columns} FROM schedules WHERE bot_id = ${botId} ORDER BY next_run_at
-          `.pipe(Effect.map((rows) => rows.map(toSchedule)), Effect.orDie),
+          `.pipe(
+            Effect.map((rows) => rows.map(toSchedule)),
+            Effect.orDie,
+          ),
 
         due: (now) =>
           sql<ScheduleRow>`
             SELECT ${columns} FROM schedules WHERE next_run_at <= ${now}
-          `.pipe(Effect.map((rows) => rows.map(toSchedule)), Effect.orDie),
+          `.pipe(
+            Effect.map((rows) => rows.map(toSchedule)),
+            Effect.orDie,
+          ),
 
         create: (botId, cron, prompt, nextRunAt) => {
-          const schedule: Schedule = { id: crypto.randomUUID(), botId, cron, prompt, paused: false, nextRunAt };
+          const schedule: Schedule = {
+            id: crypto.randomUUID(),
+            botId,
+            cron,
+            prompt,
+            paused: false,
+            nextRunAt,
+          };
 
           return write(sql`
             INSERT INTO schedules (id, bot_id, cron, prompt, next_run_at)
@@ -73,7 +88,9 @@ export class ScheduleRepository extends Context.Service<
         },
 
         update: (id, cron, prompt, nextRunAt) =>
-          write(sql`UPDATE schedules SET cron = ${cron}, prompt = ${prompt}, next_run_at = ${nextRunAt} WHERE id = ${id}`),
+          write(
+            sql`UPDATE schedules SET cron = ${cron}, prompt = ${prompt}, next_run_at = ${nextRunAt} WHERE id = ${id}`,
+          ),
 
         setPaused: (id, paused) =>
           write(sql`UPDATE schedules SET paused = ${paused ? 1 : 0} WHERE id = ${id}`),

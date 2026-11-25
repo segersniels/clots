@@ -19,16 +19,23 @@ export const AttachmentRouteLayer = HttpRouter.add(
     const { botId, attachmentId } = yield* HttpRouter.params;
 
     // The id becomes part of a file name lookup, so only a real id passes.
-    if (attachmentId === undefined || !UUID.test(attachmentId)) return notFound;
+    if (attachmentId === undefined || !UUID.test(attachmentId)) {
+      return notFound;
+    }
 
     const bot = yield* bots.find(botId as BotId);
-    if (bot === undefined) return notFound;
+    if (bot === undefined) {
+      return notFound;
+    }
 
     const directory = join(bot.workingDirectory, "attachments");
-    const file = yield* Effect.try(() => readdirSync(directory).find((name) => name.startsWith(attachmentId))).pipe(
-      Effect.orElseSucceed(() => undefined),
-    );
-    if (file === undefined) return notFound;
+    const file = yield* Effect.try(() =>
+      readdirSync(directory).find((name) => name.startsWith(attachmentId)),
+    ).pipe(Effect.orElseSucceed(() => undefined));
+
+    if (file === undefined) {
+      return notFound;
+    }
 
     // An attachment id names one file that never changes, so the browser keeps it and a remount shows it at once.
     return yield* HttpServerResponse.file(join(directory, file), {

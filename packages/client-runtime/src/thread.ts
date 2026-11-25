@@ -27,17 +27,24 @@ export const emptyThread: ThreadState = {
 
 /** Applies one server event, or the start of a subscription, to the thread state. */
 export const applyThreadEvent = (state: ThreadState, event: ThreadUpdate): ThreadState => {
-  if (event._tag === "Subscribed") return { ...state, replayedThrough: Number.POSITIVE_INFINITY };
+  if (event._tag === "Subscribed") {
+    return { ...state, replayedThrough: Number.POSITIVE_INFINITY };
+  }
 
   // The first live state of a subscription ends its replay. Later live states do not move the end.
   if (event._tag === "Live") {
-    const replayedThrough = state.replayedThrough === Number.POSITIVE_INFINITY ? state.lastSequence : state.replayedThrough;
+    const replayedThrough =
+      state.replayedThrough === Number.POSITIVE_INFINITY
+        ? state.lastSequence
+        : state.replayedThrough;
 
     return { ...state, live: event.state, synced: true, replayedThrough };
   }
 
   // A resumed subscription can replay a message that this client already has.
-  if (event.message.sequence <= state.lastSequence) return state;
+  if (event.message.sequence <= state.lastSequence) {
+    return state;
+  }
 
   return {
     ...state,

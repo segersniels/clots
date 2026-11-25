@@ -18,7 +18,9 @@ export const makeStore = <T>(
 
   const set = (update: (current: T) => T) => {
     value = update(value);
-    for (const listener of listeners) listener();
+    for (const listener of listeners) {
+      listener();
+    }
   };
 
   return {
@@ -26,11 +28,15 @@ export const makeStore = <T>(
     set,
     subscribe: (listener) => {
       listeners.add(listener);
-      if (listeners.size === 1) stop = start?.(set);
+      if (listeners.size === 1) {
+        stop = start?.(set);
+      }
 
       return () => {
         listeners.delete(listener);
-        if (listeners.size > 0) return;
+        if (listeners.size > 0) {
+          return;
+        }
 
         stop?.();
         stop = undefined;

@@ -20,7 +20,10 @@ function readSavedDrafts(): ReadonlyMap<BotId, Draft> {
     for (let index = 0; index < localStorage.length; index++) {
       const key = localStorage.key(index);
       if (key?.startsWith(DRAFT_KEY_PREFIX)) {
-        saved.set(key.slice(DRAFT_KEY_PREFIX.length) as BotId, { text: localStorage.getItem(key) ?? "", fileCount: 0 });
+        saved.set(key.slice(DRAFT_KEY_PREFIX.length) as BotId, {
+          text: localStorage.getItem(key) ?? "",
+          fileCount: 0,
+        });
       }
     }
   } catch {
@@ -32,9 +35,11 @@ function readSavedDrafts(): ReadonlyMap<BotId, Draft> {
 
 /** The unsent drafts of all bots. The sidebar shows them, and the composer starts from them. */
 export const drafts = makeStore(readSavedDrafts(), (set) => {
-  // A composer in another window saves its draft there. The storage event brings it here.
+  /** A composer in another window saves its draft there. The storage event brings it here. */
   const takeOtherWindow = (event: StorageEvent) => {
-    if (event.key === null || event.key.startsWith(DRAFT_KEY_PREFIX)) set(readSavedDrafts);
+    if (event.key === null || event.key.startsWith(DRAFT_KEY_PREFIX)) {
+      set(readSavedDrafts);
+    }
   };
 
   set(readSavedDrafts);
@@ -51,23 +56,32 @@ export const hasContent = (draft: Draft | undefined): draft is Draft =>
 export function saveDraft(botId: BotId, draft: Draft) {
   const current = drafts.get().get(botId);
 
-  if (current?.text === draft.text && current.fileCount === draft.fileCount) return;
+  if (current?.text === draft.text && current.fileCount === draft.fileCount) {
+    return;
+  }
 
   drafts.set((all) => {
     const next = new Map(all);
-    if (hasContent(draft)) next.set(botId, draft);
-    else next.delete(botId);
+    if (hasContent(draft)) {
+      next.set(botId, draft);
+    } else {
+      next.delete(botId);
+    }
 
     return next;
   });
 
   try {
-    if (draft.text === "") localStorage.removeItem(DRAFT_KEY_PREFIX + botId);
-    else localStorage.setItem(DRAFT_KEY_PREFIX + botId, draft.text);
+    if (draft.text === "") {
+      localStorage.removeItem(DRAFT_KEY_PREFIX + botId);
+    } else {
+      localStorage.setItem(DRAFT_KEY_PREFIX + botId, draft.text);
+    }
   } catch {
     // The draft still lives in this window until a reload.
   }
 }
 
 /** Reads the draft of one bot. Only a change to that draft renders the caller again. */
-export const useDraft = (botId: BotId) => useSyncExternalStore(drafts.subscribe, () => drafts.get().get(botId));
+export const useDraft = (botId: BotId) =>
+  useSyncExternalStore(drafts.subscribe, () => drafts.get().get(botId));

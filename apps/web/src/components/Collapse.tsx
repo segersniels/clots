@@ -18,10 +18,14 @@ export function Collapse({
 }) {
   const [settled, setSettled] = useState({ open, done: true });
 
-  if (settled.open !== open) setSettled({ open, done: false });
+  if (settled.open !== open) {
+    setSettled({ open, done: false });
+  }
 
   const finish = (event: TransitionEvent) => {
-    if (event.target === event.currentTarget) setSettled({ open, done: true });
+    if (event.target === event.currentTarget) {
+      setSettled({ open, done: true });
+    }
   };
 
   const clipped = !(unclipWhenOpen && open && settled.done);
@@ -34,11 +38,15 @@ export function Collapse({
         open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
       }`}
     >
-      {/*
+      {/**
         The padding and the negative margin keep focus rings inside the clipped area. A closed area
         drops them, because the padding would still stick out of its zero height and make the page scroll.
       */}
-      <div className={`min-h-0 ${clipped ? "overflow-hidden" : ""} ${open ? "-m-1 p-1" : ""} ${className}`}>{children}</div>
+      <div
+        className={`min-h-0 ${clipped ? "overflow-hidden" : ""} ${open ? "-m-1 p-1" : ""} ${className}`}
+      >
+        {children}
+      </div>
     </div>
   );
 }

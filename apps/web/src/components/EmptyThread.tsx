@@ -49,9 +49,19 @@ type Step = "field" | "saved" | "skipped";
  * Asks for the instructions of a bot whose thread has no messages yet. They are optional: the
  * operator can skip them and send a message. The text is the same as Instructions in the details pane.
  */
-export function EmptyThread({ bot, focusOnOpen, onDone }: { bot: BotSummary; focusOnOpen: boolean; onDone: () => void }) {
+export function EmptyThread({
+  bot,
+  focusOnOpen,
+  onDone,
+}: {
+  bot: BotSummary;
+  focusOnOpen: boolean;
+  onDone: () => void;
+}) {
   const [step, setStep] = useState<Step>(() => {
-    if (bot.instructions.trim() !== "") return "saved";
+    if (bot.instructions.trim() !== "") {
+      return "saved";
+    }
 
     return skippedBots.has(bot.id) ? "skipped" : "field";
   });
@@ -65,7 +75,9 @@ export function EmptyThread({ bot, focusOnOpen, onDone }: { bot: BotSummary; foc
   const empty = text.trim() === "";
 
   useEffect(() => {
-    if (step !== "field" || !focusField.current) return;
+    if (step !== "field" || !focusField.current) {
+      return;
+    }
 
     focusField.current = false;
     field.current?.focus();
@@ -73,7 +85,9 @@ export function EmptyThread({ bot, focusOnOpen, onDone }: { bot: BotSummary; foc
 
   // The instructions can change in the details pane while the thread shows them.
   useEffect(() => {
-    if (bot.instructions === saved.current) return;
+    if (bot.instructions === saved.current) {
+      return;
+    }
 
     saved.current = bot.instructions;
     field.current?.setText(bot.instructions);
@@ -83,14 +97,18 @@ export function EmptyThread({ bot, focusOnOpen, onDone }: { bot: BotSummary; foc
   const save = () => {
     const trimmed = text.trim();
 
-    if (trimmed === saved.current) return;
+    if (trimmed === saved.current) {
+      return;
+    }
 
     saved.current = trimmed;
     void client.updateBot(bot.id, { instructions: trimmed });
   };
 
   const finish = () => {
-    if (empty) return;
+    if (empty) {
+      return;
+    }
 
     save();
     setStep("saved");
@@ -120,10 +138,19 @@ export function EmptyThread({ bot, focusOnOpen, onDone }: { bot: BotSummary; foc
 
   return (
     <div className="flex w-full max-w-[520px] flex-col text-center">
-      <Character shape={bot.shape} color={bot.color} size={96} gaze={gaze} hops={hops} className="mb-3.5 self-center" />
+      <Character
+        shape={bot.shape}
+        color={bot.color}
+        size={96}
+        gaze={gaze}
+        hops={hops}
+        className="mb-3.5 self-center"
+      />
 
       <Collapse open={step === "field"} unclipWhenOpen>
-        <h2 className="mb-1 text-xl font-semibold tracking-[-0.01em]">What should {bot.name} do?</h2>
+        <h2 className="mb-1 text-xl font-semibold tracking-[-0.01em]">
+          What should {bot.name} do?
+        </h2>
         <p className="mx-auto mb-[18px] max-w-[42ch] text-sm text-muted-foreground">
           Give it instructions before its first message. You can change them later in its details.
         </p>
@@ -147,8 +174,15 @@ export function EmptyThread({ bot, focusOnOpen, onDone }: { bot: BotSummary; foc
             className="max-h-60 overflow-y-auto [&_.ProseMirror]:min-h-[4.875rem] [&_.ProseMirror]:text-[14.5px] [&_.ProseMirror]:leading-normal"
           />
           <div className="mt-2 flex items-center gap-1 px-2.5">
-            <span className="text-xs text-muted-foreground">{empty ? "Optional" : `${SAVE_KEYS} to save`}</span>
-            <Button variant="ghost" size="sm" className="ml-auto h-8 rounded-full text-muted-foreground" onClick={skip}>
+            <span className="text-xs text-muted-foreground">
+              {empty ? "Optional" : `${SAVE_KEYS} to save`}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="ml-auto h-8 rounded-full text-muted-foreground"
+              onClick={skip}
+            >
               Skip
             </Button>
             <Button size="sm" className="h-8 rounded-full px-3.5" disabled={empty} onClick={finish}>
@@ -175,7 +209,9 @@ export function EmptyThread({ bot, focusOnOpen, onDone }: { bot: BotSummary; foc
 
       <Collapse open={step !== "field"}>
         <h2 className="mb-1 text-xl font-semibold tracking-[-0.01em]">{bot.name}</h2>
-        <p className="mx-auto max-w-[42ch] text-sm text-muted-foreground">Send {bot.name} its first message.</p>
+        <p className="mx-auto max-w-[42ch] text-sm text-muted-foreground">
+          Send {bot.name} its first message.
+        </p>
 
         <Collapse open={step === "saved"}>
           <div className="mt-[18px] flex w-full gap-3 rounded-2xl bg-muted px-3.5 py-3 text-left">

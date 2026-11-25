@@ -34,15 +34,21 @@ export const knownNames = (skills: Iterable<string>, bots: Iterable<string>): Kn
  */
 export const findReferenceQuery = (text: string, caret: number): ReferenceQuery | null => {
   let start = caret;
-  while (start > 0 && !/\s/.test(text[start - 1]!)) start -= 1;
+  while (start > 0 && !/\s/.test(text[start - 1]!)) {
+    start -= 1;
+  }
 
   const match = /^([$/@])([\w:.-]*)$/.exec(text.slice(start, caret));
 
-  if (match === null) return null;
+  if (match === null) {
+    return null;
+  }
 
   const [, trigger, query] = match as unknown as [string, string, string];
 
-  if (trigger === "$" && /^\d/.test(query)) return null;
+  if (trigger === "$" && /^\d/.test(query)) {
+    return null;
+  }
 
   return { kind: trigger === "@" ? "bot" : "skill", start, query };
 };
@@ -58,8 +64,11 @@ export const matchItems = <T extends { readonly name: string; readonly descripti
 
   for (const item of items) {
     const name = item.name.toLowerCase();
-    if (name.startsWith(needle)) startsWith.push(item);
-    else if (name.includes(needle) || item.description.toLowerCase().includes(needle)) contains.push(item);
+    if (name.startsWith(needle)) {
+      startsWith.push(item);
+    } else if (name.includes(needle) || item.description.toLowerCase().includes(needle)) {
+      contains.push(item);
+    }
   }
 
   return [...startsWith, ...contains];
@@ -67,7 +76,9 @@ export const matchItems = <T extends { readonly name: string; readonly descripti
 
 /** Finds a reference to a known skill or bot that starts at `index`. A reference starts a word. */
 const referenceAt = (text: string, index: number, known: KnownNames) => {
-  if (index > 0 && !/\s/.test(text[index - 1]!)) return null;
+  if (index > 0 && !/\s/.test(text[index - 1]!)) {
+    return null;
+  }
 
   if (text[index] === "/" || text[index] === "$") {
     const name = /^[a-zA-Z0-9](?:[\w:.-]*\w)?/.exec(text.slice(index + 1))?.[0];
@@ -76,7 +87,9 @@ const referenceAt = (text: string, index: number, known: KnownNames) => {
   }
 
   if (text[index] === "@") {
-    const name = known.bots.find((bot) => text.startsWith(bot, index + 1) && !/\w/.test(text[index + 1 + bot.length] ?? ""));
+    const name = known.bots.find(
+      (bot) => text.startsWith(bot, index + 1) && !/\w/.test(text[index + 1 + bot.length] ?? ""),
+    );
 
     return name === undefined ? null : { kind: "bot" as const, name };
   }
@@ -92,9 +105,13 @@ export const splitReferences = (text: string, known: KnownNames): ReadonlyArray<
   for (let index = 0; index < text.length; index += 1) {
     const reference = referenceAt(text, index, known);
 
-    if (reference === null) continue;
+    if (reference === null) {
+      continue;
+    }
 
-    if (index > plainFrom) parts.push({ text: text.slice(plainFrom, index), reference: null });
+    if (index > plainFrom) {
+      parts.push({ text: text.slice(plainFrom, index), reference: null });
+    }
 
     const end = index + reference.name.length + 1;
     parts.push({ text: text.slice(index, end), reference });
@@ -102,7 +119,9 @@ export const splitReferences = (text: string, known: KnownNames): ReadonlyArray<
     index = end - 1;
   }
 
-  if (plainFrom < text.length) parts.push({ text: text.slice(plainFrom), reference: null });
+  if (plainFrom < text.length) {
+    parts.push({ text: text.slice(plainFrom), reference: null });
+  }
 
   return parts;
 };

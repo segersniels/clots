@@ -31,7 +31,9 @@ export class ClotsConfig extends Context.Service<
     const claudePath = Bun.which("claude");
 
     // The operator installs Claude Code. clots does not bundle it.
-    if (claudePath === null) throw new Error("clots: `claude` is not on PATH. Install Claude Code first.");
+    if (claudePath === null) {
+      throw new Error("clots: `claude` is not on PATH. Install Claude Code first.");
+    }
 
     const { webRoot } = runtimePaths;
 
@@ -40,7 +42,10 @@ export class ClotsConfig extends Context.Service<
       port: Number(process.env.CLOTS_PORT ?? DEFAULT_PORT),
       claudePath,
       webRoot: existsSync(webRoot) ? webRoot : undefined,
-      webDevPort: process.env.CLOTS_WEB_DEV_PORT === undefined ? undefined : Number(process.env.CLOTS_WEB_DEV_PORT),
+      webDevPort:
+        process.env.CLOTS_WEB_DEV_PORT === undefined
+          ? undefined
+          : Number(process.env.CLOTS_WEB_DEV_PORT),
       tailnet: process.env.CLOTS_TAILNET !== "off",
     });
   });

@@ -19,10 +19,13 @@ const serviceEnvironment = (): Record<string, string> => ({
   ...(process.env.CLOTS_HOME === undefined ? {} : { CLOTS_HOME: process.env.CLOTS_HOME }),
   ...(process.env.CLOTS_PORT === undefined ? {} : { CLOTS_PORT: process.env.CLOTS_PORT }),
   ...(process.env.CLOTS_TAILNET === undefined ? {} : { CLOTS_TAILNET: process.env.CLOTS_TAILNET }),
-  ...(process.env.CLAUDE_CONFIG_DIR === undefined ? {} : { CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR }),
+  ...(process.env.CLAUDE_CONFIG_DIR === undefined
+    ? {}
+    : { CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR }),
 });
 
-const run = (command: ReadonlyArray<string>) => Bun.spawnSync([...command], { stdout: "pipe", stderr: "pipe" });
+const run = (command: ReadonlyArray<string>) =>
+  Bun.spawnSync([...command], { stdout: "pipe", stderr: "pipe" });
 
 export const systemdUnit = (command: ReadonlyArray<string>, environment: Record<string, string>) =>
   [

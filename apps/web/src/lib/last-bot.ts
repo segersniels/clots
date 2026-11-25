@@ -9,8 +9,11 @@ let starting = true;
 /** Keeps the bot that is open, or forgets it with `null`. A blocked storage only loses the bot. */
 export function saveLastBot(botId: BotId | null) {
   try {
-    if (botId === null) localStorage.removeItem(LAST_BOT_KEY);
-    else localStorage.setItem(LAST_BOT_KEY, botId);
+    if (botId === null) {
+      localStorage.removeItem(LAST_BOT_KEY);
+    } else {
+      localStorage.setItem(LAST_BOT_KEY, botId);
+    }
   } catch {
     // The app opens the first bot next time.
   }
@@ -21,7 +24,9 @@ export function saveLastBot(botId: BotId | null) {
  * on a phone, gets `null` and stays there.
  */
 export function takeStartupBot(): BotId | null {
-  if (!starting) return null;
+  if (!starting) {
+    return null;
+  }
 
   starting = false;
 

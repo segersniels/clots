@@ -1,5 +1,13 @@
 import type { BotSummary, Schedule } from "@clots/contracts";
-import { CirclePauseIcon, ClockIcon, MoreHorizontalIcon, PencilIcon, PlayIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import {
+  CirclePauseIcon,
+  ClockIcon,
+  MoreHorizontalIcon,
+  PencilIcon,
+  PlayIcon,
+  PlusIcon,
+  Trash2Icon,
+} from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import {
@@ -13,9 +21,23 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 import { client, useStore } from "../client.ts";
 import { knownNames, type KnownNames } from "../references.ts";
@@ -23,7 +45,13 @@ import { formatClock, formatNextDay } from "../time.ts";
 import { CHIP_PICKER_CLASSES, PANE_EMPTY, PANE_LABEL } from "./BotSettings.tsx";
 import { Collapse } from "./Collapse.tsx";
 import { ComposerField } from "./ComposerField.tsx";
-import { CreateDialog, CreateDialogFooter, DIALOG_CHIP_FIELD, DIALOG_FIELD, THIN_SCROLLBAR } from "./CreateDialog.tsx";
+import {
+  CreateDialog,
+  CreateDialogFooter,
+  DIALOG_CHIP_FIELD,
+  DIALOG_FIELD,
+  THIN_SCROLLBAR,
+} from "./CreateDialog.tsx";
 import { FOOTER_SELECT_TRIGGER } from "./ProjectPicker.tsx";
 import { ReferenceText } from "./ReferenceText.tsx";
 
@@ -54,34 +82,52 @@ const ruleOf = (cron: string) => PRESETS.find((preset) => preset.value === cron)
  * Adds a routine, or edits one with `schedule`. Its schedule is a preset or a custom cron
  * expression. Escape closes the dialog, and Cmd or Ctrl+Enter saves.
  */
-function RoutineForm({ bot, schedule, onDone }: { bot: BotSummary; schedule: Schedule | undefined; onDone: () => void }) {
+function RoutineForm({
+  bot,
+  schedule,
+  onDone,
+}: {
+  bot: BotSummary;
+  schedule: Schedule | undefined;
+  onDone: () => void;
+}) {
   const form = useRef<HTMLFormElement>(null);
   const cronField = useRef<HTMLInputElement>(null);
   const isPreset = PRESETS.some((preset) => preset.value === schedule?.cron);
   const [prompt, setPrompt] = useState(schedule?.prompt ?? "");
   const [preset, setPreset] = useState(() => {
-    if (schedule === undefined) return DEFAULT_PRESET;
+    if (schedule === undefined) {
+      return DEFAULT_PRESET;
+    }
 
     return isPreset ? schedule.cron : CUSTOM;
   });
-  const [customCron, setCustomCron] = useState(schedule !== undefined && !isPreset ? schedule.cron : "");
+  const [customCron, setCustomCron] = useState(
+    schedule !== undefined && !isPreset ? schedule.cron : "",
+  );
   const [invalidCron, setInvalidCron] = useState(false);
   const [saving, setSaving] = useState(false);
   const cron = preset === CUSTOM ? customCron.trim() : preset;
   // An edit that changes nothing would only restart the schedule, so Save waits for a change.
-  const changed = schedule === undefined || prompt.trim() !== schedule.prompt || cron !== schedule.cron;
+  const changed =
+    schedule === undefined || prompt.trim() !== schedule.prompt || cron !== schedule.cron;
   const canSave = prompt.trim() !== "" && cron !== "" && changed && !invalidCron && !saving;
 
   const save = async (event: FormEvent) => {
     event.preventDefault();
 
-    if (!canSave) return;
+    if (!canSave) {
+      return;
+    }
 
     setSaving(true);
 
     try {
-      if (schedule === undefined) await client.createSchedule(bot.id, cron, prompt.trim());
-      else await client.updateSchedule(schedule.id, cron, prompt.trim());
+      if (schedule === undefined) {
+        await client.createSchedule(bot.id, cron, prompt.trim());
+      } else {
+        await client.updateSchedule(schedule.id, cron, prompt.trim());
+      }
 
       onDone();
     } catch {
@@ -96,7 +142,9 @@ function RoutineForm({ bot, schedule, onDone }: { bot: BotSummary; schedule: Sch
     setInvalidCron(false);
 
     // The field opens with the focus, so the operator can type the expression at once.
-    if (value === CUSTOM) requestAnimationFrame(() => cronField.current?.focus());
+    if (value === CUSTOM) {
+      requestAnimationFrame(() => cronField.current?.focus());
+    }
   };
 
   return (
@@ -123,7 +171,9 @@ function RoutineForm({ bot, schedule, onDone }: { bot: BotSummary; schedule: Sch
             setInvalidCron(false);
           }}
           onKeyDown={(event) => {
-            if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) form.current?.requestSubmit();
+            if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+              form.current?.requestSubmit();
+            }
           }}
           placeholder="0 9 * * *"
           aria-label="Cron expression"
@@ -134,9 +184,21 @@ function RoutineForm({ bot, schedule, onDone }: { bot: BotSummary; schedule: Sch
         />
       </Collapse>
 
-      <CreateDialogFooter submitLabel={schedule === undefined ? "Add routine" : "Save"} disabled={!canSave} className="mt-5">
-        <Select items={OPTIONS} value={preset} onValueChange={(value) => choosePreset(value as string)}>
-          <SelectTrigger aria-label="Schedule" title="Schedule" className={`${FOOTER_SELECT_TRIGGER} mb-2 w-full sm:mr-auto sm:mb-0 sm:w-fit`}>
+      <CreateDialogFooter
+        submitLabel={schedule === undefined ? "Add routine" : "Save"}
+        disabled={!canSave}
+        className="mt-5"
+      >
+        <Select
+          items={OPTIONS}
+          value={preset}
+          onValueChange={(value) => choosePreset(value as string)}
+        >
+          <SelectTrigger
+            aria-label="Schedule"
+            title="Schedule"
+            className={`${FOOTER_SELECT_TRIGGER} mb-2 w-full sm:mr-auto sm:mb-0 sm:w-fit`}
+          >
             <ClockIcon className="text-muted-foreground" />
             <SelectValue />
           </SelectTrigger>
@@ -202,11 +264,18 @@ function RoutineRow({
             onClick={onEdit}
             className="grid grid-cols-[18px_minmax(0,1fr)] items-center gap-x-2.5 gap-y-px rounded-xl py-2 pl-2.5 text-left outline-none focus-visible:ring-1 focus-visible:ring-ring/40"
           >
-            <Icon className={`row-span-2 size-[17px] text-muted-foreground transition-opacity ${schedule.paused ? "opacity-50" : ""}`} />
-            <span title={schedule.prompt} className={`col-start-2 truncate transition-opacity ${schedule.paused ? "opacity-50" : ""}`}>
+            <Icon
+              className={`row-span-2 size-[17px] text-muted-foreground transition-opacity ${schedule.paused ? "opacity-50" : ""}`}
+            />
+            <span
+              title={schedule.prompt}
+              className={`col-start-2 truncate transition-opacity ${schedule.paused ? "opacity-50" : ""}`}
+            >
               <ReferenceText text={schedule.prompt} known={known} bots={bots} />
             </span>
-            <span className="col-start-2 row-start-2 truncate text-[0.8125rem] text-muted-foreground tabular-nums">{when}</span>
+            <span className="col-start-2 row-start-2 truncate text-[0.8125rem] text-muted-foreground tabular-nums">
+              {when}
+            </span>
           </button>
           <DropdownMenu>
             <DropdownMenuTrigger
@@ -226,7 +295,9 @@ function RoutineRow({
                 <PencilIcon />
                 Edit
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => void client.setSchedulePaused(schedule.id, !schedule.paused)}>
+              <DropdownMenuItem
+                onClick={() => void client.setSchedulePaused(schedule.id, !schedule.paused)}
+              >
                 {schedule.paused ? <PlayIcon /> : <CirclePauseIcon />}
                 {schedule.paused ? "Resume" : "Pause"}
               </DropdownMenuItem>
@@ -252,7 +323,9 @@ export function Routines({ bot }: { bot: BotSummary }) {
     skills.map((skill) => skill.name),
     bots.map((other) => other.name),
   );
-  const [editing, setEditing] = useState<{ schedule: Schedule | undefined; round: number } | null>(null);
+  const [editing, setEditing] = useState<{ schedule: Schedule | undefined; round: number } | null>(
+    null,
+  );
   const [dialogOpen, setDialogOpen] = useState(false);
   const [removing, setRemoving] = useState<ReadonlySet<string>>(new Set());
   const [confirmingDelete, setConfirmingDelete] = useState<Schedule | null>(null);
@@ -280,7 +353,13 @@ export function Routines({ bot }: { bot: BotSummary }) {
     <section className="flex flex-col gap-1">
       <div className="flex h-7 items-center justify-between">
         <h2 className={PANE_LABEL}>Routines</h2>
-        <Button variant="ghost" size="icon-sm" aria-label="New routine" className="text-muted-foreground" onClick={() => openEditor(undefined)}>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="New routine"
+          className="text-muted-foreground"
+          onClick={() => openEditor(undefined)}
+        >
           <PlusIcon />
         </Button>
       </div>
@@ -309,14 +388,26 @@ export function Routines({ bot }: { bot: BotSummary }) {
         onOpenChange={setDialogOpen}
         className="overflow-visible sm:max-w-[440px]"
       >
-        {editing !== null && <RoutineForm key={editing.round} bot={bot} schedule={editing.schedule} onDone={() => setDialogOpen(false)} />}
+        {editing !== null && (
+          <RoutineForm
+            key={editing.round}
+            bot={bot}
+            schedule={editing.schedule}
+            onDone={() => setDialogOpen(false)}
+          />
+        )}
       </CreateDialog>
 
-      <AlertDialog open={confirmingDelete !== null} onOpenChange={(open) => !open && setConfirmingDelete(null)}>
+      <AlertDialog
+        open={confirmingDelete !== null}
+        onOpenChange={(open) => !open && setConfirmingDelete(null)}
+      >
         <AlertDialogContent size="sm">
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this routine?</AlertDialogTitle>
-            <AlertDialogDescription>{bot.name} stops running it. You cannot undo this.</AlertDialogDescription>
+            <AlertDialogDescription>
+              {bot.name} stops running it. You cannot undo this.
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>

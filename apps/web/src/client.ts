@@ -8,4 +8,5 @@ export const client = makeClotsClient(window.location.origin);
 const ignoreChanges = () => () => {};
 
 /** Reads a client-runtime store and renders again when it changes. An inactive view shows the last value and does not listen. */
-export const useStore = <T>(store: Store<T>, active = true): T => useSyncExternalStore(active ? store.subscribe : ignoreChanges, store.get);
+export const useStore = <T>(store: Store<T>, active = true): T =>
+  useSyncExternalStore(active ? store.subscribe : ignoreChanges, store.get);

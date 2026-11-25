@@ -17,7 +17,9 @@ declare global {
 export const startBotNotifications = (openBot: (botId: BotId) => void) => {
   const app = window.clotsApp;
 
-  if (app === undefined) return;
+  if (app === undefined) {
+    return;
+  }
 
   // The first list is the state at start, not a change, so it notifies nobody.
   let working: Set<BotId> | undefined;
@@ -28,7 +30,10 @@ export const startBotNotifications = (openBot: (botId: BotId) => void) => {
 
     // The app icon counts the unread bots, as a chat app counts its unread chats.
     const unread = bots.filter((bot) => bot.unread).length;
-    if (unread !== unreadCount) void app.setBadgeCount?.(unread);
+    if (unread !== unreadCount) {
+      void app.setBadgeCount?.(unread);
+    }
+
     unreadCount = unread;
 
     const before = working;
@@ -37,10 +42,14 @@ export const startBotNotifications = (openBot: (botId: BotId) => void) => {
     // The operator sees the change in the window, so only a window in the background notifies.
     const inBackground = !document.hasFocus();
 
-    if (before === undefined || !inBackground) return;
+    if (before === undefined || !inBackground) {
+      return;
+    }
 
     for (const bot of bots) {
-      if (!before.has(bot.id) || bot.status !== "idle") continue;
+      if (!before.has(bot.id) || bot.status !== "idle") {
+        continue;
+      }
 
       // The tag makes a new notification of the same bot replace its last one.
       const notification = new Notification(bot.name, { body: bot.statusLine, tag: bot.id });

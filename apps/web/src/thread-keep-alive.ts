@@ -16,7 +16,9 @@ export const keepWorkingThreadsCurrent = () => {
     const bots = client.bots.get();
 
     for (const bot of bots) {
-      if (bot.status === "idle" || held.has(bot.id)) continue;
+      if (bot.status === "idle" || held.has(bot.id)) {
+        continue;
+      }
 
       // The thread store changes on its own stream, so each change checks again whether the turn is over.
       const thread = client.thread(bot.id);
@@ -27,15 +29,23 @@ export const keepWorkingThreadsCurrent = () => {
       const bot = bots.find((candidate) => candidate.id === botId);
       const thread = client.thread(botId).get();
 
-      // The bot list can say idle before the thread has its last messages. The idle live state comes after them.
-      // A store that followed the thread before keeps its old live state, so only a new one counts.
-      const settled = bot === undefined || (bot.status === "idle" && thread.live !== liveBefore && thread.live.status === "idle");
+      /**
+       * The bot list can say idle before the thread has its last messages. The idle live state comes after them.
+       * A store that followed the thread before keeps its old live state, so only a new one counts.
+       */
+      const settled =
+        bot === undefined ||
+        (bot.status === "idle" && thread.live !== liveBefore && thread.live.status === "idle");
 
-      if (!settled) continue;
+      if (!settled) {
+        continue;
+      }
 
       held.delete(botId);
       release();
-      if (bot !== undefined) saveCachedThread(botId, thread.messages);
+      if (bot !== undefined) {
+        saveCachedThread(botId, thread.messages);
+      }
     }
   };
 

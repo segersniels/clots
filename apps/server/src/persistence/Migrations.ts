@@ -140,7 +140,7 @@ const resume = Effect.gen(function* () {
 const search = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
 
-  /*
+  /**
    * The search finds the words of a conversation: the operator's, the bots' and the routines'. Tool
    * steps and dividers stay out. A row shares its rowid with its message, which keeps a delete fast.
    * A VACUUM could number the messages again, so clots must not run one.

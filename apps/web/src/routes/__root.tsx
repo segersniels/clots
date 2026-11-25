@@ -15,7 +15,9 @@ export const Route = createRootRoute({
   beforeLoad: ({ location }) => {
     const lastBot = takeStartupBot();
 
-    if (location.pathname === "/" && lastBot !== null) throw redirect({ to: "/bots/$botId", params: { botId: lastBot }, replace: true });
+    if (location.pathname === "/" && lastBot !== null) {
+      throw redirect({ to: "/bots/$botId", params: { botId: lastBot }, replace: true });
+    }
   },
 });
 
@@ -47,7 +49,9 @@ function Layout() {
   );
 
   // A phone has no sidebar. The home page shows the bot list instead.
-  if (!wide) return <div className="h-full text-sm">{main}</div>;
+  if (!wide) {
+    return <div className="h-full text-sm">{main}</div>;
+  }
 
   return (
     // Only the reset animates. During a drag the sidebar follows the pointer at once.

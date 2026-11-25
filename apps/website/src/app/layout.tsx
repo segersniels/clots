@@ -14,7 +14,15 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: TITLE,
   description: DESCRIPTION,
-  keywords: ["Claude Code bots", "Claude Code", "Claude subscription", "always-on AI bots", "AI agents", "Claude Agent SDK", "open source"],
+  keywords: [
+    "Claude Code bots",
+    "Claude Code",
+    "Claude subscription",
+    "always-on AI bots",
+    "AI agents",
+    "Claude Agent SDK",
+    "open source",
+  ],
   alternates: { canonical: "/" },
   icons: { icon: icon.src },
   openGraph: {
@@ -23,9 +31,21 @@ export const metadata: Metadata = {
     siteName: "clots",
     title: TITLE,
     description: DESCRIPTION,
-    images: [{ url: intro.src, width: intro.width, height: intro.height, alt: "The clots app with a bot at work" }],
+    images: [
+      {
+        url: intro.src,
+        width: intro.width,
+        height: intro.height,
+        alt: "The clots app with a bot at work",
+      },
+    ],
   },
-  twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION, images: [intro.src] },
+  twitter: {
+    card: "summary_large_image",
+    title: TITLE,
+    description: DESCRIPTION,
+    images: [intro.src],
+  },
 };
 
 /** Tells search engines that the page is about a free macOS app, for richer results. */
@@ -44,7 +64,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(STRUCTURED_DATA) }} />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(STRUCTURED_DATA) }}
+        />
         {children}
       </body>
     </html>

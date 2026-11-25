@@ -18,6 +18,7 @@ const runDueSchedules = Effect.gen(function* () {
     // The create call validates the cron, so this guard only protects against edited rows.
     if (next === undefined || bot === undefined) {
       yield* schedules.setPaused(schedule.id, true);
+
       continue;
     }
 
@@ -25,7 +26,9 @@ const runDueSchedules = Effect.gen(function* () {
     yield* schedules.setNextRunAt(schedule.id, next);
 
     // A paused schedule still moves forward, so that it does not fire at once when it resumes.
-    if (schedule.paused) continue;
+    if (schedule.paused) {
+      continue;
+    }
 
     yield* sessions.send(bot, "routine", schedule.prompt);
   }

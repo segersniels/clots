@@ -2,10 +2,25 @@ import { Character, type Gaze } from "@clots/character";
 import type { BotColor, BotId, BotShape } from "@clots/contracts";
 import { useNavigate } from "@tanstack/react-router";
 import { ChevronLeftIcon, ChevronRightIcon, XIcon } from "lucide-react";
-import { useEffect, useRef, useState, type ComponentProps, type FormEvent, type ReactNode, type SyntheticEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ComponentProps,
+  type FormEvent,
+  type ReactNode,
+  type SyntheticEvent,
+} from "react";
 
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 
 import { client } from "../client.ts";
@@ -30,7 +45,8 @@ export const THIN_SCROLLBAR =
   "[&::-webkit-scrollbar]:w-2.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:border-[3px] [&::-webkit-scrollbar-thumb]:border-solid [&::-webkit-scrollbar-thumb]:border-transparent [&::-webkit-scrollbar-thumb]:bg-foreground/25 [&::-webkit-scrollbar-thumb]:bg-clip-padding [&::-webkit-scrollbar-track]:my-2";
 
 /** The motion of the views of the New bot dialog: they slide 16 px and fade. Reduced motion keeps the fade. */
-const VIEW = "transition-[opacity,translate] duration-200 ease-out motion-reduce:transition-opacity";
+const VIEW =
+  "transition-[opacity,translate] duration-200 ease-out motion-reduce:transition-opacity";
 
 const HIDDEN_LEFT = "pointer-events-none -translate-x-4 opacity-0 motion-reduce:translate-none";
 
@@ -44,7 +60,9 @@ let createdBot: BotId | null = null;
 
 /** Checks whether the operator just created this bot, and forgets it, so the page reacts only once. */
 export function takeCreatedBot(botId: BotId) {
-  if (createdBot !== botId) return false;
+  if (createdBot !== botId) {
+    return false;
+  }
 
   createdBot = null;
 
@@ -58,7 +76,9 @@ export function takeCreatedBot(botId: BotId) {
 const untilListed = (botId: BotId) =>
   new Promise<void>((resolve) => {
     const check = () => {
-      if (!client.bots.get().some((bot) => bot.id === botId)) return;
+      if (!client.bots.get().some((bot) => bot.id === botId)) {
+        return;
+      }
 
       stop();
       resolve();
@@ -119,7 +139,9 @@ function CreateDialogHeader({ children }: { children: ReactNode }) {
   return (
     <DialogHeader className="relative z-10 h-7 flex-row items-center gap-2">
       {children}
-      <DialogClose render={<Button variant="ghost" size="icon-sm" className="-mr-1.5 text-muted-foreground" />}>
+      <DialogClose
+        render={<Button variant="ghost" size="icon-sm" className="-mr-1.5 text-muted-foreground" />}
+      >
         <XIcon />
         <span className="sr-only">Close</span>
       </DialogClose>
@@ -152,7 +174,9 @@ function CreateDialogHero({ children }: { children: ReactNode }) {
 }
 
 /** The name field of a create dialog. It has the focus when the dialog opens, and it rests lighter than the other fields. */
-function CreateDialogName(props: Omit<ComponentProps<typeof Input>, "className" | "autoFocus" | "required">) {
+function CreateDialogName(
+  props: Omit<ComponentProps<typeof Input>, "className" | "autoFocus" | "required">,
+) {
   return (
     <Input
       {...props}
@@ -180,9 +204,15 @@ export function CreateDialogFooter({
   className?: string;
 }) {
   return (
-    <DialogFooter className={`mx-0 mb-0 ${className} flex-col rounded-none border-t-0 bg-transparent p-0 sm:flex-row`}>
+    <DialogFooter
+      className={`mx-0 mb-0 ${className} flex-col rounded-none border-t-0 bg-transparent p-0 sm:flex-row`}
+    >
       {children}
-      <DialogClose render={<Button type="button" variant="ghost" className="order-2 sm:order-none" />}>Cancel</DialogClose>
+      <DialogClose
+        render={<Button type="button" variant="ghost" className="order-2 sm:order-none" />}
+      >
+        Cancel
+      </DialogClose>
       <Button type="submit" disabled={disabled} className="order-1 sm:order-none">
         {submitLabel}
       </Button>
@@ -311,15 +341,21 @@ function NewBotForm({
   const lastTemplate = useRef<BotTemplate | null>(null);
 
   useEffect(() => {
-    goBack.current = view === "form" ? null : () => (view === "page" ? setView("list") : showForm());
+    goBack.current =
+      view === "form" ? null : () => (view === "page" ? setView("list") : showForm());
   });
 
   // The form gets the focus back where the operator left it, or on the name of a picked template, selected so typing replaces it.
   useEffect(() => {
-    if (view !== "form" || focusOnForm.current === null) return;
+    if (view !== "form" || focusOnForm.current === null) {
+      return;
+    }
 
-    if (focusOnForm.current === "name") nameField.current?.select();
-    else pill.current?.focus();
+    if (focusOnForm.current === "name") {
+      nameField.current?.select();
+    } else {
+      pill.current?.focus();
+    }
 
     focusOnForm.current = null;
   }, [view]);
@@ -380,7 +416,13 @@ function NewBotForm({
     <>
       <CreateDialogHeader>
         {view !== "form" && (
-          <Button type="button" variant="ghost" size="icon-sm" className="-ml-1.5" onClick={() => (view === "page" ? setView("list") : showForm())}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="-ml-1.5"
+            onClick={() => (view === "page" ? setView("list") : showForm())}
+          >
             <ChevronLeftIcon />
             <span className="sr-only">Back</span>
           </Button>
@@ -406,7 +448,11 @@ function NewBotForm({
       </CreateDialogHeader>
 
       <div className="relative grid">
-        <CreateDialogForm onSubmit={create} inert={view !== "form"} className={`col-start-1 row-start-1 ${VIEW} ${view === "form" ? "" : HIDDEN_LEFT}`}>
+        <CreateDialogForm
+          onSubmit={create}
+          inert={view !== "form"}
+          className={`col-start-1 row-start-1 ${VIEW} ${view === "form" ? "" : HIDDEN_LEFT}`}
+        >
           <CreateDialogHero>
             <Character shape={shape} color={color} size={76} gaze={gaze} />
           </CreateDialogHero>
@@ -426,34 +472,61 @@ function NewBotForm({
             <div
               inert={template === null}
               className={`absolute inset-x-0 top-[7px] flex items-center justify-center gap-1.5 text-[12.5px] text-muted-foreground ${VIEW} ${
-                template === null ? "pointer-events-none -translate-y-1 opacity-0 motion-reduce:translate-none" : ""
+                template === null
+                  ? "pointer-events-none -translate-y-1 opacity-0 motion-reduce:translate-none"
+                  : ""
               }`}
             >
               <span>From the {shownTemplate?.name} template</span>
               <span aria-hidden>·</span>
-              <button type="button" onClick={clearTemplate} className="underline decoration-muted-foreground/50 underline-offset-2 outline-none hover:text-foreground focus-visible:text-foreground">
+              <button
+                type="button"
+                onClick={clearTemplate}
+                className="underline decoration-muted-foreground/50 underline-offset-2 outline-none hover:text-foreground focus-visible:text-foreground"
+              >
                 Clear
               </button>
             </div>
           </div>
 
           <div className="mt-[26px]">
-            <CharacterPicker compact color={color} shape={shape} onColorChange={setColor} onShapeChange={setShape} />
+            <CharacterPicker
+              compact
+              color={color}
+              shape={shape}
+              onColorChange={setColor}
+              onShapeChange={setShape}
+            />
           </div>
 
           <CreateDialogFooter submitLabel="Create bot" disabled={creating || name.trim() === ""}>
-            <ProjectSelect projectId={projectId} onChange={setProjectId} className="mb-2 w-full sm:mr-auto sm:mb-0 sm:w-fit" />
+            <ProjectSelect
+              projectId={projectId}
+              onChange={setProjectId}
+              className="mb-2 w-full sm:mr-auto sm:mb-0 sm:w-fit"
+            />
           </CreateDialogFooter>
         </CreateDialogForm>
 
-        <div inert={view !== "list"} className={`absolute inset-0 ${VIEW} ${view === "list" ? "" : view === "page" ? HIDDEN_LEFT : HIDDEN_RIGHT}`}>
+        <div
+          inert={view !== "list"}
+          className={`absolute inset-0 ${VIEW} ${view === "list" ? "" : view === "page" ? HIDDEN_LEFT : HIDDEN_RIGHT}`}
+        >
           <TemplateList templates={TEMPLATES} active={view === "list"} onOpen={openTemplate} />
         </div>
 
         {/* The page reaches the dialog's edges, so its body scrolls under the floating header. */}
-        <div inert={view !== "page"} className={`absolute -inset-x-6 -top-12 -bottom-5 ${VIEW} ${view === "page" ? "" : HIDDEN_RIGHT}`}>
+        <div
+          inert={view !== "page"}
+          className={`absolute -inset-x-6 -top-12 -bottom-5 ${VIEW} ${view === "page" ? "" : HIDDEN_RIGHT}`}
+        >
           {viewing !== undefined && (
-            <TemplatePage template={viewing} active={view === "page"} onBack={() => setView("list")} onUse={() => useTemplate(viewing)} />
+            <TemplatePage
+              template={viewing}
+              active={view === "page"}
+              onBack={() => setView("list")}
+              onUse={() => useTemplate(viewing)}
+            />
           )}
         </div>
       </div>
@@ -462,7 +535,13 @@ function NewBotForm({
 }
 
 /** Creates a project. The new project then shows in the sidebar. */
-export function NewProjectDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+export function NewProjectDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   return (
     <CreateDialog title="New project" open={open} onOpenChange={onOpenChange}>
       <NewProjectForm onCreated={() => onOpenChange(false)} />
@@ -498,7 +577,11 @@ function NewProjectForm({ onCreated }: { onCreated: () => void }) {
         <ClotGroup />
       </CreateDialogHero>
 
-      <CreateDialogName value={name} onChange={(event) => setName(event.target.value)} placeholder="Name your project" />
+      <CreateDialogName
+        value={name}
+        onChange={(event) => setName(event.target.value)}
+        placeholder="Name your project"
+      />
 
       <div className="mt-[22px] flex flex-col gap-[7px]">
         <label htmlFor="project-directory" className="px-1 text-[0.8125rem] text-muted-foreground">

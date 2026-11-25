@@ -26,7 +26,9 @@ export class ProjectRepository extends Context.Service<
       return ProjectRepository.of({
         changes,
 
-        list: sql<Project>`SELECT id, name, directory FROM projects ORDER BY created_at`.pipe(Effect.orDie),
+        list: sql<Project>`SELECT id, name, directory FROM projects ORDER BY created_at`.pipe(
+          Effect.orDie,
+        ),
 
         create: (name, directory) => {
           const project: Project = { id: crypto.randomUUID(), name, directory };
@@ -34,7 +36,11 @@ export class ProjectRepository extends Context.Service<
           return sql`
             INSERT INTO projects (id, name, directory, created_at)
             VALUES (${project.id}, ${name}, ${directory}, ${Date.now()})
-          `.pipe(Effect.orDie, Effect.andThen(PubSub.publish(changes, undefined)), Effect.as(project));
+          `.pipe(
+            Effect.orDie,
+            Effect.andThen(PubSub.publish(changes, undefined)),
+            Effect.as(project),
+          );
         },
 
         rename: (projectId, name) =>
@@ -53,7 +59,12 @@ export class ProjectRepository extends Context.Service<
             `;
             yield* sql`UPDATE bots SET project_id = NULL WHERE project_id = ${projectId}`;
             yield* sql`DELETE FROM projects WHERE id = ${projectId}`;
-          }).pipe(sql.withTransaction, Effect.orDie, Effect.andThen(PubSub.publish(changes, undefined)), Effect.asVoid),
+          }).pipe(
+            sql.withTransaction,
+            Effect.orDie,
+            Effect.andThen(PubSub.publish(changes, undefined)),
+            Effect.asVoid,
+          ),
       });
     }),
   );

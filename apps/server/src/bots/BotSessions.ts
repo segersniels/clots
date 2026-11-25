@@ -41,8 +41,19 @@ import { BotRepository, type BotChanges, type StoredBot } from "./BotRepository.
 import { readPages } from "../browser/BotChrome.ts";
 import { botChrome, closeBrowser, makeBrowserEnvironment } from "../browser/BrowserEnvironment.ts";
 import { copyLogin, findLoginSources, siteOf } from "../browser/Logins.ts";
-import { botPlugins, botSkillsSignature, ensurePluginManifest, OWN_SKILLS_NOTE, showOwnSkills, toOwnSkills } from "./BotPlugin.ts";
-import { makeClaudeEnvironment, removeClaudeTranscripts, transcriptPath } from "./ClaudeEnvironment.ts";
+import {
+  botPlugins,
+  botSkillsSignature,
+  ensurePluginManifest,
+  OWN_SKILLS_NOTE,
+  showOwnSkills,
+  toOwnSkills,
+} from "./BotPlugin.ts";
+import {
+  makeClaudeEnvironment,
+  removeClaudeTranscripts,
+  transcriptPath,
+} from "./ClaudeEnvironment.ts";
 
 const HANDOFF_TOOL = "request_handoff";
 
@@ -63,11 +74,17 @@ const MAX_READ_MESSAGE_LENGTH = 1500;
 
 /** Checks whether a message mentions a bot: `@Name` at the start of a word, not followed by more of a word. */
 const mentions = (text: string, name: string) => {
-  for (let index = text.indexOf(`@${name}`); index !== -1; index = text.indexOf(`@${name}`, index + 1)) {
+  for (
+    let index = text.indexOf(`@${name}`);
+    index !== -1;
+    index = text.indexOf(`@${name}`, index + 1)
+  ) {
     const startsWord = index === 0 || /\s/.test(text[index - 1]!);
     const endsWord = !/\w/.test(text[index + name.length + 1] ?? "");
 
-    if (startsWord && endsWord) return true;
+    if (startsWord && endsWord) {
+      return true;
+    }
   }
 
   return false;
@@ -87,7 +104,9 @@ const FOLLOW_INTERVAL = "3 seconds";
  * after a reboot its id can belong to another program.
  */
 const claudeIsRunning = (pid: number) => {
-  const status = Bun.spawnSync(["ps", "-o", "stat=,args=", "-p", String(pid)]).stdout.toString().trim();
+  const status = Bun.spawnSync(["ps", "-o", "stat=,args=", "-p", String(pid)])
+    .stdout.toString()
+    .trim();
 
   return status !== "" && !status.startsWith("Z") && status.includes("stream-json");
 };
@@ -99,12 +118,17 @@ const AUTO_COMPACT_WINDOW = 258_000;
 const COMPACT_STEP = "compact-";
 
 /** Writes a token count the short way, for example 4.5k or 180k. */
-const shortTokens = (tokens: number) => (tokens < 10_000 ? `${(tokens / 1000).toFixed(1)}k` : `${Math.round(tokens / 1000)}k`);
+const shortTokens = (tokens: number) =>
+  tokens < 10_000 ? `${(tokens / 1000).toFixed(1)}k` : `${Math.round(tokens / 1000)}k`;
 
 /** Describes a finished compaction for the thread, for example "Conversation compacted · 180k → 32k tokens". */
 const compactNote = (trigger: "manual" | "auto", before: number, after: number | undefined) => {
-  const what = trigger === "auto" ? "Conversation compacted automatically" : "Conversation compacted";
-  if (after === undefined) return `${what} · ${shortTokens(before)} tokens before`;
+  const what =
+    trigger === "auto" ? "Conversation compacted automatically" : "Conversation compacted";
+
+  if (after === undefined) {
+    return `${what} · ${shortTokens(before)} tokens before`;
+  }
 
   return `${what} · ${shortTokens(before)} → ${shortTokens(after)} tokens`;
 };
@@ -116,7 +140,9 @@ const uniqueName = (wanted: string, bots: ReadonlyArray<StoredBot>) => {
   for (let number = 1; ; number += 1) {
     const candidate = number === 1 ? wanted : `${wanted} ${number}`;
 
-    if (!taken.has(candidate.toLowerCase())) return candidate;
+    if (!taken.has(candidate.toLowerCase())) {
+      return candidate;
+    }
   }
 };
 
@@ -187,7 +213,8 @@ const TURN_FAILURES: Record<SDKResultError["subtype"], string> = {
   error_during_execution: "Something went wrong, so I stopped. Send your message again to retry.",
   error_max_turns: "I stopped because this turn took too many steps.",
   error_max_budget_usd: "I stopped because this turn reached its spending limit.",
-  error_max_structured_output_retries: "I stopped because I could not write the reply in the required format.",
+  error_max_structured_output_retries:
+    "I stopped because I could not write the reply in the required format.",
 };
 
 /**
@@ -208,9 +235,14 @@ const settingsNote = (before: StoredBot, after: StoredBot) => {
 const withSettingsNote = (prompt: SDKUserMessage, note: string): SDKUserMessage => {
   const content = prompt.message.content;
 
-  if (typeof content === "string") return prompt;
+  if (typeof content === "string") {
+    return prompt;
+  }
 
-  return { ...prompt, message: { role: "user", content: [...content, { type: "text", text: note }] } };
+  return {
+    ...prompt,
+    message: { role: "user", content: [...content, { type: "text", text: note }] },
+  };
 };
 
 const systemPromptFor = (bot: StoredBot) =>
@@ -266,13 +298,21 @@ export class BotSessions extends Context.Service<
     noteSettingsChange(bot: StoredBot, changes: BotChanges): Effect.Effect<void>;
     /** Switches the model of a running session. A bot without a session reads its model at the next start. */
     setModel(botId: BotId, model: BotModel): Effect.Effect<void>;
-    resolveApproval(botId: BotId, approvalId: string, decision: ApprovalDecision): Effect.Effect<void>;
+    resolveApproval(
+      botId: BotId,
+      approvalId: string,
+      decision: ApprovalDecision,
+    ): Effect.Effect<void>;
     resolveHandoff(botId: BotId, handoffId: string): Effect.Effect<void>;
     /** Lists the other bots of the bot's project that are logged in on the site of a page, latest first. */
     findLogins(bot: StoredBot, url: string): Effect.Effect<ReadonlyArray<LoginSource>>;
     /** Copies another bot's login on the site of a page into the bot's browser, for the take-over window. */
     copyLogin(bot: StoredBot, source: StoredBot, url: string): Effect.Effect<void, LoginCopyFailed>;
-    resolveLoginRequest(botId: BotId, requestId: string, decision: LoginDecision): Effect.Effect<void>;
+    resolveLoginRequest(
+      botId: BotId,
+      requestId: string,
+      decision: LoginDecision,
+    ): Effect.Effect<void>;
     live(botId: BotId): ThreadLiveState;
     events(botId: BotId): PubSub.PubSub<ThreadEvent>;
     /** Counts the operator as a viewer of the bot's conversation until the scope closes. */
@@ -311,7 +351,9 @@ export class BotSessions extends Context.Service<
 
       const runtimeFor = (botId: BotId): BotRuntime => {
         const existing = runtimes.get(botId);
-        if (existing !== undefined) return existing;
+        if (existing !== undefined) {
+          return existing;
+        }
 
         const runtime: BotRuntime = {
           live: IDLE,
@@ -342,7 +384,9 @@ export class BotSessions extends Context.Service<
         runtime.live = { ...runtime.live, ...patch };
         publish(runtime, { _tag: "Live", state: runtime.live });
 
-        if (runtime.live.status !== previousStatus) PubSub.publishUnsafe(statusChanges, undefined);
+        if (runtime.live.status !== previousStatus) {
+          PubSub.publishUnsafe(statusChanges, undefined);
+        }
       };
 
       /** Derives the status after an approval, a handoff or a login request changes. */
@@ -350,7 +394,9 @@ export class BotSessions extends Context.Service<
         const loginState = runtime.live.loginRequest?.state;
         const asksForLogin = loginState === "asking" || loginState === "failed";
 
-        return runtime.live.approvals.length > 0 || runtime.live.handoff !== null || asksForLogin ? "waiting" : "working";
+        return runtime.live.approvals.length > 0 || runtime.live.handoff !== null || asksForLogin
+          ? "waiting"
+          : "working";
       };
 
       const record = (
@@ -374,12 +420,14 @@ export class BotSessions extends Context.Service<
         (toolName, input, { signal, suggestions }) =>
           new Promise<PermissionResult>((resolve) => {
             // The handoff and the login request are themselves requests to the operator, so they need no approval.
-            if (toolName === `mcp__clots__${HANDOFF_TOOL}` || toolName === `mcp__clots__${LOGIN_TOOL}`) {
+            if (
+              toolName === `mcp__clots__${HANDOFF_TOOL}` ||
+              toolName === `mcp__clots__${LOGIN_TOOL}`
+            ) {
               resolve({ behavior: "allow", updatedInput: input });
 
               return;
             }
-
 
             const id = crypto.randomUUID();
 
@@ -418,28 +466,49 @@ export class BotSessions extends Context.Service<
               input: JSON.stringify(input, null, 2),
               canAllowAlways: suggestions !== undefined && suggestions.length > 0,
             };
-            setLive(runtime, { approvals: [...runtime.live.approvals, approval], status: "waiting" });
+            setLive(runtime, {
+              approvals: [...runtime.live.approvals, approval],
+              status: "waiting",
+            });
           });
 
       /** Finds a bot by its id or by its name, which the operator writes as `@Name`. */
       const findBot = (reference: string) =>
         repository.list.pipe(
           Effect.map((bots) =>
-            bots.find((bot) => bot.id === reference || bot.name.toLowerCase() === reference.replace(/^@/, "").toLowerCase()),
+            bots.find(
+              (bot) =>
+                bot.id === reference ||
+                bot.name.toLowerCase() === reference.replace(/^@/, "").toLowerCase(),
+            ),
           ),
         );
 
       /** Lists the bots whose routines belong to `self`: itself and its clones, which run routines in their own threads. */
       const ownRoutineBots = (self: StoredBot) =>
-        repository.list.pipe(Effect.map((bots) => bots.filter((bot) => bot.id === self.id || bot.clonedFrom === self.id)));
+        repository.list.pipe(
+          Effect.map((bots) =>
+            bots.filter((bot) => bot.id === self.id || bot.clonedFrom === self.id),
+          ),
+        );
 
       /** Lists the bots of the target's project that are logged in on the site of a page. Without its own Chrome, a bot cannot copy logins. */
       const loginSourcesFor = (target: StoredBot, url: string) =>
         repository.list.pipe(
-          Effect.flatMap((bots) => (botChrome(target) === undefined ? Effect.succeed([]) : Effect.promise(() => findLoginSources(target, bots, url)))),
+          Effect.flatMap((bots) =>
+            botChrome(target) === undefined
+              ? Effect.succeed([])
+              : Effect.promise(() => findLoginSources(target, bots, url)),
+          ),
         );
 
-      const toLoginSource = ({ bot, updatedAt }: { readonly bot: StoredBot; readonly updatedAt: number }): LoginSource => ({
+      const toLoginSource = ({
+        bot,
+        updatedAt,
+      }: {
+        readonly bot: StoredBot;
+        readonly updatedAt: number;
+      }): LoginSource => ({
         botId: bot.id,
         name: bot.name,
         color: bot.color,
@@ -452,22 +521,37 @@ export class BotSessions extends Context.Service<
         const from = botChrome(source);
         const to = botChrome(target);
         if (from === undefined || to === undefined) {
-          return Effect.fail(new LoginCopyFailed({ message: "clots runs no Chrome of its own for the bots here, so it cannot copy logins." }));
+          return Effect.fail(
+            new LoginCopyFailed({
+              message:
+                "clots runs no Chrome of its own for the bots here, so it cannot copy logins.",
+            }),
+          );
         }
 
         return Effect.tryPromise({
           try: () => copyLogin(from, to, url),
-          catch: (error) => new LoginCopyFailed({ message: error instanceof Error ? error.message : String(error) }),
+          catch: (error) =>
+            new LoginCopyFailed({
+              message: error instanceof Error ? error.message : String(error),
+            }),
         }).pipe(
           Effect.timeoutOrElse({
             duration: LOGIN_COPY_TIMEOUT,
-            orElse: () => Effect.fail(new LoginCopyFailed({ message: `${source.name}'s browser did not answer. Try again in a moment.` })),
+            orElse: () =>
+              Effect.fail(
+                new LoginCopyFailed({
+                  message: `${source.name}'s browser did not answer. Try again in a moment.`,
+                }),
+              ),
           }),
         );
       };
 
       const updateLoginRequest = (runtime: BotRuntime, patch: Partial<LoginRequest>) => {
-        if (runtime.live.loginRequest === null) return;
+        if (runtime.live.loginRequest === null) {
+          return;
+        }
 
         setLive(runtime, { loginRequest: { ...runtime.live.loginRequest, ...patch } });
         setLive(runtime, { status: statusWhileRunning(runtime) });
@@ -475,10 +559,17 @@ export class BotSessions extends Context.Service<
 
       /** Names the running login request step by its outcome, so the trace says what happened. */
       const titleLoginStep = (runtime: BotRuntime, title: string) => {
-        const step = runtime.live.steps.findLast((step) => step.status === "running" && step.title === `Using ${LOGIN_TOOL}`);
-        if (step === undefined) return;
+        const step = runtime.live.steps.findLast(
+          (step) => step.status === "running" && step.title === `Using ${LOGIN_TOOL}`,
+        );
 
-        setLive(runtime, { steps: runtime.live.steps.map((each) => (each === step ? { ...each, title } : each)) });
+        if (step === undefined) {
+          return;
+        }
+
+        setLive(runtime, {
+          steps: runtime.live.steps.map((each) => (each === step ? { ...each, title } : each)),
+        });
       };
 
       /**
@@ -488,11 +579,19 @@ export class BotSessions extends Context.Service<
       const loginHintFor =
         (runtime: BotRuntime, bot: StoredBot): HookCallback =>
         async (input) => {
-          if (input.hook_event_name !== "PostToolUse") return {};
+          if (input.hook_event_name !== "PostToolUse") {
+            return {};
+          }
 
           const command = (input.tool_input as { command?: unknown }).command;
           const chrome = botChrome(bot);
-          if (typeof command !== "string" || !command.includes("agent-browser") || chrome === undefined) return {};
+          if (
+            typeof command !== "string" ||
+            !command.includes("agent-browser") ||
+            chrome === undefined
+          ) {
+            return {};
+          }
 
           const bots = await Effect.runPromise(repository.list);
           const self = bots.find((each) => each.id === bot.id) ?? bot;
@@ -500,10 +599,14 @@ export class BotSessions extends Context.Service<
 
           for (const page of await readPages(chrome.port)) {
             const site = siteOf(page.url);
-            if (site === undefined || runtime.loginHints.has(site)) continue;
+            if (site === undefined || runtime.loginHints.has(site)) {
+              continue;
+            }
 
             const sources = await findLoginSources(self, bots, page.url);
-            if (sources.length === 0) continue;
+            if (sources.length === 0) {
+              continue;
+            }
 
             runtime.loginHints.add(site);
             const names = sources.map((source) => source.bot.name);
@@ -514,9 +617,16 @@ export class BotSessions extends Context.Service<
             );
           }
 
-          if (hints.length === 0) return {};
+          if (hints.length === 0) {
+            return {};
+          }
 
-          return { hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: hints.join("\n") } };
+          return {
+            hookSpecificOutput: {
+              hookEventName: "PostToolUse",
+              additionalContext: hints.join("\n"),
+            },
+          };
         };
 
       /**
@@ -533,20 +643,38 @@ export class BotSessions extends Context.Service<
               {
                 task: z
                   .string()
-                  .describe("The clone's first message: what to do and what to report. It can contain a skill, such as /review <url>."),
-                bot: z.string().optional().describe("The bot to clone, by id or name such as @Engineer. The default is you."),
-                name: z.string().optional().describe("A short name for the clone, such as Review #12."),
+                  .describe(
+                    "The clone's first message: what to do and what to report. It can contain a skill, such as /review <url>.",
+                  ),
+                bot: z
+                  .string()
+                  .optional()
+                  .describe(
+                    "The bot to clone, by id or name such as @Engineer. The default is you.",
+                  ),
+                name: z
+                  .string()
+                  .optional()
+                  .describe("A short name for the clone, such as Review #12."),
               },
               async ({ task, bot: reference, name }) => {
-                if (self.clonedFrom !== null) return toolText("A clone cannot make clones. Ask your orchestrator instead.");
+                if (self.clonedFrom !== null) {
+                  return toolText("A clone cannot make clones. Ask your orchestrator instead.");
+                }
 
                 const bots = await Effect.runPromise(repository.list);
                 if (bots.filter((bot) => bot.clonedFrom === self.id).length >= MAX_CLONES) {
-                  return toolText(`You have ${MAX_CLONES} clones already. Delete finished ones with delete_bot first.`);
+                  return toolText(
+                    `You have ${MAX_CLONES} clones already. Delete finished ones with delete_bot first.`,
+                  );
                 }
 
-                const source = reference === undefined ? self : await Effect.runPromise(findBot(reference));
-                if (source === undefined) return toolText(`No bot is called ${reference}. list_bots shows the bots.`);
+                const source =
+                  reference === undefined ? self : await Effect.runPromise(findBot(reference));
+
+                if (source === undefined) {
+                  return toolText(`No bot is called ${reference}. list_bots shows the bots.`);
+                }
 
                 const clone = await Effect.runPromise(
                   repository.create({
@@ -563,7 +691,11 @@ export class BotSessions extends Context.Service<
                 PubSub.publishUnsafe(statusChanges, undefined);
 
                 await Effect.runPromise(
-                  send(clone, "bot", `@${self.name}: ${task}\n\nWhen you are done, report the result to @${self.name} with send_bot_message. Then stay: @${self.name} or the operator deletes you when you are no longer needed.`),
+                  send(
+                    clone,
+                    "bot",
+                    `@${self.name}: ${task}\n\nWhen you are done, report the result to @${self.name} with send_bot_message. Then stay: @${self.name} or the operator deletes you when you are no longer needed.`,
+                  ),
                 );
 
                 return toolText(
@@ -577,11 +709,20 @@ export class BotSessions extends Context.Service<
               { bot: z.string().describe("The clone's id or name, or your own.") },
               async ({ bot: reference }) => {
                 const target = await Effect.runPromise(findBot(reference));
-                if (target === undefined) return toolText(`No bot is called ${reference}. list_bots shows the bots.`);
+                if (target === undefined) {
+                  return toolText(`No bot is called ${reference}. list_bots shows the bots.`);
+                }
 
                 // Only clones can go this way: the clone itself, or its orchestrator. The operator's own bots stay.
-                const mayDelete = target.clonedFrom !== null && (target.id === self.id || target.clonedFrom === self.id);
-                if (!mayDelete) return toolText(`@${target.name} is not a clone of yours, so only the operator can delete it.`);
+                const mayDelete =
+                  target.clonedFrom !== null &&
+                  (target.id === self.id || target.clonedFrom === self.id);
+
+                if (!mayDelete) {
+                  return toolText(
+                    `@${target.name} is not a clone of yours, so only the operator can delete it.`,
+                  );
+                }
 
                 // A bot that deletes itself stops its own session, so the delete starts after this call has answered.
                 if (target.id === self.id) {
@@ -606,25 +747,48 @@ export class BotSessions extends Context.Service<
               "create_routine",
               `Make a clots routine: a prompt that clots sends on a schedule, such as a morning brief every day at 9:00. Use it for recurring work that must keep running across restarts. For a short check within this session, such as every 5 minutes for the next hour, use CronCreate or Monitor instead. By default the routine gets its own thread: a bot under you that runs it, so its runs do not fill this conversation, and that can read your notes and thread. Use where "here" only for reminders or tasks that belong in this conversation. The operator can pause or delete a routine in the details pane of the bot that runs it.`,
               {
-                title: z.string().describe("A short name, such as Morning brief. It names the routine's own thread."),
-                cron: z.string().describe(`A 5-field cron expression in the host's time zone (${HOST_TIME_ZONE}), such as "0 9 * * *" for every day at 9:00.`),
-                prompt: z.string().describe("The message that each run gets. Say what to do and what to report, so it works without this conversation."),
-                where: z.enum(["own thread", "here"]).optional().describe('"own thread" (the default) or "here", this conversation.'),
+                title: z
+                  .string()
+                  .describe(
+                    "A short name, such as Morning brief. It names the routine's own thread.",
+                  ),
+                cron: z
+                  .string()
+                  .describe(
+                    `A 5-field cron expression in the host's time zone (${HOST_TIME_ZONE}), such as "0 9 * * *" for every day at 9:00.`,
+                  ),
+                prompt: z
+                  .string()
+                  .describe(
+                    "The message that each run gets. Say what to do and what to report, so it works without this conversation.",
+                  ),
+                where: z
+                  .enum(["own thread", "here"])
+                  .optional()
+                  .describe('"own thread" (the default) or "here", this conversation.'),
               },
               async ({ title, cron, prompt, where = "own thread" }) => {
                 const next = nextRunAt(cron, Date.now());
-                if (next === undefined) return toolText(`"${cron}" is not a valid cron expression.`);
+                if (next === undefined) {
+                  return toolText(`"${cron}" is not a valid cron expression.`);
+                }
 
                 // A clone cannot make clones, so its routines run in its own thread.
                 if (where === "here" || self.clonedFrom !== null) {
-                  const routine = await Effect.runPromise(schedules.create(self.id, cron, prompt, next));
+                  const routine = await Effect.runPromise(
+                    schedules.create(self.id, cron, prompt, next),
+                  );
 
-                  return toolText(`Made routine ${routine.id} in this thread. The first run is ${new Date(next).toLocaleString()} (${HOST_TIME_ZONE}).`);
+                  return toolText(
+                    `Made routine ${routine.id} in this thread. The first run is ${new Date(next).toLocaleString()} (${HOST_TIME_ZONE}).`,
+                  );
                 }
 
                 const bots = await Effect.runPromise(repository.list);
                 if (bots.filter((bot) => bot.clonedFrom === self.id).length >= MAX_CLONES) {
-                  return toolText(`You have ${MAX_CLONES} clones and routine threads already. Delete one first, or use where "here".`);
+                  return toolText(
+                    `You have ${MAX_CLONES} clones and routine threads already. Delete one first, or use where "here".`,
+                  );
                 }
 
                 const runner = await Effect.runPromise(
@@ -634,7 +798,9 @@ export class BotSessions extends Context.Service<
                       self.instructions,
                       `You run the clots routine "${title}" for @${self.name}. Each run arrives as a message in this thread, and the operator reads your result here.`,
                       `When a run needs to know what @${self.name} did, read its notes directory ${self.workingDirectory} and its thread with read_bot_thread.`,
-                    ].filter((part) => part.trim() !== "").join("\n\n"),
+                    ]
+                      .filter((part) => part.trim() !== "")
+                      .join("\n\n"),
                     color: self.color,
                     shape: self.shape,
                     model: self.model,
@@ -642,7 +808,9 @@ export class BotSessions extends Context.Service<
                     clonedFrom: self.id,
                   }),
                 );
-                const routine = await Effect.runPromise(schedules.create(runner.id, cron, prompt, next));
+                const routine = await Effect.runPromise(
+                  schedules.create(runner.id, cron, prompt, next),
+                );
                 // The bot list shows the routine's thread.
                 PubSub.publishUnsafe(statusChanges, undefined);
 
@@ -651,24 +819,31 @@ export class BotSessions extends Context.Service<
                 );
               },
             ),
-            tool("list_routines", "List your clots routines, also those in their own threads, with id, thread, schedule, next run and prompt.", {}, async () => {
-              const runners = await Effect.runPromise(ownRoutineBots(self));
-              const lines = await Promise.all(
-                runners.map(async (runner) =>
-                  (await Effect.runPromise(schedules.list(runner.id))).map((routine) =>
-                    [
-                      routine.id,
-                      runner.id === self.id ? "here" : `@${runner.name}`,
-                      routine.cron,
-                      routine.paused ? "paused" : `next ${new Date(routine.nextRunAt).toLocaleString()}`,
-                      routine.prompt,
-                    ].join(" | "),
+            tool(
+              "list_routines",
+              "List your clots routines, also those in their own threads, with id, thread, schedule, next run and prompt.",
+              {},
+              async () => {
+                const runners = await Effect.runPromise(ownRoutineBots(self));
+                const lines = await Promise.all(
+                  runners.map(async (runner) =>
+                    (await Effect.runPromise(schedules.list(runner.id))).map((routine) =>
+                      [
+                        routine.id,
+                        runner.id === self.id ? "here" : `@${runner.name}`,
+                        routine.cron,
+                        routine.paused
+                          ? "paused"
+                          : `next ${new Date(routine.nextRunAt).toLocaleString()}`,
+                        routine.prompt,
+                      ].join(" | "),
+                    ),
                   ),
-                ),
-              );
+                );
 
-              return toolText(lines.flat().join("\n") || "You have no routines.");
-            }),
+                return toolText(lines.flat().join("\n") || "You have no routines.");
+              },
+            ),
             tool(
               "delete_routine",
               "Delete one of your clots routines, for example when the operator no longer wants it. A routine with its own thread also deletes that thread.",
@@ -676,11 +851,16 @@ export class BotSessions extends Context.Service<
               async ({ id }) => {
                 for (const runner of await Effect.runPromise(ownRoutineBots(self))) {
                   const routines = await Effect.runPromise(schedules.list(runner.id));
-                  if (!routines.some((routine) => routine.id === id)) continue;
+                  if (!routines.some((routine) => routine.id === id)) {
+                    continue;
+                  }
 
                   // The routine's own thread exists only for its runs, so it goes with its last routine.
-                  if (runner.id !== self.id && routines.length === 1) await Effect.runPromise(deleteBot(runner));
-                  else await Effect.runPromise(schedules.remove(id));
+                  if (runner.id !== self.id && routines.length === 1) {
+                    await Effect.runPromise(deleteBot(runner));
+                  } else {
+                    await Effect.runPromise(schedules.remove(id));
+                  }
 
                   return toolText(`Deleted routine ${id}.`);
                 }
@@ -688,34 +868,49 @@ export class BotSessions extends Context.Service<
                 return toolText(`You have no routine ${id}. list_routines shows yours.`);
               },
             ),
-            tool("list_bots", "List the other clots bots with their id, status, project and Claude Code session.", {}, async () => {
-              const bots = await Effect.runPromise(repository.list);
-              const lines = bots
-                .filter((bot) => bot.id !== self.id)
-                .map((bot) =>
-                  [
-                    `@${bot.name}`,
-                    `id ${bot.id}`,
-                    runtimes.get(bot.id)?.live.status ?? "idle",
-                    bot.projectName === null ? "no project" : `project ${bot.projectName}`,
-                    bot.sdkSessionId === null ? "no session yet" : `session ${bot.sdkSessionId}`,
-                  ].join(" | "),
-                );
+            tool(
+              "list_bots",
+              "List the other clots bots with their id, status, project and Claude Code session.",
+              {},
+              async () => {
+                const bots = await Effect.runPromise(repository.list);
+                const lines = bots
+                  .filter((bot) => bot.id !== self.id)
+                  .map((bot) =>
+                    [
+                      `@${bot.name}`,
+                      `id ${bot.id}`,
+                      runtimes.get(bot.id)?.live.status ?? "idle",
+                      bot.projectName === null ? "no project" : `project ${bot.projectName}`,
+                      bot.sdkSessionId === null ? "no session yet" : `session ${bot.sdkSessionId}`,
+                    ].join(" | "),
+                  );
 
-              return toolText(lines.join("\n") || "There are no other bots.");
-            }),
+                return toolText(lines.join("\n") || "There are no other bots.");
+              },
+            ),
             tool(
               "read_bot_thread",
               "Read the recent messages and the live status of another clots bot, to see what it works on.",
               {
                 bot: z.string().describe("The bot's id, or its name such as @Engineer."),
-                count: z.number().int().min(1).max(50).optional().describe("How many recent messages. The default is 20."),
+                count: z
+                  .number()
+                  .int()
+                  .min(1)
+                  .max(50)
+                  .optional()
+                  .describe("How many recent messages. The default is 20."),
               },
               async ({ bot: reference, count = 20 }) => {
                 const bot = await Effect.runPromise(findBot(reference));
-                if (bot === undefined) return toolText(`No bot is called ${reference}. list_bots shows the bots.`);
+                if (bot === undefined) {
+                  return toolText(`No bot is called ${reference}. list_bots shows the bots.`);
+                }
 
-                const messages = (await Effect.runPromise(repository.messagesAfter(bot.id, 0))).slice(-count);
+                const messages = (
+                  await Effect.runPromise(repository.messagesAfter(bot.id, 0))
+                ).slice(-count);
                 const live = runtimes.get(bot.id)?.live ?? IDLE;
                 const lines = messages.map((message) =>
                   message.role === "trace"
@@ -724,7 +919,9 @@ export class BotSessions extends Context.Service<
                 );
                 const now = [
                   `Status: ${live.status}.`,
-                  ...live.steps.filter((step) => step.status === "running").map((step) => `Running: ${step.title}`),
+                  ...live.steps
+                    .filter((step) => step.status === "running")
+                    .map((step) => `Running: ${step.title}`),
                   ...live.tasks.map((task) => `In the background: ${task.description}`),
                 ];
 
@@ -736,16 +933,27 @@ export class BotSessions extends Context.Service<
               "Send a message to another clots bot. It arrives in that bot's thread and starts its turn. Its answer stays in its own thread: read it later with read_bot_thread.",
               {
                 bot: z.string().describe("The bot's id, or its name such as @Engineer."),
-                text: z.string().describe("The message. Say what you need and why, so the bot can act without asking."),
+                text: z
+                  .string()
+                  .describe(
+                    "The message. Say what you need and why, so the bot can act without asking.",
+                  ),
               },
               async ({ bot: reference, text }) => {
                 const bot = await Effect.runPromise(findBot(reference));
-                if (bot === undefined) return toolText(`No bot is called ${reference}. list_bots shows the bots.`);
-                if (bot.id === self.id) return toolText("That is you. Pick another bot.");
+                if (bot === undefined) {
+                  return toolText(`No bot is called ${reference}. list_bots shows the bots.`);
+                }
+
+                if (bot.id === self.id) {
+                  return toolText("That is you. Pick another bot.");
+                }
 
                 await Effect.runPromise(send(bot, "bot", `@${self.name}: ${text}`));
 
-                return toolText(`Sent to @${bot.name}. Read its answer later with read_bot_thread.`);
+                return toolText(
+                  `Sent to @${bot.name}. Read its answer later with read_bot_thread.`,
+                );
               },
             ),
             tool(
@@ -755,11 +963,19 @@ export class BotSessions extends Context.Service<
               async ({ reason }) => {
                 await new Promise<void>((resolve) => {
                   runtime.finishHandoff = resolve;
-                  setLive(runtime, { handoff: { id: crypto.randomUUID(), reason }, status: "waiting" });
+                  setLive(runtime, {
+                    handoff: { id: crypto.randomUUID(), reason },
+                    status: "waiting",
+                  });
                 });
 
                 return {
-                  content: [{ type: "text", text: "The operator is done. Take a snapshot to see the page." }],
+                  content: [
+                    {
+                      type: "text",
+                      text: "The operator is done. Take a snapshot to see the page.",
+                    },
+                  ],
                 };
               },
             ),
@@ -767,17 +983,31 @@ export class BotSessions extends Context.Service<
               LOGIN_TOOL,
               "Use another clots bot's login on a site, so the operator does not have to log you in. Call it when a hint says that another bot is logged in, or when a site asks you to log in. The operator allows or skips the copy. It copies only that site's cookies and saved data, and you never see them. Returns copied, skipped, or why the copy failed.",
               {
-                site: z.string().describe("The site's host, such as app.example.com, or the page's address."),
-                bot: z.string().optional().describe("The bot whose login to use, by id or name such as @Scout. The default is the bot that logged in last."),
+                site: z
+                  .string()
+                  .describe("The site's host, such as app.example.com, or the page's address."),
+                bot: z
+                  .string()
+                  .optional()
+                  .describe(
+                    "The bot whose login to use, by id or name such as @Scout. The default is the bot that logged in last.",
+                  ),
               },
               async ({ site, bot: reference }) => {
                 const url = site.includes("://") ? site : `https://${site}`;
                 const host = URL.parse(url)?.hostname;
-                if (host === undefined) return toolText(`${site} is not a site. Give a host such as app.example.com.`);
+                if (host === undefined) {
+                  return toolText(`${site} is not a site. Give a host such as app.example.com.`);
+                }
 
                 const sources = await Effect.runPromise(loginSourcesFor(self, url));
-                const named = reference === undefined ? undefined : await Effect.runPromise(findBot(reference));
-                const source = reference === undefined ? sources[0] : sources.find((each) => each.bot.id === named?.id);
+                const named =
+                  reference === undefined ? undefined : await Effect.runPromise(findBot(reference));
+                const source =
+                  reference === undefined
+                    ? sources[0]
+                    : sources.find((each) => each.bot.id === named?.id);
+
                 if (source === undefined) {
                   return toolText(
                     reference === undefined
@@ -786,7 +1016,13 @@ export class BotSessions extends Context.Service<
                   );
                 }
 
-                const request: LoginRequest = { id: crypto.randomUUID(), host, from: toLoginSource(source), state: "asking", error: null };
+                const request: LoginRequest = {
+                  id: crypto.randomUUID(),
+                  host,
+                  from: toLoginSource(source),
+                  state: "asking",
+                  error: null,
+                };
                 const name = source.bot.name;
                 setLive(runtime, { loginRequest: request, status: "waiting" });
 
@@ -803,12 +1039,19 @@ export class BotSessions extends Context.Service<
                     setLive(runtime, { loginRequest: null });
                     setLive(runtime, { status: statusWhileRunning(runtime) });
 
-                    return toolText(failure === null ? "skipped" : `skipped after a failed copy: ${failure}`);
+                    return toolText(
+                      failure === null ? "skipped" : `skipped after a failed copy: ${failure}`,
+                    );
                   }
 
                   updateLoginRequest(runtime, { state: "copying", error: null });
                   const error = await Effect.runPromise(
-                    copyLoginBetween(source.bot, self, url).pipe(Effect.match({ onSuccess: () => null, onFailure: (failure) => failure.message })),
+                    copyLoginBetween(source.bot, self, url).pipe(
+                      Effect.match({
+                        onSuccess: () => null,
+                        onFailure: (failure) => failure.message,
+                      }),
+                    ),
                   );
 
                   if (error !== null) {
@@ -820,10 +1063,14 @@ export class BotSessions extends Context.Service<
                   updateLoginRequest(runtime, { state: "done" });
                   titleLoginStep(runtime, `Used ${name}'s login on ${host}`);
                   setTimeout(() => {
-                    if (runtime.live.loginRequest?.id === request.id) setLive(runtime, { loginRequest: null });
+                    if (runtime.live.loginRequest?.id === request.id) {
+                      setLive(runtime, { loginRequest: null });
+                    }
                   }, LOGIN_DONE_MS);
 
-                  return toolText("copied. The page reloaded with the login. Take a snapshot to see it.");
+                  return toolText(
+                    "copied. The page reloaded with the login. Take a snapshot to see it.",
+                  );
                 }
               },
             ),
@@ -831,7 +1078,9 @@ export class BotSessions extends Context.Service<
         });
 
       const setStepStatus = (runtime: BotRuntime, finished: ReadonlySet<string>) => {
-        const steps = runtime.live.steps.map((step) => (finished.has(step.id) ? { ...step, status: "done" as const } : step));
+        const steps = runtime.live.steps.map((step) =>
+          finished.has(step.id) ? { ...step, status: "done" as const } : step,
+        );
         setLive(runtime, { steps });
       };
 
@@ -842,14 +1091,20 @@ export class BotSessions extends Context.Service<
       const recordTrace = (runtime: BotRuntime, botId: BotId, turnEnded: boolean) =>
         Effect.gen(function* () {
           const finished = runtime.live.steps.filter((step) => turnEnded || step.status === "done");
-          if (finished.length === 0) return;
+          if (finished.length === 0) {
+            return;
+          }
 
           const steps = finished.map((step) => ({ ...step, status: "done" as const }));
           const images = finished.flatMap((step) => runtime.stepImages.get(step.id) ?? []);
-          for (const step of finished) runtime.stepImages.delete(step.id);
+          for (const step of finished) {
+            runtime.stepImages.delete(step.id);
+          }
 
           yield* record(runtime, botId, "trace", "", images, steps);
-          setLive(runtime, { steps: runtime.live.steps.filter((step) => !finished.includes(step)) });
+          setLive(runtime, {
+            steps: runtime.live.steps.filter((step) => !finished.includes(step)),
+          });
         });
 
       /**
@@ -858,21 +1113,32 @@ export class BotSessions extends Context.Service<
        */
       const keepOpenedImage = (runtime: BotRuntime, botId: BotId, stepId: string, path: unknown) =>
         Effect.gen(function* () {
-          const mediaType = typeof path === "string" ? SHOWN_IMAGE_TYPES[extname(path).toLowerCase()] : undefined;
-          if (typeof path !== "string" || mediaType === undefined) return;
+          const mediaType =
+            typeof path === "string" ? SHOWN_IMAGE_TYPES[extname(path).toLowerCase()] : undefined;
+
+          if (typeof path !== "string" || mediaType === undefined) {
+            return;
+          }
 
           const bot = yield* repository.find(botId);
-          if (bot === undefined) return;
+          if (bot === undefined) {
+            return;
+          }
 
           // The file can be gone, or too large to keep. Then the step shows no image.
           yield* Effect.try(() => {
             const size = statSync(path).size;
-            if (size > MAX_UPLOAD_BYTES) return;
+            if (size > MAX_UPLOAD_BYTES) {
+              return;
+            }
 
             const id = crypto.randomUUID();
             const directory = join(bot.workingDirectory, "attachments");
             mkdirSync(directory, { recursive: true });
-            copyFileSync(path, join(directory, `${id}-${basename(path).replaceAll(/[^\w.-]+/g, "_")}`));
+            copyFileSync(
+              path,
+              join(directory, `${id}-${basename(path).replaceAll(/[^\w.-]+/g, "_")}`),
+            );
             runtime.stepImages.set(stepId, { id, name: basename(path), mediaType, size });
           }).pipe(Effect.ignore);
         });
@@ -880,16 +1146,25 @@ export class BotSessions extends Context.Service<
       /** Keeps the files of a message in the bot's notes directory, where the bot can also read them. */
       const saveUploads = (bot: StoredBot, uploads: ReadonlyArray<Upload>) => {
         const directory = join(bot.workingDirectory, "attachments");
-        if (uploads.length > 0) mkdirSync(directory, { recursive: true });
+        if (uploads.length > 0) {
+          mkdirSync(directory, { recursive: true });
+        }
 
         return uploads.map((upload) => {
           const id = crypto.randomUUID();
           const bytes = Buffer.from(upload.data, "base64");
           // The name comes from the client, so only its last part without odd characters is used.
-          const path = join(directory, `${id}-${basename(upload.name).replaceAll(/[^\w.-]+/g, "_")}`);
+          const path = join(
+            directory,
+            `${id}-${basename(upload.name).replaceAll(/[^\w.-]+/g, "_")}`,
+          );
           writeFileSync(path, bytes);
 
-          return { upload, path, attachment: { id, name: upload.name, mediaType: upload.mediaType, size: bytes.length } };
+          return {
+            upload,
+            path,
+            attachment: { id, name: upload.name, mediaType: upload.mediaType, size: bytes.length },
+          };
         });
       };
 
@@ -898,7 +1173,11 @@ export class BotSessions extends Context.Service<
         repository
           .setSkills(
             botId,
-            showOwnSkills(commands.filter((command) => command.builtin !== true).map(({ name, description }) => ({ name, description }))),
+            showOwnSkills(
+              commands
+                .filter((command) => command.builtin !== true)
+                .map(({ name, description }) => ({ name, description })),
+            ),
           )
           .pipe(Effect.andThen(PubSub.publish(skillChanges, undefined)));
 
@@ -907,7 +1186,9 @@ export class BotSessions extends Context.Service<
 
       const loadSkills = (bot: StoredBot) =>
         Effect.gen(function* () {
-          if (skillsListed.has(bot.id)) return;
+          if (skillsListed.has(bot.id)) {
+            return;
+          }
 
           skillsListed.add(bot.id);
           const skills = botSkillsSignature(bot);
@@ -918,7 +1199,9 @@ export class BotSessions extends Context.Service<
             options: {
               ...claudeOptions,
               cwd: bot.projectDirectory ?? bot.workingDirectory,
-              ...(bot.projectDirectory === null ? {} : { additionalDirectories: [bot.workingDirectory] }),
+              ...(bot.projectDirectory === null
+                ? {}
+                : { additionalDirectories: [bot.workingDirectory] }),
               env: { ...claudeOptions.env, CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD: "1" },
               settingSources: ["user", "project", "local"],
               plugins: botPlugins(bot),
@@ -928,7 +1211,9 @@ export class BotSessions extends Context.Service<
 
           yield* Effect.tryPromise(() => lister.supportedCommands()).pipe(
             // A skill file that changed while the process started gets its own, newer list.
-            Effect.flatMap((commands) => (botSkillsSignature(bot) === skills ? saveSkills(bot.id, commands) : Effect.void)),
+            Effect.flatMap((commands) =>
+              botSkillsSignature(bot) === skills ? saveSkills(bot.id, commands) : Effect.void,
+            ),
             Effect.timeout("30 seconds"),
             Effect.ignore,
             Effect.ensuring(Effect.sync(() => lister.close())),
@@ -943,14 +1228,21 @@ export class BotSessions extends Context.Service<
           const signature = botSkillsSignature(bot);
           const previous = ownSkills.get(bot.id);
 
-          if (previous === signature) return;
+          if (previous === signature) {
+            return;
+          }
 
           ownSkills.set(bot.id, signature);
 
           // The first look at a bot only learns its files.
-          if (previous === undefined) return;
+          if (previous === undefined) {
+            return;
+          }
 
-          if (signature !== "") ensurePluginManifest(bot);
+          if (signature !== "") {
+            ensurePluginManifest(bot);
+          }
+
           yield* PubSub.publish(ownSkillChanges, bot.id);
           skillsListed.delete(bot.id);
           yield* loadSkills(bot).pipe(Effect.forkIn(scope));
@@ -964,7 +1256,8 @@ export class BotSessions extends Context.Service<
         Effect.forkIn(scope),
       );
 
-      const hasOldSkills = (session: NonNullable<BotRuntime["session"]>) => botSkillsSignature(session.startedAs) !== session.skills;
+      const hasOldSkills = (session: NonNullable<BotRuntime["session"]>) =>
+        botSkillsSignature(session.startedAs) !== session.skills;
 
       const handle = (runtime: BotRuntime, botId: BotId, message: SDKMessage) =>
         Effect.gen(function* () {
@@ -986,8 +1279,15 @@ export class BotSessions extends Context.Service<
           // Compaction summarizes the older context. While it runs, the thread shows it as a step.
           if (message.type === "system" && message.subtype === "status") {
             if (message.status === "compacting") {
-              const step = { id: `${COMPACT_STEP}${Date.now()}`, title: "Compacting the conversation", status: "running" as const };
-              setLive(runtime, { status: statusWhileRunning(runtime), steps: [...runtime.live.steps, step] });
+              const step = {
+                id: `${COMPACT_STEP}${Date.now()}`,
+                title: "Compacting the conversation",
+                status: "running" as const,
+              };
+              setLive(runtime, {
+                status: statusWhileRunning(runtime),
+                steps: [...runtime.live.steps, step],
+              });
             }
 
             return;
@@ -995,7 +1295,9 @@ export class BotSessions extends Context.Service<
 
           // A finished compaction leaves a note in the thread, so the operator sees where the bot's memory was summarized.
           if (message.type === "system" && message.subtype === "compact_boundary") {
-            const running = runtime.live.steps.filter((step) => step.id.startsWith(COMPACT_STEP) && step.status === "running");
+            const running = runtime.live.steps.filter(
+              (step) => step.id.startsWith(COMPACT_STEP) && step.status === "running",
+            );
             setStepStatus(runtime, new Set(running.map((step) => step.id)));
 
             const { trigger, pre_tokens, post_tokens } = message.compact_metadata;
@@ -1004,10 +1306,14 @@ export class BotSessions extends Context.Service<
             return;
           }
 
-          // The session found more skills, for example in a project directory.
-          // A session with old skill files lists old skills, so the newer list from `loadSkills` stays.
+          /**
+           * The session found more skills, for example in a project directory.
+           * A session with old skill files lists old skills, so the newer list from `loadSkills` stays.
+           */
           if (message.type === "system" && message.subtype === "commands_changed") {
-            if (runtime.session === null || !hasOldSkills(runtime.session)) yield* saveSkills(botId, message.commands);
+            if (runtime.session === null || !hasOldSkills(runtime.session)) {
+              yield* saveSkills(botId, message.commands);
+            }
 
             return;
           }
@@ -1028,8 +1334,14 @@ export class BotSessions extends Context.Service<
             yield* recordTrace(runtime, botId, true);
 
             if (message.subtype !== "success") {
-              yield* record(runtime, botId, "assistant", runtime.stopping ? "Stopped." : TURN_FAILURES[message.subtype]);
+              yield* record(
+                runtime,
+                botId,
+                "assistant",
+                runtime.stopping ? "Stopped." : TURN_FAILURES[message.subtype],
+              );
             }
+
             runtime.stopping = false;
 
             // The operator did not see the turn end, so the sidebar marks the bot.
@@ -1046,8 +1358,17 @@ export class BotSessions extends Context.Service<
           }
 
           // Subagent output stays out of the thread. Only the bot's own messages show.
-          if (message.type !== "stream_event" && message.type !== "assistant" && message.type !== "user") return;
-          if (message.parent_tool_use_id !== null) return;
+          if (
+            message.type !== "stream_event" &&
+            message.type !== "assistant" &&
+            message.type !== "user"
+          ) {
+            return;
+          }
+
+          if (message.parent_tool_use_id !== null) {
+            return;
+          }
 
           // A user message from the SDK carries the results of tool calls. Each result ends its step.
           if (message.type === "user") {
@@ -1055,21 +1376,32 @@ export class BotSessions extends Context.Service<
             const finished = new Set(
               typeof content === "string"
                 ? []
-                : content.flatMap((block) => (block.type === "tool_result" ? [block.tool_use_id] : [])),
+                : content.flatMap((block) =>
+                    block.type === "tool_result" ? [block.tool_use_id] : [],
+                  ),
             );
-            if (finished.size > 0) setStepStatus(runtime, finished);
+
+            if (finished.size > 0) {
+              setStepStatus(runtime, finished);
+            }
 
             return;
           }
 
           // A queued prompt can start a new turn after the previous result.
-          if (runtime.live.status === "idle") setLive(runtime, { status: "working" });
+          if (runtime.live.status === "idle") {
+            setLive(runtime, { status: "working" });
+          }
 
           if (message.type === "stream_event") {
             const event = message.event;
 
             if (event.type === "content_block_start" && event.content_block.type === "tool_use") {
-              const step = { id: event.content_block.id, title: `Using ${shownToolName(event.content_block.name)}`, status: "running" as const };
+              const step = {
+                id: event.content_block.id,
+                title: `Using ${shownToolName(event.content_block.name)}`,
+                status: "running" as const,
+              };
               setLive(runtime, { steps: [...runtime.live.steps, step] });
             }
 
@@ -1078,23 +1410,41 @@ export class BotSessions extends Context.Service<
 
           // The finished tool call carries a short description of what the bot does.
           for (const block of message.message.content) {
-            if (block.type !== "tool_use") continue;
+            if (block.type !== "tool_use") {
+              continue;
+            }
 
-            if (block.name === "Read") yield* keepOpenedImage(runtime, botId, block.id, (block.input as { file_path?: unknown }).file_path);
+            if (block.name === "Read") {
+              yield* keepOpenedImage(
+                runtime,
+                botId,
+                block.id,
+                (block.input as { file_path?: unknown }).file_path,
+              );
+            }
 
             const description = (block.input as { description?: unknown }).description;
 
             // A transcript has no stream events, so after a restart the step starts here.
             if (!runtime.live.steps.some((step) => step.id === block.id)) {
-              const title = typeof description === "string" ? description : `Using ${shownToolName(block.name)}`;
-              setLive(runtime, { steps: [...runtime.live.steps, { id: block.id, title, status: "running" }] });
+              const title =
+                typeof description === "string"
+                  ? description
+                  : `Using ${shownToolName(block.name)}`;
+              setLive(runtime, {
+                steps: [...runtime.live.steps, { id: block.id, title, status: "running" }],
+              });
 
               continue;
             }
 
-            if (typeof description !== "string") continue;
+            if (typeof description !== "string") {
+              continue;
+            }
 
-            const steps = runtime.live.steps.map((step) => (step.id === block.id ? { ...step, title: description } : step));
+            const steps = runtime.live.steps.map((step) =>
+              step.id === block.id ? { ...step, title: description } : step,
+            );
             setLive(runtime, { steps });
           }
 
@@ -1118,7 +1468,9 @@ export class BotSessions extends Context.Service<
             getSessionMessages(sessionId, { dir: bot.projectDirectory ?? bot.workingDirectory }),
           );
           const start = entries.findIndex((entry) => entry.uuid === after);
-          if (start === -1) return after;
+          if (start === -1) {
+            return after;
+          }
 
           for (const entry of entries.slice(start + 1)) {
             yield* handle(runtime, bot.id, entry as SDKMessage);
@@ -1142,8 +1494,13 @@ export class BotSessions extends Context.Service<
           for (;;) {
             // The check comes first, so the last read sees everything that the process wrote.
             const running = claudeIsRunning(pid);
-            if (bot.sdkSessionId !== null && after !== null) after = yield* catchUp(runtime, bot, bot.sdkSessionId, after);
-            if (!running) break;
+            if (bot.sdkSessionId !== null && after !== null) {
+              after = yield* catchUp(runtime, bot, bot.sdkSessionId, after);
+            }
+
+            if (!running) {
+              break;
+            }
 
             yield* Effect.sleep(FOLLOW_INTERVAL);
           }
@@ -1155,9 +1512,13 @@ export class BotSessions extends Context.Service<
           setLive(runtime, { status: "idle", steps: [] });
 
           const current = yield* repository.find(bot.id);
-          if (current === undefined) return;
+          if (current === undefined) {
+            return;
+          }
 
-          for (const prompt of waiting) yield* deliver(current, runtime, prompt);
+          for (const prompt of waiting) {
+            yield* deliver(current, runtime, prompt);
+          }
         });
 
       const startSession = (bot: StoredBot, runtime: BotRuntime) =>
@@ -1172,7 +1533,9 @@ export class BotSessions extends Context.Service<
               ...claudeOptions,
               cwd: bot.projectDirectory ?? bot.workingDirectory,
               // In a project, the bot still reads and writes its notes directory.
-              ...(bot.projectDirectory === null ? {} : { additionalDirectories: [bot.workingDirectory] }),
+              ...(bot.projectDirectory === null
+                ? {}
+                : { additionalDirectories: [bot.workingDirectory] }),
               env: {
                 ...claudeOptions.env,
                 ...makeBrowserEnvironment(bot),
@@ -1192,11 +1555,18 @@ export class BotSessions extends Context.Service<
                 autoCompactWindow: AUTO_COMPACT_WINDOW,
               },
               // A recorded prompt survives a resume, so a restart for new settings would keep the old name and instructions.
-              systemPrompt: { type: "preset", preset: "claude_code", append: systemPrompt, snapshot: false },
+              systemPrompt: {
+                type: "preset",
+                preset: "claude_code",
+                append: systemPrompt,
+                snapshot: false,
+              },
               // The thread shows whole replies, but a partial message tells it at once that a tool call starts.
               includePartialMessages: true,
-              // A classifier allows or denies each tool call. It asks the operator through canUseTool
-              // only when it cannot decide.
+              /**
+               * A classifier allows or denies each tool call. It asks the operator through canUseTool
+               * only when it cannot decide.
+               */
               permissionMode: "auto",
               canUseTool: canUseToolFor(runtime),
               mcpServers: { clots: clotsServerFor(runtime, bot) },
@@ -1206,15 +1576,30 @@ export class BotSessions extends Context.Service<
               ...(bot.sdkSessionId === null ? {} : { resume: bot.sdkSessionId }),
               // The process id tells the next server whether this session outlived a restart.
               spawnClaudeCodeProcess: ({ command, args, cwd, env, signal }) => {
-                const child = spawn(command, args, { cwd, env, signal, stdio: ["pipe", "pipe", "ignore"] });
-                if (child.pid !== undefined) Effect.runFork(repository.setClaudePid(bot.id, child.pid));
+                const child = spawn(command, args, {
+                  cwd,
+                  env,
+                  signal,
+                  stdio: ["pipe", "pipe", "ignore"],
+                });
+
+                if (child.pid !== undefined) {
+                  Effect.runFork(repository.setClaudePid(bot.id, child.pid));
+                }
 
                 // The SDK starts the same Node child process itself. Bun's types lack its event methods.
                 return child as unknown as SpawnedProcess;
               },
             },
           });
-          runtime.session = { prompts, query: session, systemPrompt, startedAs: bot, skills, ended };
+          runtime.session = {
+            prompts,
+            query: session,
+            systemPrompt,
+            startedAs: bot,
+            skills,
+            ended,
+          };
 
           // Iterate the Query itself: `return()` on the raw generator waits behind a pending read.
           const messages: AsyncIterable<SDKMessage> = { [Symbol.asyncIterator]: () => session };
@@ -1224,7 +1609,12 @@ export class BotSessions extends Context.Service<
             Effect.catchCause((cause) =>
               Cause.hasInterruptsOnly(cause)
                 ? Effect.void
-                : record(runtime, bot.id, "assistant", `The session stopped: ${Cause.pretty(cause)}`),
+                : record(
+                    runtime,
+                    bot.id,
+                    "assistant",
+                    `The session stopped: ${Cause.pretty(cause)}`,
+                  ),
             ),
             Effect.ensuring(repository.setClaudePid(bot.id, null)),
             Effect.ensuring(
@@ -1247,10 +1637,14 @@ export class BotSessions extends Context.Service<
       const stop = (botId: BotId) =>
         Effect.gen(function* () {
           const leftover = runtimes.get(botId)?.leftover;
-          if (leftover !== undefined && leftover !== null) process.kill(leftover.pid, "SIGTERM");
+          if (leftover !== undefined && leftover !== null) {
+            process.kill(leftover.pid, "SIGTERM");
+          }
 
           const session = runtimes.get(botId)?.session;
-          if (session === undefined || session === null) return;
+          if (session === undefined || session === null) {
+            return;
+          }
 
           session.query.close();
           // A new session or a delete must not overlap with the last writes of this one.
@@ -1266,9 +1660,15 @@ export class BotSessions extends Context.Service<
           Effect.map((bots) => {
             // Bots in other projects can share a name, so a mention reaches only the sender's own project.
             const mentioned = bots.filter(
-              (bot) => bot.id !== sender.id && bot.projectId === sender.projectId && mentions(text, bot.name),
+              (bot) =>
+                bot.id !== sender.id &&
+                bot.projectId === sender.projectId &&
+                mentions(text, bot.name),
             );
-            if (mentioned.length === 0) return "";
+
+            if (mentioned.length === 0) {
+              return "";
+            }
 
             const lines = mentioned.map((bot) =>
               bot.sdkSessionId === null
@@ -1280,36 +1680,57 @@ export class BotSessions extends Context.Service<
           }),
         );
 
-      const send = (bot: StoredBot, role: Exclude<MessageRole, "assistant">, text: string, uploads: ReadonlyArray<Upload> = []) =>
-          Effect.gen(function* () {
-            const runtime = runtimeFor(bot.id);
-            runtime.lastPromptFrom = role;
-            const saved = saveUploads(bot, uploads);
-            yield* record(runtime, bot.id, role, text, saved.map((file) => file.attachment));
-            setLive(runtime, { status: statusWhileRunning(runtime) });
+      const send = (
+        bot: StoredBot,
+        role: Exclude<MessageRole, "assistant">,
+        text: string,
+        uploads: ReadonlyArray<Upload> = [],
+      ) =>
+        Effect.gen(function* () {
+          const runtime = runtimeFor(bot.id);
+          runtime.lastPromptFrom = role;
+          const saved = saveUploads(bot, uploads);
+          yield* record(
+            runtime,
+            bot.id,
+            role,
+            text,
+            saved.map((file) => file.attachment),
+          );
+          setLive(runtime, { status: statusWhileRunning(runtime) });
 
-            // The bot sees an image at once. For each file it also gets the path, so it can read or use the file.
-            const images = saved
-              .filter((file) => INLINE_IMAGE_TYPES.has(file.upload.mediaType))
-              .map((file) => ({
-                type: "image",
-                source: { type: "base64", media_type: file.upload.mediaType, data: file.upload.data },
-              }));
-            const paths = saved.length === 0 ? "" : `\n\nAttached files:\n${saved.map((file) => file.path).join("\n")}`;
-            const note = yield* mentionNote(text, bot);
-            const origins: Partial<Record<MessageRole, string>> = {
-              bot: "\n\n(This came from another clots bot. Answer with send_bot_message only when it needs an answer.)",
-              // Without this, a bot that gets its routine's prompt can set the routine up again instead of doing it.
-              routine: "\n\n(This is one of your clots routines firing on its schedule. Do the task now. Do not create, list or change routines unless the task asks.)",
-            };
-            const origin = origins[role] ?? "";
+          // The bot sees an image at once. For each file it also gets the path, so it can read or use the file.
+          const images = saved
+            .filter((file) => INLINE_IMAGE_TYPES.has(file.upload.mediaType))
+            .map((file) => ({
+              type: "image",
+              source: { type: "base64", media_type: file.upload.mediaType, data: file.upload.data },
+            }));
+          const paths =
+            saved.length === 0
+              ? ""
+              : `\n\nAttached files:\n${saved.map((file) => file.path).join("\n")}`;
+          const note = yield* mentionNote(text, bot);
+          const origins: Partial<Record<MessageRole, string>> = {
+            bot: "\n\n(This came from another clots bot. Answer with send_bot_message only when it needs an answer.)",
+            // Without this, a bot that gets its routine's prompt can set the routine up again instead of doing it.
+            routine:
+              "\n\n(This is one of your clots routines firing on its schedule. Do the task now. Do not create, list or change routines unless the task asks.)",
+          };
+          const origin = origins[role] ?? "";
 
-            yield* deliver(bot, runtime, {
-              type: "user",
-              message: { role: "user", content: [...images, { type: "text", text: `${toOwnSkills(bot, text)}${paths}${note}${origin}`.trim() }] },
-              parent_tool_use_id: null,
-            } as SDKUserMessage);
-          });
+          yield* deliver(bot, runtime, {
+            type: "user",
+            message: {
+              role: "user",
+              content: [
+                ...images,
+                { type: "text", text: `${toOwnSkills(bot, text)}${paths}${note}${origin}`.trim() },
+              ],
+            },
+            parent_tool_use_id: null,
+          } as SDKUserMessage);
+        });
 
       /** Gives a prompt to the bot's session, and starts or resumes the session when none runs. */
       const deliver = (bot: StoredBot, runtime: BotRuntime, prompt: SDKUserMessage) =>
@@ -1328,9 +1749,18 @@ export class BotSessions extends Context.Service<
           }
 
           // Changed settings or skills need a new session, but the running turn must finish first.
-          if (runtime.session !== null && (runtime.session.systemPrompt !== systemPromptFor(bot) || hasOldSkills(runtime.session))) {
+          if (
+            runtime.session !== null &&
+            (runtime.session.systemPrompt !== systemPromptFor(bot) || hasOldSkills(runtime.session))
+          ) {
             const settingsChanged = runtime.session.systemPrompt !== systemPromptFor(bot);
-            runtime.restart = { prompts: [settingsChanged ? withSettingsNote(prompt, settingsNote(runtime.session.startedAs, bot)) : prompt] };
+            runtime.restart = {
+              prompts: [
+                settingsChanged
+                  ? withSettingsNote(prompt, settingsNote(runtime.session.startedAs, bot))
+                  : prompt,
+              ],
+            };
             yield* restartAfterTurn(bot.id, runtime, runtime.session).pipe(Effect.forkIn(scope));
 
             return;
@@ -1345,7 +1775,11 @@ export class BotSessions extends Context.Service<
        * after its running turn and its queued prompts finish. Then the waiting prompts resume the
        * conversation in a new session with the current settings.
        */
-      const restartAfterTurn = (botId: BotId, runtime: BotRuntime, session: NonNullable<BotRuntime["session"]>): Effect.Effect<void> =>
+      const restartAfterTurn = (
+        botId: BotId,
+        runtime: BotRuntime,
+        session: NonNullable<BotRuntime["session"]>,
+      ): Effect.Effect<void> =>
         Effect.gen(function* () {
           Queue.endUnsafe(session.prompts);
           yield* Deferred.await(session.ended);
@@ -1355,23 +1789,34 @@ export class BotSessions extends Context.Service<
 
           const current = yield* repository.find(botId);
 
-          if (current === undefined) return;
+          if (current === undefined) {
+            return;
+          }
 
           // The old session went idle when it ended, but the waiting prompts still run.
           setLive(runtime, { status: "working" });
-          for (const prompt of waiting) yield* deliver(current, runtime, prompt);
+          for (const prompt of waiting) {
+            yield* deliver(current, runtime, prompt);
+          }
         });
 
-      const removeRuntime = (botId: BotId) => stop(botId).pipe(Effect.andThen(Effect.sync(() => runtimes.delete(botId))));
+      const removeRuntime = (botId: BotId) =>
+        stop(botId).pipe(Effect.andThen(Effect.sync(() => runtimes.delete(botId))));
 
       const noteSettingsChange = (bot: StoredBot, changes: BotChanges) => {
         const notes = [
-          changes.name !== undefined && changes.name !== bot.name ? `Renamed to ${changes.name}` : "",
-          changes.instructions !== undefined && changes.instructions !== bot.instructions ? "Instructions updated" : "",
+          changes.name !== undefined && changes.name !== bot.name
+            ? `Renamed to ${changes.name}`
+            : "",
+          changes.instructions !== undefined && changes.instructions !== bot.instructions
+            ? "Instructions updated"
+            : "",
         ].filter((note) => note !== "");
 
         // A thread without messages has no conversation for the divider to split, and it shows the empty state until the first message.
-        if (notes.length === 0 || bot.lastMessageAt === null) return Effect.void;
+        if (notes.length === 0 || bot.lastMessageAt === null) {
+          return Effect.void;
+        }
 
         return record(runtimeFor(bot.id), bot.id, "settings", notes.join(" · "));
       };
@@ -1387,7 +1832,9 @@ export class BotSessions extends Context.Service<
 
       // A session that was running when the server stopped may still run its turn.
       for (const bot of yield* repository.list) {
-        if (bot.claudePid !== null) yield* Effect.forkIn(followLeftover(bot, bot.claudePid), scope);
+        if (bot.claudePid !== null) {
+          yield* Effect.forkIn(followLeftover(bot, bot.claudePid), scope);
+        }
       }
 
       return BotSessions.of({
@@ -1408,10 +1855,14 @@ export class BotSessions extends Context.Service<
         interrupt: (botId) =>
           Effect.promise(async () => {
             const runtime = runtimeFor(botId);
-            if (runtime.live.status !== "idle") runtime.stopping = true;
+            if (runtime.live.status !== "idle") {
+              runtime.stopping = true;
+            }
 
             // The session from before a restart takes no commands, so Stop ends its process.
-            if (runtime.leftover !== null) process.kill(runtime.leftover.pid, "SIGTERM");
+            if (runtime.leftover !== null) {
+              process.kill(runtime.leftover.pid, "SIGTERM");
+            }
 
             await runtime.session?.query.interrupt();
           }),
@@ -1437,7 +1888,9 @@ export class BotSessions extends Context.Service<
         resolveHandoff: (botId, handoffId) =>
           Effect.sync(() => {
             const runtime = runtimeFor(botId);
-            if (runtime.live.handoff?.id !== handoffId) return;
+            if (runtime.live.handoff?.id !== handoffId) {
+              return;
+            }
 
             runtime.finishHandoff?.();
             runtime.finishHandoff = null;
@@ -1445,7 +1898,8 @@ export class BotSessions extends Context.Service<
             setLive(runtime, { status: statusWhileRunning(runtime) });
           }),
 
-        findLogins: (bot, url) => loginSourcesFor(bot, url).pipe(Effect.map((sources) => sources.map(toLoginSource))),
+        findLogins: (bot, url) =>
+          loginSourcesFor(bot, url).pipe(Effect.map((sources) => sources.map(toLoginSource))),
 
         copyLogin: (bot, source, url) => copyLoginBetween(source, bot, url),
 
@@ -1455,7 +1909,13 @@ export class BotSessions extends Context.Service<
             const request = runtime.live.loginRequest;
 
             // A copy that runs or that already worked takes no new decision.
-            if (request?.id !== requestId || request.state === "copying" || request.state === "done") return;
+            if (
+              request?.id !== requestId ||
+              request.state === "copying" ||
+              request.state === "done"
+            ) {
+              return;
+            }
 
             runtime.finishLoginRequest?.(decision);
           }),

@@ -17,7 +17,12 @@ import {
   type DragStartEvent,
   type UniqueIdentifier,
 } from "@dnd-kit/core";
-import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import {
+  arrayMove,
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Link, useParams } from "@tanstack/react-router";
 import { ChevronDownIcon, PencilLineIcon, PlusIcon, SearchIcon } from "lucide-react";
@@ -39,7 +44,12 @@ import { NewBotDialog, NewProjectDialog, NoBots } from "./CreateDialog.tsx";
 import { AccountMenu } from "./AccountMenu.tsx";
 import { UpdatePill, useUpdates } from "./UpdateControl.tsx";
 import { ProjectMenu } from "./ProjectMenu.tsx";
-import { NewDialog, SearchDialog, useSearchShortcuts, type SearchCommands } from "./SearchDialog.tsx";
+import {
+  NewDialog,
+  SearchDialog,
+  useSearchShortcuts,
+  type SearchCommands,
+} from "./SearchDialog.tsx";
 
 /** The line of an empty group. It sits on the label line, like the empty lines of the details pane. */
 const EMPTY_HINT = "px-1 text-sm text-muted-foreground";
@@ -48,7 +58,8 @@ const EMPTY_HINT = "px-1 text-sm text-muted-foreground";
  * The label row of a group: 28 px high, with its text on the label line. The hover background reaches
  * past the line, so its padding moves into a negative margin.
  */
-const GROUP_LABEL = "-mx-1.5 flex h-7 w-[calc(100%+0.75rem)] items-center rounded-lg px-2.5 text-[0.8125rem]";
+const GROUP_LABEL =
+  "-mx-1.5 flex h-7 w-[calc(100%+0.75rem)] items-center rounded-lg px-2.5 text-[0.8125rem]";
 
 /** The window width from which the sidebar shows beside the main area. It matches the Tailwind `md` breakpoint. */
 const WIDE_WINDOW = "(min-width: 48rem)";
@@ -77,13 +88,23 @@ const groupDropId = (group: string) => `group:${group}`;
 /** Finds the group of a bot row, or of the drop area of a group. */
 function groupOf(groups: Groups, id: UniqueIdentifier) {
   const name = String(id);
-  if (name.startsWith("group:")) return name.slice("group:".length);
+  if (name.startsWith("group:")) {
+    return name.slice("group:".length);
+  }
 
   return Object.keys(groups).find((group) => groups[group]?.includes(name as BotId));
 }
 
 /** Takes a dragged bot into a group, also when the group is empty or closed. */
-function BotDropZone({ group, highlighted, children }: { group: string; highlighted: boolean; children: ReactNode }) {
+function BotDropZone({
+  group,
+  highlighted,
+  children,
+}: {
+  group: string;
+  highlighted: boolean;
+  children: ReactNode;
+}) {
   const { setNodeRef } = useDroppable({ id: groupDropId(group) });
 
   return (
@@ -125,7 +146,9 @@ function RenameField({
     const trimmed = name.trim();
 
     // A bot or a project always has a name, so an empty field keeps the saved one.
-    if (!cancelled.current && trimmed !== "" && trimmed !== savedName) onSave(trimmed);
+    if (!cancelled.current && trimmed !== "" && trimmed !== savedName) {
+      onSave(trimmed);
+    }
 
     onDone();
   };
@@ -138,8 +161,13 @@ function RenameField({
       onFocus={(event) => event.currentTarget.select()}
       onBlur={finish}
       onKeyDown={(event) => {
-        if (event.key === "Escape") cancelled.current = true;
-        if (event.key === "Enter" || event.key === "Escape") event.currentTarget.blur();
+        if (event.key === "Escape") {
+          cancelled.current = true;
+        }
+
+        if (event.key === "Enter" || event.key === "Escape") {
+          event.currentTarget.blur();
+        }
       }}
       aria-label={label}
       className={`-mx-1 h-5 flex-1 rounded-md border-0 px-1 py-0 select-text ${className} md:text-[length:inherit] text-[length:inherit] focus-visible:ring-2 dark:bg-transparent`}
@@ -157,7 +185,9 @@ const LINE_HIDDEN = "pointer-events-none translate-y-1 opacity-0 motion-reduce:t
 function describeDraft({ text, fileCount }: Draft) {
   const files = fileCount === 1 ? "1 file" : `${fileCount} files`;
 
-  if (text.trim() === "") return files;
+  if (text.trim() === "") {
+    return files;
+  }
 
   return fileCount > 0 ? `${text.trim()} · ${files}` : text.trim();
 }
@@ -170,7 +200,9 @@ function useGlance(active: boolean) {
   const [glancing, setGlancing] = useState(false);
 
   useEffect(() => {
-    if (!active) return;
+    if (!active) {
+      return;
+    }
 
     let timer: ReturnType<typeof setTimeout>;
     const lookDown = () => {
@@ -207,8 +239,12 @@ function BotRow({ bot }: { bot: BotSummary }) {
 
   // An unread reply reads like the name above it, so it catches the eye. A working bot pulses instead.
   let statusTone = "text-muted-foreground";
-  if (bot.status === "working" && !showDraft) statusTone = "animate-pulse motion-reduce:animate-none";
-  else if (bot.unread) statusTone = "text-foreground";
+  if (bot.status === "working" && !showDraft) {
+    statusTone = "animate-pulse motion-reduce:animate-none";
+  } else if (bot.unread) {
+    statusTone = "text-foreground";
+  }
+
   const glancing = useGlance(showDraft && mood === "idle" && !reduceMotion);
 
   useEffect(() => {
@@ -223,11 +259,19 @@ function BotRow({ bot }: { bot: BotSummary }) {
         params={{ botId: bot.id }}
         disabled={renaming}
         className={`flex items-center gap-2.5 rounded-xl px-2.5 py-2 transition-[color,opacity,translate] duration-200 ease-out ${
-          entersLate ? "starting:translate-y-1 starting:opacity-0 motion-reduce:starting:translate-y-0" : ""
+          entersLate
+            ? "starting:translate-y-1 starting:opacity-0 motion-reduce:starting:translate-y-0"
+            : ""
         }`}
         activeProps={{ className: "bg-sidebar-accent" }}
       >
-        <Character shape={bot.shape} color={bot.color} mood={mood} size={36} gaze={glancing ? DRAFT_GAZE : undefined} />
+        <Character
+          shape={bot.shape}
+          color={bot.color}
+          mood={mood}
+          size={36}
+          gaze={glancing ? DRAFT_GAZE : undefined}
+        />
         <span className="min-w-0 flex-1">
           <span className="flex items-baseline gap-2">
             {renaming ? (
@@ -240,10 +284,16 @@ function BotRow({ bot }: { bot: BotSummary }) {
                 className="font-medium"
               />
             ) : (
-              <span className={`min-w-0 flex-1 truncate ${bot.unread ? "font-semibold" : "font-medium"}`}>{bot.name}</span>
+              <span
+                className={`min-w-0 flex-1 truncate ${bot.unread ? "font-semibold" : "font-medium"}`}
+              >
+                {bot.name}
+              </span>
             )}
             {bot.lastMessageAt !== null && (
-              <span className="shrink-0 text-[0.6875rem] text-muted-foreground">{formatRecent(bot.lastMessageAt)}</span>
+              <span className="shrink-0 text-[0.6875rem] text-muted-foreground">
+                {formatRecent(bot.lastMessageAt)}
+              </span>
             )}
           </span>
           <span className="flex items-center">
@@ -263,7 +313,9 @@ function BotRow({ bot }: { bot: BotSummary }) {
                   <PencilLineIcon className="size-3" />
                   Draft
                 </span>
-                <span className="min-w-0 truncate text-muted-foreground">{draft && describeDraft(draft)}</span>
+                <span className="min-w-0 truncate text-muted-foreground">
+                  {draft && describeDraft(draft)}
+                </span>
               </span>
             </span>
             {/* The dot marks a bot that waits for the operator, or that is unread. Its place opens and closes, so the status line does not jump. */}
@@ -365,7 +417,9 @@ function useBotDrag(storeGroups: Groups) {
 
   // The server saved the drop, so the store order is the same as the dragged order now.
   useEffect(() => {
-    if (dragged === null && override !== null && JSON.stringify(override) === storeOrder) setOverride(null);
+    if (dragged === null && override !== null && JSON.stringify(override) === storeOrder) {
+      setOverride(null);
+    }
   }, [dragged, override, storeOrder]);
 
   const sensors = useSensors(
@@ -380,18 +434,24 @@ function useBotDrag(storeGroups: Groups) {
     const zone = pointerWithin(args).find((collision) => String(collision.id).startsWith("group:"));
     const group = zone === undefined ? undefined : groupOf(groups, zone.id);
     const rows = args.droppableContainers.filter((container) =>
-      group === undefined ? !String(container.id).startsWith("group:") : groups[group]?.includes(container.id as BotId),
+      group === undefined
+        ? !String(container.id).startsWith("group:")
+        : groups[group]?.includes(container.id as BotId),
     );
 
     // An empty group takes the bot as its only row.
-    if (zone !== undefined && rows.length === 0) return [zone];
+    if (zone !== undefined && rows.length === 0) {
+      return [zone];
+    }
 
     return closestCenter({ ...args, droppableContainers: rows });
   };
 
   const onDragStart = ({ active }: DragStartEvent) => {
     const from = groupOf(groups, active.id);
-    if (from === undefined) return;
+    if (from === undefined) {
+      return;
+    }
 
     setDragged({ botId: active.id as BotId, from });
     setOverride(groups);
@@ -399,38 +459,54 @@ function useBotDrag(storeGroups: Groups) {
 
   /** Moves the dragged bot into the group under the pointer. Inside a group, the sortable list moves it. */
   const onDragOver = ({ active, over }: DragOverEvent) => {
-    if (over === null) return;
+    if (over === null) {
+      return;
+    }
 
     const from = groupOf(groups, active.id);
     const to = groupOf(groups, over.id);
-    if (from === undefined || to === undefined || from === to) return;
+    if (from === undefined || to === undefined || from === to) {
+      return;
+    }
 
     const target = [...(groups[to] ?? [])];
     const overIndex = target.indexOf(over.id as BotId);
     target.splice(overIndex === -1 ? target.length : overIndex, 0, active.id as BotId);
 
-    setOverride({ ...groups, [from]: (groups[from] ?? []).filter((botId) => botId !== active.id), [to]: target });
+    setOverride({
+      ...groups,
+      [from]: (groups[from] ?? []).filter((botId) => botId !== active.id),
+      [to]: target,
+    });
   };
 
   const onDragEnd = ({ active, over }: DragEndEvent) => {
     setDragged(null);
 
     const group = groupOf(groups, active.id);
-    if (dragged === null || group === undefined) return setOverride(null);
+    if (dragged === null || group === undefined) {
+      return setOverride(null);
+    }
 
     const rows = groups[group] ?? [];
     const overIndex = over === null ? -1 : rows.indexOf(over.id as BotId);
-    const order = overIndex === -1 ? rows : arrayMove([...rows], rows.indexOf(active.id as BotId), overIndex);
+    const order =
+      overIndex === -1 ? rows : arrayMove([...rows], rows.indexOf(active.id as BotId), overIndex);
     const dropped = { ...groups, [group]: order };
     setOverride(dropped);
 
     const joins = group !== dragged.from;
-    if (!joins && order.join() === storeGroups[group]?.join()) return;
+    if (!joins && order.join() === storeGroups[group]?.join()) {
+      return;
+    }
 
     const botId = dragged.botId;
     void (async () => {
       // A bot from another group joins this one first, then takes its place.
-      if (joins) await client.setBotProject(botId, group === PERSONAL ? null : group);
+      if (joins) {
+        await client.setBotProject(botId, group === PERSONAL ? null : group);
+      }
+
       await client.reorderBots(order);
     })().finally(() => {
       // A failed call, or a bot that came or went meanwhile, must not hold the dragged order forever.
@@ -471,7 +547,17 @@ function useGroupOpen(group: string) {
 }
 
 /** The header of a bot group. It opens and closes the group's list. */
-function GroupToggle({ name, open, onToggle, title }: { name: string; open: boolean; onToggle: () => void; title?: string }) {
+function GroupToggle({
+  name,
+  open,
+  onToggle,
+  title,
+}: {
+  name: string;
+  open: boolean;
+  onToggle: () => void;
+  title?: string;
+}) {
   return (
     <button
       type="button"
@@ -506,7 +592,12 @@ function ProjectSection({
 
   return (
     <BotDropZone group={project.id} highlighted={highlighted}>
-      <ProjectMenu project={project} botCount={botCount} onRename={() => setRenaming(true)} renameField={renameField}>
+      <ProjectMenu
+        project={project}
+        botCount={botCount}
+        onRename={() => setRenaming(true)}
+        renameField={renameField}
+      >
         {renaming ? (
           <div className={GROUP_LABEL}>
             <RenameField
@@ -518,7 +609,12 @@ function ProjectSection({
             />
           </div>
         ) : (
-          <GroupToggle name={project.name} open={open} onToggle={toggleOpen} {...(project.directory === null ? {} : { title: project.directory })} />
+          <GroupToggle
+            name={project.name}
+            open={open}
+            onToggle={toggleOpen}
+            {...(project.directory === null ? {} : { title: project.directory })}
+          />
         )}
       </ProjectMenu>
 
@@ -543,7 +639,10 @@ export function BotList() {
   const projects = useStore(client.projects);
   const connection = useStore(client.connection);
   const updates = useUpdates();
-  const [search, setSearch] = useState<{ open: boolean; instant: boolean }>({ open: false, instant: false });
+  const [search, setSearch] = useState<{ open: boolean; instant: boolean }>({
+    open: false,
+    instant: false,
+  });
   const [accountOpen, setAccountOpen] = useState(false);
   const [personalOpen, togglePersonal] = useGroupOpen(PERSONAL);
   const reduceMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
@@ -554,7 +653,9 @@ export function BotList() {
 
   // Bots also go away by their own hand or on another device. An empty list may not have arrived yet, so it forgets nothing.
   useEffect(() => {
-    if (botIds !== "") forgetDeletedThreads(botIds.split(",") as Array<BotId>);
+    if (botIds !== "") {
+      forgetDeletedThreads(botIds.split(",") as Array<BotId>);
+    }
   }, [botIds]);
 
   /** Checks whether a bot shows under its orchestrator, which is the case when both are in the same group. */
@@ -577,9 +678,16 @@ export function BotList() {
   const rowsOf = (group: string): ReadonlyArray<Row> =>
     (drag.groups[group] ?? []).flatMap((botId) => {
       const bot = botsById.get(botId);
-      if (bot === undefined) return [];
+      if (bot === undefined) {
+        return [];
+      }
 
-      return [{ bot, clones: bots.filter((clone) => clone.clonedFrom === botId && isGroupedClone(clone)) }];
+      return [
+        {
+          bot,
+          clones: bots.filter((clone) => clone.clonedFrom === botId && isGroupedClone(clone)),
+        },
+      ];
     });
 
   const personal = rowsOf(PERSONAL);
@@ -620,7 +728,13 @@ export function BotList() {
           commands={searchCommands}
         />
 
-        <Button variant="secondary" size="icon" aria-label="New" className="rounded-full" onClick={() => setNewOpen(true)}>
+        <Button
+          variant="secondary"
+          size="icon"
+          aria-label="New"
+          className="rounded-full"
+          onClick={() => setNewOpen(true)}
+        >
           <PlusIcon />
         </Button>
         <NewDialog open={newOpen} onOpenChange={setNewOpen} commands={searchCommands} />
@@ -650,11 +764,15 @@ export function BotList() {
 
             <BotDropZone group={PERSONAL} highlighted={drag.highlightedGroup === PERSONAL}>
               {/* Without a project there is one plain list, so the heading would only add noise. */}
-              {projects.length > 0 && <GroupToggle name="Personal" open={personalOpen} onToggle={togglePersonal} />}
+              {projects.length > 0 && (
+                <GroupToggle name="Personal" open={personalOpen} onToggle={togglePersonal} />
+              )}
               <Collapse open={personalOpen || projects.length === 0}>
                 <div className={BOT_ROWS}>
                   <BotRows rows={personal} />
-                  {projects.length > 0 && personal.length === 0 && <p className={EMPTY_HINT}>Drag Bots here</p>}
+                  {projects.length > 0 && personal.length === 0 && (
+                    <p className={EMPTY_HINT}>Drag Bots here</p>
+                  )}
                 </div>
               </Collapse>
             </BotDropZone>

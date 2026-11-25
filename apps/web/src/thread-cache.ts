@@ -42,8 +42,13 @@ export function forgetDeletedThreads(botIds: ReadonlyArray<BotId>) {
   const kept = new Set(botIds.map((botId) => THREAD_CACHE_KEY + botId));
 
   try {
-    const stale = Object.keys(localStorage).filter((key) => key.startsWith(THREAD_CACHE_KEY) && !kept.has(key));
-    for (const key of stale) localStorage.removeItem(key);
+    const stale = Object.keys(localStorage).filter(
+      (key) => key.startsWith(THREAD_CACHE_KEY) && !kept.has(key),
+    );
+
+    for (const key of stale) {
+      localStorage.removeItem(key);
+    }
   } catch {
     // A blocked storage holds no cache.
   }

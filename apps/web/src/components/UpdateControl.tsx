@@ -1,12 +1,32 @@
 import { Character } from "@clots/character";
-import { isNewerVersion, type AppUpdateState, type BotSummary, type UpdateInfo } from "@clots/contracts";
+import {
+  isNewerVersion,
+  type AppUpdateState,
+  type BotSummary,
+  type UpdateInfo,
+} from "@clots/contracts";
 import { cn } from "cn";
-import { ArrowUpIcon, ArrowUpRightIcon, CheckIcon, LaptopIcon, RotateCwIcon, ServerIcon, XIcon } from "lucide-react";
+import {
+  ArrowUpIcon,
+  ArrowUpRightIcon,
+  CheckIcon,
+  LaptopIcon,
+  RotateCwIcon,
+  ServerIcon,
+  XIcon,
+} from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 import { client, useStore } from "@/client.ts";
 import { Button } from "@/components/ui/button";
-import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "@/components/ui/item";
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemMedia,
+  ItemTitle,
+} from "@/components/ui/item";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
 
@@ -39,7 +59,9 @@ const DESKTOP_VERSION = /clots-desktop\/\w+\/([\d.]+)/.exec(navigator.userAgent)
 
 /** Checks whether the latest release is newer than this Clots app. A browser has no app to update. */
 const hasAppUpdate = (info: UpdateInfo | undefined) =>
-  info?.latest !== undefined && DESKTOP_VERSION !== undefined && isNewerVersion(info.latest.version, DESKTOP_VERSION);
+  info?.latest !== undefined &&
+  DESKTOP_VERSION !== undefined &&
+  isNewerVersion(info.latest.version, DESKTOP_VERSION);
 
 /**
  * Follows the Clots app's own update. A browser, and an app from before the updater, report `off`:
@@ -51,7 +73,9 @@ function useAppUpdate() {
   useEffect(() => {
     const bridge = window.clotsApp;
 
-    if (bridge?.updateState === undefined || bridge.onUpdateState === undefined) return;
+    if (bridge?.updateState === undefined || bridge.onUpdateState === undefined) {
+      return;
+    }
 
     const stop = bridge.onUpdateState(setState);
     void bridge.updateState().then(setState);
@@ -83,7 +107,9 @@ export function useUpdates() {
 
   // A new connection can mean a new server version, so the client asks again on each one.
   useEffect(() => {
-    if (connection !== "connected") return;
+    if (connection !== "connected") {
+      return;
+    }
 
     const check = () => void client.getUpdateInfo().then(setInfo, () => undefined);
     check();
@@ -94,7 +120,9 @@ export function useUpdates() {
 
   // The restart ends when the client is connected to the new version again.
   useEffect(() => {
-    if (phase.name !== "restarting") return;
+    if (phase.name !== "restarting") {
+      return;
+    }
 
     if (connection === "connected" && info?.current === phase.target) {
       setPhase({ name: "done", target: phase.target });
@@ -103,7 +131,11 @@ export function useUpdates() {
     }
 
     const timer = setTimeout(
-      () => setPhase({ name: "failed", message: "The server did not come back after the restart. Check it on its machine." }),
+      () =>
+        setPhase({
+          name: "failed",
+          message: "The server did not come back after the restart. Check it on its machine.",
+        }),
       phase.since + RESTART_TIMEOUT_MS - Date.now(),
     );
 
@@ -111,9 +143,14 @@ export function useUpdates() {
   }, [phase, connection, info?.current]);
 
   useEffect(() => {
-    if (phase.name !== "done" && phase.name !== "current") return;
+    if (phase.name !== "done" && phase.name !== "current") {
+      return;
+    }
 
-    const timer = setTimeout(() => setPhase({ name: "idle" }), phase.name === "done" ? DONE_MS : UP_TO_DATE_MS);
+    const timer = setTimeout(
+      () => setPhase({ name: "idle" }),
+      phase.name === "done" ? DONE_MS : UP_TO_DATE_MS,
+    );
 
     return () => clearTimeout(timer);
   }, [phase.name]);
@@ -121,7 +158,8 @@ export function useUpdates() {
   const latest = info?.latest;
 
   /** Checks whether the app has something to show. An app that updates itself knows better than the server. */
-  const appHasUpdate = (found: UpdateInfo | undefined) => (app.status === "off" ? hasAppUpdate(found) : app.status !== "current");
+  const appHasUpdate = (found: UpdateInfo | undefined) =>
+    app.status === "off" ? hasAppUpdate(found) : app.status !== "current";
   const appUpdate = appHasUpdate(info);
 
   /**
@@ -129,18 +167,28 @@ export function useUpdates() {
    * anything new, it says so for a moment. An update in progress keeps its own pill.
    */
   const checkNow = async () => {
-    if (phase.name !== "idle") return;
+    if (phase.name !== "idle") {
+      return;
+    }
 
     setPhase({ name: "checking" });
     const found = await client.getUpdateInfo().catch(() => undefined);
 
-    if (found !== undefined) setInfo(found);
+    if (found !== undefined) {
+      setInfo(found);
+    }
 
-    setPhase(found !== undefined && (found.serverUpdate || appHasUpdate(found)) ? { name: "idle" } : { name: "current" });
+    setPhase(
+      found !== undefined && (found.serverUpdate || appHasUpdate(found))
+        ? { name: "idle" }
+        : { name: "current" },
+    );
   };
 
   const updateServer = async () => {
-    if (latest === undefined) return;
+    if (latest === undefined) {
+      return;
+    }
 
     setPhase({ name: "downloading", target: latest.version });
 
@@ -149,11 +197,23 @@ export function useUpdates() {
       setPhase({ name: "restarting", target: latest.version, since: Date.now() });
     } catch (error) {
       const message = (error as { message?: unknown }).message;
-      setPhase({ name: "failed", message: typeof message === "string" ? message : "The update did not start." });
+      setPhase({
+        name: "failed",
+        message: typeof message === "string" ? message : "The update did not start.",
+      });
     }
   };
 
-  return { info, phase, app, appUpdate, serverUpdate: info?.serverUpdate === true, updateServer, checkNow, restarting: phase.name === "restarting" };
+  return {
+    info,
+    phase,
+    app,
+    appUpdate,
+    serverUpdate: info?.serverUpdate === true,
+    updateServer,
+    checkNow,
+    restarting: phase.name === "restarting",
+  };
 }
 
 type Updates = ReturnType<typeof useUpdates>;
@@ -184,12 +244,22 @@ export function ProgressLine({ from, to, durationMs }: Progress) {
 }
 
 /** Names the bots that a restart affects, with the character of a single bot. */
-function BotsNote({ bots, one, many }: { bots: ReadonlyArray<BotSummary>; one: string; many: string }) {
+function BotsNote({
+  bots,
+  one,
+  many,
+}: {
+  bots: ReadonlyArray<BotSummary>;
+  one: string;
+  many: string;
+}) {
   const [first] = bots;
 
   return (
     <p className="flex items-start gap-2 text-xs text-muted-foreground">
-      {bots.length === 1 && first !== undefined && <Character shape={first.shape} color={first.color} size={16} className="mt-px shrink-0" />}
+      {bots.length === 1 && first !== undefined && (
+        <Character shape={first.shape} color={first.color} size={16} className="mt-px shrink-0" />
+      )}
       {bots.length === 1 ? `${first?.name} ${one}` : `${bots.length} ${many}`}
     </p>
   );
@@ -202,7 +272,9 @@ function ServerItem({ updates, failed }: { updates: Updates; failed: string | un
   const waiting = bots.filter((bot) => bot.status === "waiting");
   const { info } = updates;
 
-  if (info?.latest === undefined) return null;
+  if (info?.latest === undefined) {
+    return null;
+  }
 
   return (
     <Item className="flex-nowrap items-start px-1 py-1.5">
@@ -222,14 +294,22 @@ function ServerItem({ updates, failed }: { updates: Updates; failed: string | un
           />
         )}
         {waiting.length > 0 && failed === undefined && (
-          <BotsNote bots={waiting} one="waits for you. The restart cancels its request." many="bots wait for you. The restart cancels their requests." />
+          <BotsNote
+            bots={waiting}
+            one="waits for you. The restart cancels its request."
+            many="bots wait for you. The restart cancels their requests."
+          />
         )}
         {failed !== undefined && <p className="text-xs text-muted-foreground">{failed}</p>}
         <ItemActions className="mt-1 flex-wrap">
           <Button size="sm" onClick={() => void updates.updateServer()}>
             {failed === undefined ? "Update" : "Try again"}
           </Button>
-          <Button variant="ghost" size="sm" render={<a href={info.latest.url} target="_blank" rel="noreferrer" />}>
+          <Button
+            variant="ghost"
+            size="sm"
+            render={<a href={info.latest.url} target="_blank" rel="noreferrer" />}
+          >
             What's new
             <ArrowUpRightIcon />
           </Button>
@@ -244,11 +324,17 @@ function ServerItem({ updates, failed }: { updates: Updates; failed: string | un
  * message as `detail`.
  */
 const describeAppFailure = (message: string): { text: string; detail?: string } => {
-  if (/ERR_INTERNET_DISCONNECTED|ERR_NAME_NOT_RESOLVED|ERR_NETWORK_CHANGED|ENOTFOUND|ENETUNREACH/.test(message)) {
+  if (
+    /ERR_INTERNET_DISCONNECTED|ERR_NAME_NOT_RESOLVED|ERR_NETWORK_CHANGED|ENOTFOUND|ENETUNREACH/.test(
+      message,
+    )
+  ) {
     return { text: "No internet connection. Check it and try again." };
   }
 
-  if (/checksum|sha512|signature|code requirement/i.test(message)) return { text: "The download was damaged. Try again." };
+  if (/checksum|sha512|signature|code requirement/i.test(message)) {
+    return { text: "The download was damaged. Try again." };
+  }
 
   return { text: "The download did not finish.", detail: message };
 };
@@ -274,7 +360,11 @@ function AppAction({ info, app }: { info: UpdateInfo | undefined; app: AppUpdate
   }
 
   return (
-    <Button variant="secondary" size="sm" render={<a href={info?.latest?.url} target="_blank" rel="noreferrer" />}>
+    <Button
+      variant="secondary"
+      size="sm"
+      render={<a href={info?.latest?.url} target="_blank" rel="noreferrer" />}
+    >
       Download
       <ArrowUpRightIcon />
     </Button>
@@ -289,7 +379,9 @@ function AppFailure({ message }: { message: string }) {
     <>
       <p className="text-xs text-muted-foreground">{text}</p>
       {detail !== undefined && (
-        <pre className="rounded-lg bg-muted/60 px-2.5 py-2 font-mono text-xs wrap-anywhere whitespace-pre-wrap text-muted-foreground">{detail}</pre>
+        <pre className="rounded-lg bg-muted/60 px-2.5 py-2 font-mono text-xs wrap-anywhere whitespace-pre-wrap text-muted-foreground">
+          {detail}
+        </pre>
       )}
     </>
   );
@@ -299,11 +391,17 @@ function AppFailure({ message }: { message: string }) {
 function AppItem({ info, app }: { info: UpdateInfo | undefined; app: AppUpdateState }) {
   let version = info?.latest?.version;
 
-  if (app.status === "current") return null;
+  if (app.status === "current") {
+    return null;
+  }
 
-  if (app.status !== "off") version = app.version;
+  if (app.status !== "off") {
+    version = app.version;
+  }
 
-  if (version === undefined) return null;
+  if (version === undefined) {
+    return null;
+  }
 
   return (
     <Item className="flex-nowrap items-start px-1 py-1.5">
@@ -317,7 +415,11 @@ function AppItem({ info, app }: { info: UpdateInfo | undefined; app: AppUpdateSt
         </ItemDescription>
         {app.status === "failed" && <AppFailure message={app.message} />}
         {/* The local server runs as its own service, so the app's restart does not touch the bots. */}
-        {app.status === "ready" && <p className="text-xs text-muted-foreground">Downloaded. Clots restarts to finish. Your bots keep working.</p>}
+        {app.status === "ready" && (
+          <p className="text-xs text-muted-foreground">
+            Downloaded. Clots restarts to finish. Your bots keep working.
+          </p>
+        )}
         <ItemActions className="mt-1 flex-wrap">
           <AppAction info={info} app={app} />
         </ItemActions>
@@ -326,25 +428,70 @@ function AppItem({ info, app }: { info: UpdateInfo | undefined; app: AppUpdateSt
   );
 }
 
-type PillView = "available" | "checking" | "current" | "downloading" | "restarting" | "done" | "failed" | "ready";
+type PillView =
+  "available" | "checking" | "current" | "downloading" | "restarting" | "done" | "failed" | "ready";
 
 /** The look of each pill: its dot, its label, and whether a click opens the popover. */
 const PILL: Record<PillView, { dot: string; icon: ReactNode; label: string; opens: boolean }> = {
-  available: { dot: "bg-attention text-white", icon: <ArrowUpIcon className="size-3" strokeWidth={2.75} />, label: "Update", opens: true },
-  checking: { dot: "bg-muted", icon: <Spinner className="size-3" />, label: "Checking…", opens: false },
-  current: { dot: "bg-emerald-500 text-white dark:bg-emerald-400", icon: <CheckIcon className="size-3" strokeWidth={3} />, label: "Up to date", opens: false },
-  downloading: { dot: "bg-muted", icon: <Spinner className="size-3" />, label: "Downloading…", opens: false },
-  restarting: { dot: "bg-muted", icon: <Spinner className="size-3" />, label: "Restarting…", opens: false },
-  done: { dot: "bg-emerald-500 text-white dark:bg-emerald-400", icon: <CheckIcon className="size-3" strokeWidth={3} />, label: "Updated", opens: false },
-  failed: { dot: "bg-destructive text-white", icon: <XIcon className="size-3" strokeWidth={3} />, label: "Update failed", opens: true },
-  ready: { dot: "bg-attention text-white", icon: <RotateCwIcon className="size-3" strokeWidth={2.75} />, label: "Restart to update", opens: true },
+  available: {
+    dot: "bg-attention text-white",
+    icon: <ArrowUpIcon className="size-3" strokeWidth={2.75} />,
+    label: "Update",
+    opens: true,
+  },
+  checking: {
+    dot: "bg-muted",
+    icon: <Spinner className="size-3" />,
+    label: "Checking…",
+    opens: false,
+  },
+  current: {
+    dot: "bg-emerald-500 text-white dark:bg-emerald-400",
+    icon: <CheckIcon className="size-3" strokeWidth={3} />,
+    label: "Up to date",
+    opens: false,
+  },
+  downloading: {
+    dot: "bg-muted",
+    icon: <Spinner className="size-3" />,
+    label: "Downloading…",
+    opens: false,
+  },
+  restarting: {
+    dot: "bg-muted",
+    icon: <Spinner className="size-3" />,
+    label: "Restarting…",
+    opens: false,
+  },
+  done: {
+    dot: "bg-emerald-500 text-white dark:bg-emerald-400",
+    icon: <CheckIcon className="size-3" strokeWidth={3} />,
+    label: "Updated",
+    opens: false,
+  },
+  failed: {
+    dot: "bg-destructive text-white",
+    icon: <XIcon className="size-3" strokeWidth={3} />,
+    label: "Update failed",
+    opens: true,
+  },
+  ready: {
+    dot: "bg-attention text-white",
+    icon: <RotateCwIcon className="size-3" strokeWidth={2.75} />,
+    label: "Restart to update",
+    opens: true,
+  },
 };
 
 /** Picks the pill for an update phase, or none when nothing is pending. A server update in progress wins over the app's. */
 const pillViewOf = ({ phase, app, appUpdate, serverUpdate }: Updates): PillView | undefined => {
-  if (phase.name !== "idle") return phase.name;
+  if (phase.name !== "idle") {
+    return phase.name;
+  }
 
-  if (app.status === "downloading" || app.status === "ready" || app.status === "failed") return app.status;
+  if (app.status === "downloading" || app.status === "ready" || app.status === "failed") {
+    return app.status;
+  }
 
   return appUpdate || serverUpdate ? "available" : undefined;
 };
@@ -354,7 +501,15 @@ const pillViewOf = ({ phase, app, appUpdate, serverUpdate }: Updates): PillView 
  * server's restart has none, so its fill slows down and stops short of the end, and finishes when
  * the server is back.
  */
-function RestartFill({ finishing, gone, percent }: { finishing: boolean; gone: boolean; percent: number | undefined }) {
+function RestartFill({
+  finishing,
+  gone,
+  percent,
+}: {
+  finishing: boolean;
+  gone: boolean;
+  percent: number | undefined;
+}) {
   let gap = finishing ? "0%" : "8%";
   let duration = finishing ? FILL_FINISH_MS : FILL_MS;
   let easing = finishing ? "var(--ease-out)" : "cubic-bezier(0.16, 1, 0.3, 1)";
@@ -371,12 +526,14 @@ function RestartFill({ finishing, gone, percent }: { finishing: boolean; gone: b
         "absolute inset-0 rounded-full bg-attention/16 transition-[clip-path,opacity] [clip-path:inset(0_var(--fill-gap)_0_0_round_999px)] starting:[clip-path:inset(0_100%_0_0_round_999px)] motion-reduce:transition-none dark:bg-attention/24",
         percent === undefined && "motion-reduce:[clip-path:inset(0_40%_0_0_round_999px)]",
       )}
-      style={{
-        "--fill-gap": gap,
-        opacity: gone ? 0 : 1,
-        transitionDuration: `${duration}ms`,
-        transitionTimingFunction: easing,
-      } as React.CSSProperties}
+      style={
+        {
+          "--fill-gap": gap,
+          opacity: gone ? 0 : 1,
+          transitionDuration: `${duration}ms`,
+          transitionTimingFunction: easing,
+        } as React.CSSProperties
+      }
     />
   );
 }
@@ -398,18 +555,24 @@ export function UpdatePill({ updates }: { updates: Updates }) {
   const [labelWidth, setLabelWidth] = useState<number>();
 
   // A pill that left frees its place, so the text next to the account circle has the whole line.
-  if (view !== undefined && gone) setGone(false);
+  if (view !== undefined && gone) {
+    setGone(false);
+  }
 
   // A started update closes the popover. The pill shows its progress.
   useEffect(() => {
-    if (phase.name === "downloading" || app.status === "downloading") setOpen(false);
+    if (phase.name === "downloading" || app.status === "downloading") {
+      setOpen(false);
+    }
   }, [phase.name, app.status]);
 
   // The fill finishes first, then the pill says that the update is done.
   useEffect(() => {
     setFilled(false);
 
-    if (phase.name !== "done") return;
+    if (phase.name !== "done") {
+      return;
+    }
 
     const timer = setTimeout(() => setFilled(true), FILL_FINISH_MS);
 
@@ -420,11 +583,15 @@ export function UpdatePill({ updates }: { updates: Updates }) {
   useLayoutEffect(() => {
     const element = label.current;
 
-    if (element === null) return;
+    if (element === null) {
+      return;
+    }
 
     // A hidden pill measures zero. It keeps its last width, so it does not grow from nothing when it comes back.
     const observer = new ResizeObserver(() => {
-      if (element.offsetWidth > 0) setLabelWidth(element.offsetWidth);
+      if (element.offsetWidth > 0) {
+        setLabelWidth(element.offsetWidth);
+      }
     });
     observer.observe(element);
 
@@ -432,22 +599,36 @@ export function UpdatePill({ updates }: { updates: Updates }) {
   }, []);
 
   // A closing pill keeps its last look, so it fades out as it was.
-  if (view !== undefined) shown.current = { view, filled };
+  if (view !== undefined) {
+    shown.current = { view, filled };
+  }
 
-  const look = PILL[shown.current.view === "done" && !shown.current.filled ? "restarting" : shown.current.view];
+  const look =
+    PILL[
+      shown.current.view === "done" && !shown.current.filled ? "restarting" : shown.current.view
+    ];
   const filling = ["downloading", "restarting", "done", "ready"].includes(shown.current.view);
-  const percent = shown.current.view === "downloading" && app.status === "downloading" ? Math.round(app.percent) : undefined;
+  const percent =
+    shown.current.view === "downloading" && app.status === "downloading"
+      ? Math.round(app.percent)
+      : undefined;
   const ready = shown.current.view === "ready";
   let heading = "Update available";
 
-  if (failed !== undefined || app.status === "failed") heading = "Update failed";
-  else if (serverUpdate && appUpdate) heading = "2 updates";
-  else if (app.status === "ready") heading = "Ready to restart";
+  if (failed !== undefined || app.status === "failed") {
+    heading = "Update failed";
+  } else if (serverUpdate && appUpdate) {
+    heading = "2 updates";
+  } else if (app.status === "ready") {
+    heading = "Ready to restart";
+  }
 
   return (
     <div
       inert={view === undefined}
-      onTransitionEnd={(event) => event.target === event.currentTarget && view === undefined && setGone(true)}
+      onTransitionEnd={(event) =>
+        event.target === event.currentTarget && view === undefined && setGone(true)
+      }
       className={cn(
         "ml-auto origin-right transition-[opacity,scale] duration-180 ease-out starting:scale-[0.96] starting:opacity-0 motion-reduce:transition-opacity motion-reduce:starting:scale-100",
         view === undefined && "scale-[0.96] opacity-0 motion-reduce:scale-100",
@@ -460,23 +641,49 @@ export function UpdatePill({ updates }: { updates: Updates }) {
             <button
               type="button"
               disabled={!look.opens}
-              title={shown.current.view === "available" ? `Update clots to ${info?.latest?.version}` : undefined}
+              title={
+                shown.current.view === "available"
+                  ? `Update clots to ${info?.latest?.version}`
+                  : undefined
+              }
               style={{ width: labelWidth === undefined ? undefined : labelWidth + PILL_PADDING_PX }}
               className="relative flex h-8 items-center overflow-hidden rounded-full bg-sidebar-accent/80 pr-3 pl-[5px] text-[13px] font-medium whitespace-nowrap outline-none focus-visible:ring-1 focus-visible:ring-ring/40 [transition:background-color_150ms_var(--ease-out),scale_150ms_var(--ease-out),width_200ms_var(--ease-out)] enabled:hover:bg-sidebar-accent enabled:active:scale-[0.97] data-popup-open:bg-sidebar-accent motion-reduce:[transition:background-color_150ms_var(--ease-out)] motion-reduce:active:scale-100"
             />
           }
         >
           {/* A finished download keeps its full fill and fades it out, as a finished server update does. */}
-          {filling && <RestartFill finishing={shown.current.view === "done"} gone={shown.current.filled || ready} percent={ready ? 100 : percent} />}
+          {filling && (
+            <RestartFill
+              finishing={shown.current.view === "done"}
+              gone={shown.current.filled || ready}
+              percent={ready ? 100 : percent}
+            />
+          )}
           <span ref={label} className="relative flex shrink-0">
-            <span key={look.label} className="flex items-center gap-[7px] transition-opacity duration-150 starting:opacity-0">
-              <span className={cn("flex size-[22px] shrink-0 items-center justify-center rounded-full", look.dot)}>{look.icon}</span>
+            <span
+              key={look.label}
+              className="flex items-center gap-[7px] transition-opacity duration-150 starting:opacity-0"
+            >
+              <span
+                className={cn(
+                  "flex size-[22px] shrink-0 items-center justify-center rounded-full",
+                  look.dot,
+                )}
+              >
+                {look.icon}
+              </span>
               {look.label}
               {shown.current.view === "available" && (
-                <span className="font-normal text-muted-foreground tabular-nums">{serverUpdate && appUpdate ? "2 updates" : info?.latest?.version}</span>
+                <span className="font-normal text-muted-foreground tabular-nums">
+                  {serverUpdate && appUpdate ? "2 updates" : info?.latest?.version}
+                </span>
               )}
-              {percent !== undefined && <span className="font-normal text-muted-foreground tabular-nums">{percent}%</span>}
-              {shown.current.view === "failed" && <span className="font-normal text-muted-foreground">Details</span>}
+              {percent !== undefined && (
+                <span className="font-normal text-muted-foreground tabular-nums">{percent}%</span>
+              )}
+              {shown.current.view === "failed" && (
+                <span className="font-normal text-muted-foreground">Details</span>
+              )}
             </span>
           </span>
         </PopoverTrigger>
@@ -489,7 +696,9 @@ export function UpdatePill({ updates }: { updates: Updates }) {
           className="w-fit max-w-72 min-w-44 gap-1 rounded-xl p-2 shadow-lg"
         >
           <p className="px-1 pt-0.5 text-xs text-muted-foreground">{heading}</p>
-          {(serverUpdate || failed !== undefined) && <ServerItem updates={updates} failed={failed} />}
+          {(serverUpdate || failed !== undefined) && (
+            <ServerItem updates={updates} failed={failed} />
+          )}
           {appUpdate && <AppItem info={info} app={updates.app} />}
         </PopoverContent>
       </Popover>

@@ -2,11 +2,29 @@ import { Character } from "@clots/character";
 import { ChevronRightIcon, LaptopIcon, ServerIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemGroup,
+  ItemMedia,
+  ItemTitle,
+} from "@/components/ui/item";
 import { Screen, ScreenDescription, ScreenTitle } from "./Screen.tsx";
 
 /** One place where clots can run. A click goes straight to its setup. */
-function Choice({ icon, title, description, onSelect }: { icon: ReactNode; title: string; description: string; onSelect: () => void }) {
+function Choice({
+  icon,
+  title,
+  description,
+  onSelect,
+}: {
+  icon: ReactNode;
+  title: string;
+  description: string;
+  onSelect: () => void;
+}) {
   return (
     <Item
       render={<button type="button" onClick={onSelect} />}
@@ -37,7 +55,9 @@ export function ChooseScreen({ onChoose }: { onChoose: (where: "local" | "remote
         <Character shape="grape" color="blue" size={44} />
       </div>
       <ScreenTitle className="text-center">Where should clots run?</ScreenTitle>
-      <ScreenDescription className="text-center">clots runs your bots on a server that you own.</ScreenDescription>
+      <ScreenDescription className="text-center">
+        clots runs your bots on a server that you own.
+      </ScreenDescription>
       <ItemGroup className="mt-8 gap-2">
         <Choice
           icon={<LaptopIcon className="size-5" />}
@@ -52,7 +72,9 @@ export function ChooseScreen({ onChoose }: { onChoose: (where: "local" | "remote
           onSelect={() => onChoose("remote")}
         />
       </ItemGroup>
-      <p className="mt-5 text-center text-xs text-muted-foreground">You can switch later with Server → Change Server…</p>
+      <p className="mt-5 text-center text-xs text-muted-foreground">
+        You can switch later with Server → Change Server…
+      </p>
     </Screen>
   );
 }

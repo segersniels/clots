@@ -4,7 +4,16 @@
  * sidecar. Install the result with `dist/clots-<platform>/clots install`.
  */
 import { $ } from "bun";
-import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  copyFileSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 
 // @ts-expect-error The package ships this helper as plain JavaScript without types.
@@ -22,10 +31,14 @@ for (const [name, path] of [
   ["web client", webClient],
   ["sidecar", sidecar],
 ] as const) {
-  if (!existsSync(path)) throw new Error(`The ${name} is not built at ${path}. Run \`bun run build\` first.`);
+  if (!existsSync(path)) {
+    throw new Error(`The ${name} is not built at ${path}. Run \`bun run build\` first.`);
+  }
 }
 
-if (agentBrowser === null) throw new Error("agent-browser has no native binary for this platform.");
+if (agentBrowser === null) {
+  throw new Error("agent-browser has no native binary for this platform.");
+}
 
 rmSync(bundle, { recursive: true, force: true });
 mkdirSync(join(bundle, "bin"), { recursive: true });

@@ -1,6 +1,13 @@
 import { FolderIcon } from "lucide-react";
 
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 import { client, useStore } from "../client.ts";
 
@@ -11,7 +18,10 @@ const PERSONAL = "personal";
 function useProjectOptions() {
   const projects = useStore(client.projects);
 
-  return [{ label: "Personal", value: PERSONAL }, ...projects.map((project) => ({ label: project.name, value: project.id }))];
+  return [
+    { label: "Personal", value: PERSONAL },
+    ...projects.map((project) => ({ label: project.name, value: project.id })),
+  ];
 }
 
 /** The look of a small select in a dialog footer: a filled button with an icon, the value and a chevron. */
@@ -31,7 +41,11 @@ export function ProjectSelect({
   const options = useProjectOptions();
 
   return (
-    <Select items={options} value={projectId ?? PERSONAL} onValueChange={(value) => onChange(value === PERSONAL ? null : (value as string))}>
+    <Select
+      items={options}
+      value={projectId ?? PERSONAL}
+      onValueChange={(value) => onChange(value === PERSONAL ? null : (value as string))}
+    >
       <SelectTrigger
         aria-label="Works in"
         title="Works in"

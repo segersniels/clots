@@ -1,6 +1,13 @@
 import type { BotSummary } from "@clots/contracts";
 import { useNavigate, useParams } from "@tanstack/react-router";
-import { BellDotIcon, BellIcon, FolderInputIcon, PencilIcon, UserRoundPlusIcon, UserRoundXIcon } from "lucide-react";
+import {
+  BellDotIcon,
+  BellIcon,
+  FolderInputIcon,
+  PencilIcon,
+  UserRoundPlusIcon,
+  UserRoundXIcon,
+} from "lucide-react";
 import { useState, type ReactNode, type RefObject } from "react";
 
 import {
@@ -65,7 +72,9 @@ export function BotMenu({
     setConfirmingDelete(false);
 
     // The page of a deleted bot has nothing to show, so the operator leaves it first.
-    if (openBotId === bot.id) void navigate({ to: "/" });
+    if (openBotId === bot.id) {
+      void navigate({ to: "/" });
+    }
 
     void client.deleteBot(bot.id);
   };
@@ -91,7 +100,9 @@ export function BotMenu({
             <ContextMenuSubContent className="w-44">
               <ContextMenuRadioGroup
                 value={bot.projectId ?? PERSONAL}
-                onValueChange={(value: string) => client.setBotProject(bot.id, value === PERSONAL ? null : value)}
+                onValueChange={(value: string) =>
+                  client.setBotProject(bot.id, value === PERSONAL ? null : value)
+                }
               >
                 {projects.map((project) => (
                   <ContextMenuRadioItem key={project.id} value={project.id}>

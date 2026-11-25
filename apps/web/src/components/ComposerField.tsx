@@ -1,15 +1,34 @@
 import { Character } from "@clots/character";
 import type { BotId } from "@clots/contracts";
-import { mergeAttributes, Node, resolveExtensions, type Editor, type JSONContent } from "@tiptap/core";
+import {
+  mergeAttributes,
+  Node,
+  resolveExtensions,
+  type Editor,
+  type JSONContent,
+} from "@tiptap/core";
 import { Placeholder } from "@tiptap/extensions";
 import { Markdown, MarkdownManager } from "@tiptap/markdown";
-import { EditorContent, NodeViewWrapper, ReactNodeViewRenderer, useEditor, type NodeViewProps } from "@tiptap/react";
+import {
+  EditorContent,
+  NodeViewWrapper,
+  ReactNodeViewRenderer,
+  useEditor,
+  type NodeViewProps,
+} from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { BoxIcon } from "lucide-react";
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
 
 import { client, useStore } from "../client.ts";
-import { findReferenceQuery, knownNames, matchItems, splitReferences, type KnownNames, type ReferenceKind } from "../references.ts";
+import {
+  findReferenceQuery,
+  knownNames,
+  matchItems,
+  splitReferences,
+  type KnownNames,
+  type ReferenceKind,
+} from "../references.ts";
 import { ReferencePicker, type PickerItem } from "./ReferencePicker.tsx";
 import { ReferenceChip } from "./ReferenceText.tsx";
 
@@ -38,7 +57,8 @@ interface ReferenceAttributes {
 }
 
 /** Writes a reference the way Claude reads it: `/name` for a skill, `@Name` for a bot. */
-const referenceText = ({ kind, name }: ReferenceAttributes) => `${kind === "skill" ? "/" : "@"}${name}`;
+const referenceText = ({ kind, name }: ReferenceAttributes) =>
+  `${kind === "skill" ? "/" : "@"}${name}`;
 
 /** Draws a reference in the field as the same chip that a sent message shows. */
 function ReferenceNodeView({ node }: NodeViewProps) {
@@ -111,15 +131,24 @@ const keepPlainText = (manager: MarkdownManager) => {
   const escape = escaping.encodeTextForMarkdown?.bind(manager);
 
   // A later version of the package can rename the method. Then the text keeps its escapes, which is safe.
-  if (escape === undefined) return;
+  if (escape === undefined) {
+    return;
+  }
 
   escaping.encodeTextForMarkdown = (text, node, parent) => {
     const escaped = escape(text, node, parent);
-    if (escaped === text) return text;
+    if (escaped === text) {
+      return text;
+    }
 
     const [block] = manager.parse(text).content ?? [];
     const [only, ...rest] = block?.content ?? [];
-    const readsAsText = block?.type === "paragraph" && rest.length === 0 && only?.type === "text" && only.text === text && only.marks === undefined;
+    const readsAsText =
+      block?.type === "paragraph" &&
+      rest.length === 0 &&
+      only?.type === "text" &&
+      only.text === text &&
+      only.marks === undefined;
 
     return readsAsText ? text : escaped;
   };
@@ -132,8 +161,12 @@ const keepPlainText = (manager: MarkdownManager) => {
  */
 const toContent = (text: string, known: KnownNames): JSONContent => {
   const parts = splitReferences(text, known);
-  const chips = parts.flatMap(({ text, reference }) => (reference === null ? [] : [{ text, reference }]));
-  const parsed = markdown.parse(parts.map((part) => (part.reference === null ? part.text : CHIP_PLACEHOLDER)).join(""));
+  const chips = parts.flatMap(({ text, reference }) =>
+    reference === null ? [] : [{ text, reference }],
+  );
+  const parsed = markdown.parse(
+    parts.map((part) => (part.reference === null ? part.text : CHIP_PLACEHOLDER)).join(""),
+  );
   let next = 0;
 
   /** Puts the chips back in place of their placeholders. Code takes text only, so a chip there stays its text. */
@@ -141,7 +174,14 @@ const toContent = (text: string, known: KnownNames): JSONContent => {
     if (node.type !== "text") {
       const code = inCode || node.type === "codeBlock";
 
-      return [{ ...node, ...(node.content === undefined ? {} : { content: node.content.flatMap((child) => restore(child, code)) }) }];
+      return [
+        {
+          ...node,
+          ...(node.content === undefined
+            ? {}
+            : { content: node.content.flatMap((child) => restore(child, code)) }),
+        },
+      ];
     }
 
     const pieces = (node.text ?? "").split(CHIP_PLACEHOLDER);
@@ -149,10 +189,14 @@ const toContent = (text: string, known: KnownNames): JSONContent => {
 
     return pieces.flatMap((piece, index) => {
       const textNode = piece === "" ? [] : [{ ...node, text: piece }];
-      if (index === pieces.length - 1) return textNode;
+      if (index === pieces.length - 1) {
+        return textNode;
+      }
 
       const chip = chips[next++]!;
-      const restored: JSONContent = keepText ? { ...node, text: chip.text } : { type: "reference", attrs: chip.reference };
+      const restored: JSONContent = keepText
+        ? { ...node, text: chip.text }
+        : { type: "reference", attrs: chip.reference };
 
       return [...textNode, restored];
     });
@@ -165,12 +209,16 @@ const toContent = (text: string, known: KnownNames): JSONContent => {
 const queryAt = (editor: Editor) => {
   const { $from, empty } = editor.state.selection;
 
-  if (!empty) return null;
+  if (!empty) {
+    return null;
+  }
 
   const before = $from.parent.textBetween(0, $from.parentOffset, undefined, CHIP_CHARACTER);
   const query = findReferenceQuery(before, before.length);
 
-  if (query === null) return null;
+  if (query === null) {
+    return null;
+  }
 
   return { ...query, from: $from.start() + query.start, to: $from.pos };
 };
@@ -230,18 +278,41 @@ export function ComposerField({
   const [dismissedAt, setDismissedAt] = useState<number | null>(null);
   const pickerOpen = query !== null && query.from !== dismissedAt;
 
-  const skillItems = skills.map((skill) => ({ ...skill, icon: <BoxIcon className="text-skill" /> }));
+  const skillItems = skills.map((skill) => ({
+    ...skill,
+    icon: <BoxIcon className="text-skill" />,
+  }));
   const botItems = otherBots.map((bot) => ({
     name: bot.name,
     description: bot.statusLine,
     icon: <Character shape={bot.shape} color={bot.color} mood="idle" size={16} />,
   }));
   const pickerSource: ReadonlyArray<PickerItem> = query?.kind === "bot" ? botItems : skillItems;
-  const matchingItems = pickerOpen ? matchItems(pickerSource, query.query).slice(0, MAX_LISTED_ITEMS) : [];
+  const matchingItems = pickerOpen
+    ? matchItems(pickerSource, query.query).slice(0, MAX_LISTED_ITEMS)
+    : [];
 
   // The editor keeps its first handlers, so they read the current ones through these refs.
-  const latest = useRef({ onTextChange, onEnter, onSubmit, onFiles, onBlur, onEscape, placeholder, handleKey: (_event: KeyboardEvent): boolean => false });
-  latest.current = { onTextChange, onEnter, onSubmit, onFiles, onBlur, onEscape, placeholder, handleKey: (event) => handleKey(event) };
+  const latest = useRef({
+    onTextChange,
+    onEnter,
+    onSubmit,
+    onFiles,
+    onBlur,
+    onEscape,
+    placeholder,
+    handleKey: (_event: KeyboardEvent): boolean => false,
+  });
+  latest.current = {
+    onTextChange,
+    onEnter,
+    onSubmit,
+    onFiles,
+    onBlur,
+    onEscape,
+    placeholder,
+    handleKey: (event) => handleKey(event),
+  };
 
   const editor = useEditor({
     extensions: [
@@ -266,7 +337,9 @@ export function ComposerField({
         const files = event.clipboardData?.files;
         const { onFiles: takeFiles } = latest.current;
 
-        if (takeFiles === undefined || files === undefined || files.length === 0) return false;
+        if (takeFiles === undefined || files === undefined || files.length === 0) {
+          return false;
+        }
 
         takeFiles(files);
 
@@ -276,7 +349,9 @@ export function ComposerField({
         const files = event.dataTransfer?.files;
         const { onFiles: takeFiles } = latest.current;
 
-        if (takeFiles === undefined || files === undefined || files.length === 0) return false;
+        if (takeFiles === undefined || files === undefined || files.length === 0) {
+          return false;
+        }
 
         event.preventDefault();
         takeFiles(files);
@@ -285,7 +360,9 @@ export function ComposerField({
       },
     },
     onCreate: ({ editor: created }) => {
-      if (created.markdown !== undefined) keepPlainText(created.markdown);
+      if (created.markdown !== undefined) {
+        keepPlainText(created.markdown);
+      }
     },
     onUpdate: ({ editor: updated }) => {
       latest.current.onTextChange(updated.getMarkdown());
@@ -297,17 +374,25 @@ export function ComposerField({
   });
 
   // Skills load after the field opens, so a known reference in the first text becomes a chip once they are there.
-  const knownKey = [...skills.map((skill) => skill.name), ...otherBots.map((bot) => bot.name)].join("\n");
+  const knownKey = [...skills.map((skill) => skill.name), ...otherBots.map((bot) => bot.name)].join(
+    "\n",
+  );
 
   useEffect(() => {
-    if (editor === null) return;
+    if (editor === null) {
+      return;
+    }
 
     // The field is focused when it opens. A caret inside the text means the operator edits it, so the text stays as it is.
     const atEnd = editor.state.selection.to === editor.state.doc.content.size - 1;
-    if (editor.isFocused && !atEnd) return;
+    if (editor.isFocused && !atEnd) {
+      return;
+    }
 
     editor.commands.setContent(toContent(editor.getMarkdown(), known), { emitUpdate: false });
-    if (editor.isFocused) editor.commands.focus("end");
+    if (editor.isFocused) {
+      editor.commands.focus("end");
+    }
   }, [editor, knownKey]);
 
   useImperativeHandle(ref, () => ({
@@ -318,7 +403,9 @@ export function ComposerField({
 
   /** Puts the picked reference as a chip in place of what the operator typed, with a space after it. */
   const insertReference = (item: PickerItem) => {
-    if (editor === null || query === null) return;
+    if (editor === null || query === null) {
+      return;
+    }
 
     editor
       .chain()
@@ -363,7 +450,9 @@ export function ComposerField({
       return true;
     }
 
-    if (event.key !== "Enter" || editor === null) return false;
+    if (event.key !== "Enter" || editor === null) {
+      return false;
+    }
 
     const { onSubmit: submit } = latest.current;
 
@@ -374,21 +463,35 @@ export function ComposerField({
     }
 
     // In code, Enter makes a new line. Three Enters leave the code block, as the editor does on its own.
-    if (editor.isActive("codeBlock")) return event.shiftKey ? editor.commands.newlineInCode() : false;
+    if (editor.isActive("codeBlock")) {
+      return event.shiftKey ? editor.commands.newlineInCode() : false;
+    }
 
     // Shift+Enter in a list starts the next item, or leaves the list from an empty one.
-    if (event.shiftKey && editor.isActive("listItem")) return editor.commands.splitListItem("listItem") || editor.commands.liftListItem("listItem");
+    if (event.shiftKey && editor.isActive("listItem")) {
+      return editor.commands.splitListItem("listItem") || editor.commands.liftListItem("listItem");
+    }
 
     // Shift+Enter on an empty line of a quote leaves the quote. On a line with text it continues the quote.
-    if (event.shiftKey && editor.isActive("blockquote") && editor.state.selection.$from.parent.content.size === 0) return editor.commands.lift("blockquote");
+    if (
+      event.shiftKey &&
+      editor.isActive("blockquote") &&
+      editor.state.selection.$from.parent.content.size === 0
+    ) {
+      return editor.commands.lift("blockquote");
+    }
 
     // Elsewhere it starts a new line as its own block, so that `1. ` or `- ` there can start a list.
-    if (event.shiftKey) return editor.commands.splitBlock();
+    if (event.shiftKey) {
+      return editor.commands.splitBlock();
+    }
 
     // Enter alone sends, in a field that sends.
     const { onEnter: send } = latest.current;
 
-    if (send === undefined) return false;
+    if (send === undefined) {
+      return false;
+    }
 
     send();
 
@@ -414,7 +517,9 @@ export function ComposerField({
 
 /** Builds the text that the picker shows when nothing matches. A new bot lists its skills a moment after it opens. */
 const emptyPickerText = (kind: ReferenceKind, noSkillsYet: boolean) => {
-  if (kind === "bot") return "No bot matches.";
+  if (kind === "bot") {
+    return "No bot matches.";
+  }
 
   return noSkillsYet ? "Loading the skills…" : "No skill matches.";
 };

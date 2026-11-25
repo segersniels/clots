@@ -1,7 +1,15 @@
 import { COLOR_HEX } from "@clots/character";
 import type { Account, UsageWindow } from "@clots/contracts";
 import { cn } from "cn";
-import { ChevronRightIcon, ContrastIcon, GaugeIcon, MonitorIcon, MoonIcon, SunIcon, type LucideIcon } from "lucide-react";
+import {
+  ChevronRightIcon,
+  ContrastIcon,
+  GaugeIcon,
+  MonitorIcon,
+  MoonIcon,
+  SunIcon,
+  type LucideIcon,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { client } from "@/client.ts";
@@ -40,28 +48,41 @@ const THEMES: ReadonlyArray<{ value: Theme; label: string; icon: LucideIcon }> =
 
 /** Tells how close a window is to its limit. Claude marks a critical one itself. */
 const levelOf = (window: UsageWindow | undefined): Level => {
-  if (window?.critical) return "critical";
+  if (window?.critical) {
+    return "critical";
+  }
 
-  if ((window?.percent ?? 0) >= NEAR_LIMIT) return "near";
+  if ((window?.percent ?? 0) >= NEAR_LIMIT) {
+    return "near";
+  }
 
   return "normal";
 };
 
 /** Names a window in the menu, such as "Fable this week". */
 const meterLabel = (window: UsageWindow) => {
-  if (window.kind === "session") return "Session";
+  if (window.kind === "session") {
+    return "Session";
+  }
 
-  if (window.kind === "model") return `${window.model} this week`;
+  if (window.kind === "model") {
+    return `${window.model} this week`;
+  }
 
   return "This week";
 };
 
 /** Names a window in the tooltip, such as "this week". */
-const shortLabel = (window: UsageWindow) => (window.kind === "session" ? "this session" : meterLabel(window).replace(/^This/, "this"));
+const shortLabel = (window: UsageWindow) =>
+  window.kind === "session" ? "this session" : meterLabel(window).replace(/^This/, "this");
 
 /** Picks the window that is closest to its limit. */
 const highestOf = (usage: ReadonlyArray<UsageWindow> | null | undefined) =>
-  usage?.reduce<UsageWindow | undefined>((highest, window) => (highest === undefined || window.percent > highest.percent ? window : highest), undefined);
+  usage?.reduce<UsageWindow | undefined>(
+    (highest, window) =>
+      highest === undefined || window.percent > highest.percent ? window : highest,
+    undefined,
+  );
 
 /** Keeps the server's account and usage, and asks again each minute while the client is connected. */
 function useAccount(connected: boolean) {
@@ -69,7 +90,9 @@ function useAccount(connected: boolean) {
   const refresh = () => void client.getAccount().then(setAccount, () => undefined);
 
   useEffect(() => {
-    if (!connected) return;
+    if (!connected) {
+      return;
+    }
 
     refresh();
     const timer = setInterval(refresh, CHECK_INTERVAL_MS);
@@ -84,13 +107,23 @@ function useAccount(connected: boolean) {
 const initialsOf = (account: Account | undefined) => {
   const words = account?.name?.split(/\s+/) ?? [];
 
-  if (words.length > 1) return `${words[0]!.charAt(0)}${words.at(-1)!.charAt(0)}`;
+  if (words.length > 1) {
+    return `${words[0]!.charAt(0)}${words.at(-1)!.charAt(0)}`;
+  }
 
   return (words[0] ?? account?.email ?? "").charAt(0);
 };
 
 /** A circle with the account's initials, ringed by the use of the limit that is closest to its end. */
-function UsageGauge({ initials, window, dimmed }: { initials: string; window: UsageWindow | undefined; dimmed: boolean }) {
+function UsageGauge({
+  initials,
+  window,
+  dimmed,
+}: {
+  initials: string;
+  window: UsageWindow | undefined;
+  dimmed: boolean;
+}) {
   const radius = 14.5;
   const length = 2 * Math.PI * radius;
   const percent = Math.min(100, window?.percent ?? 0);
@@ -98,8 +131,22 @@ function UsageGauge({ initials, window, dimmed }: { initials: string; window: Us
 
   return (
     <span className="relative size-8 shrink-0">
-      <svg viewBox="0 0 32 32" className={cn("absolute inset-0 -rotate-90 transition-opacity duration-200", dimmed && "opacity-55")} aria-hidden>
-        <circle cx="16" cy="16" r={radius} fill="none" strokeWidth="3" className="stroke-muted-foreground/22" />
+      <svg
+        viewBox="0 0 32 32"
+        className={cn(
+          "absolute inset-0 -rotate-90 transition-opacity duration-200",
+          dimmed && "opacity-55",
+        )}
+        aria-hidden
+      >
+        <circle
+          cx="16"
+          cy="16"
+          r={radius}
+          fill="none"
+          strokeWidth="3"
+          className="stroke-muted-foreground/22"
+        />
         {percent > 0 && (
           <circle
             cx="16"
@@ -110,12 +157,17 @@ function UsageGauge({ initials, window, dimmed }: { initials: string; window: Us
             strokeLinecap="round"
             strokeDasharray={length}
             strokeDashoffset={length * (1 - percent / 100)}
-            className={cn("transition-[stroke-dashoffset,stroke] duration-600 ease-out motion-reduce:transition-none", color === undefined && "stroke-muted-foreground")}
+            className={cn(
+              "transition-[stroke-dashoffset,stroke] duration-600 ease-out motion-reduce:transition-none",
+              color === undefined && "stroke-muted-foreground",
+            )}
             style={{ stroke: color }}
           />
         )}
       </svg>
-      <span className="absolute inset-1 flex items-center justify-center rounded-full bg-muted text-[10.5px] font-semibold uppercase">{initials}</span>
+      <span className="absolute inset-1 flex items-center justify-center rounded-full bg-muted text-[10.5px] font-semibold uppercase">
+        {initials}
+      </span>
     </span>
   );
 }
@@ -132,18 +184,33 @@ function UsageMeter({ window }: { window: UsageWindow }) {
       </div>
       <div className="h-[3px] overflow-hidden rounded-full bg-muted">
         <div
-          className={cn("h-full rounded-full", LEVEL_COLOR[level] === undefined && "bg-foreground/60")}
-          style={{ width: `${Math.min(100, window.percent)}%`, backgroundColor: LEVEL_COLOR[level] }}
+          className={cn(
+            "h-full rounded-full",
+            LEVEL_COLOR[level] === undefined && "bg-foreground/60",
+          )}
+          style={{
+            width: `${Math.min(100, window.percent)}%`,
+            backgroundColor: LEVEL_COLOR[level],
+          }}
         />
       </div>
-      {window.resetsAt !== null && <p className="text-xs text-muted-foreground tabular-nums">{formatReset(window.resetsAt)}</p>}
+      {window.resetsAt !== null && (
+        <p className="text-xs text-muted-foreground tabular-nums">{formatReset(window.resetsAt)}</p>
+      )}
     </div>
   );
 }
 
 /** A grey bar in place of text that is not there yet. */
 function Skeleton({ className }: { className: string }) {
-  return <span className={cn("block animate-pulse rounded-full bg-muted motion-reduce:animate-none", className)} />;
+  return (
+    <span
+      className={cn(
+        "block animate-pulse rounded-full bg-muted motion-reduce:animate-none",
+        className,
+      )}
+    />
+  );
 }
 
 /** Switches the theme of this device between the system setting, light and dark. */
@@ -189,13 +256,22 @@ function UsageRow({ account }: { account: Account | undefined }) {
         className="flex min-h-9 items-center gap-2.5 rounded-[10px] px-2.5 text-left outline-none transition-[background-color,box-shadow] duration-150 enabled:hover:bg-muted focus-visible:bg-muted focus-visible:ring-1 focus-visible:ring-ring/40"
       >
         <GaugeIcon className="size-4 shrink-0 text-muted-foreground" />
-        {account === undefined ? <Skeleton className="h-3.5 w-14" /> : <span className="truncate">{account.plan}</span>}
+        {account === undefined ? (
+          <Skeleton className="h-3.5 w-14" />
+        ) : (
+          <span className="truncate">{account.plan}</span>
+        )}
         <span className={cn("ml-auto shrink-0 tabular-nums", LEVEL_TEXT[levelOf(highest)])}>
-          {highest === undefined ? account !== undefined && "Usage unknown" : `${Math.round(highest.percent)}% used`}
+          {highest === undefined
+            ? account !== undefined && "Usage unknown"
+            : `${Math.round(highest.percent)}% used`}
         </span>
         {highest !== undefined && (
           <ChevronRightIcon
-            className={cn("-mr-1 size-4 shrink-0 text-muted-foreground transition-transform duration-200 ease-out motion-reduce:transition-none", open && "rotate-90")}
+            className={cn(
+              "-mr-1 size-4 shrink-0 text-muted-foreground transition-transform duration-200 ease-out motion-reduce:transition-none",
+              open && "rotate-90",
+            )}
           />
         )}
       </button>
@@ -232,7 +308,9 @@ export function AccountMenu({
 
   // The menu shows fresh numbers on each open, however it opens.
   useEffect(() => {
-    if (open && connected) refresh();
+    if (open && connected) {
+      refresh();
+    }
   }, [open]);
 
   return (
@@ -243,7 +321,11 @@ export function AccountMenu({
             <button
               type="button"
               aria-label="Account"
-              title={highest === undefined ? undefined : `${Math.round(highest.percent)}% used · ${shortLabel(highest)}`}
+              title={
+                highest === undefined
+                  ? undefined
+                  : `${Math.round(highest.percent)}% used · ${shortLabel(highest)}`
+              }
               className="flex rounded-full outline-none transition-[scale,box-shadow] duration-150 ease-out focus-visible:ring-1 focus-visible:ring-ring/40 active:scale-[0.96] motion-reduce:active:scale-100"
             />
           }
@@ -263,8 +345,12 @@ export function AccountMenu({
               <Skeleton className="h-4 w-32" />
             ) : (
               <>
-                <p className="truncate font-medium">{account.name ?? account.email ?? "Claude account"}</p>
-                {account.name !== null && account.email !== null && <p className="truncate text-xs text-muted-foreground">{account.email}</p>}
+                <p className="truncate font-medium">
+                  {account.name ?? account.email ?? "Claude account"}
+                </p>
+                {account.name !== null && account.email !== null && (
+                  <p className="truncate text-xs text-muted-foreground">{account.email}</p>
+                )}
               </>
             )}
           </div>

@@ -40,7 +40,9 @@ export const updateState = () => state;
  * reports each state change. The download waits for the operator's click.
  */
 export const startUpdates = async (onChange: (state: AppUpdateState) => void) => {
-  if (!app.isPackaged || process.platform !== "darwin" || !(await hasDeveloperIdSignature())) return;
+  if (!app.isPackaged || process.platform !== "darwin" || !(await hasDeveloperIdSignature())) {
+    return;
+  }
 
   report = onChange;
   autoUpdater.autoDownload = false;
@@ -48,12 +50,16 @@ export const startUpdates = async (onChange: (state: AppUpdateState) => void) =>
   autoUpdater.on("update-not-available", () => setState({ status: "current" }));
   autoUpdater.on("update-downloaded", ({ version }) => setState({ status: "ready", version }));
   autoUpdater.on("download-progress", ({ percent }) => {
-    if (state.status === "downloading") setState({ ...state, percent });
+    if (state.status === "downloading") {
+      setState({ ...state, percent });
+    }
   });
 
   // A failed check, for example without a network, keeps the last state. The next check tries again.
   autoUpdater.on("error", (error) => {
-    if (state.status === "downloading") setState({ status: "failed", version: state.version, message: error.message });
+    if (state.status === "downloading") {
+      setState({ status: "failed", version: state.version, message: error.message });
+    }
   });
 
   setState({ status: "current" });
@@ -64,19 +70,25 @@ export const startUpdates = async (onChange: (state: AppUpdateState) => void) =>
 /** Asks GitHub for a new release. A failed check, for example without a network, keeps the last state. */
 const check = () => {
   // A check during a download or before the restart would forget the downloaded version.
-  if (state.status === "downloading" || state.status === "ready") return;
+  if (state.status === "downloading" || state.status === "ready") {
+    return;
+  }
 
   void autoUpdater.checkForUpdates().catch(() => undefined);
 };
 
 /** Checks for a new release now, for the menu. The sidebar shows what the check finds. */
 export const checkForUpdates = () => {
-  if (state.status !== "off") check();
+  if (state.status !== "off") {
+    check();
+  }
 };
 
 /** Downloads the version that the last check found. The error event reports a failed download. */
 export const downloadUpdate = () => {
-  if (state.status !== "available" && state.status !== "failed") return;
+  if (state.status !== "available" && state.status !== "failed") {
+    return;
+  }
 
   setState({ status: "downloading", version: state.version, percent: 0 });
   void autoUpdater.downloadUpdate().catch(() => undefined);
@@ -84,5 +96,7 @@ export const downloadUpdate = () => {
 
 /** Quits the app and opens the downloaded version. */
 export const installUpdate = () => {
-  if (state.status === "ready") autoUpdater.quitAndInstall();
+  if (state.status === "ready") {
+    autoUpdater.quitAndInstall();
+  }
 };

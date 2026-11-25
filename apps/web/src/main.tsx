@@ -18,7 +18,9 @@ declare module "@tanstack/react-router" {
 
 // The desktop app marks itself in the user agent. The styles then make room for its window frame.
 const desktop = /clots-desktop\/(\w+)/.exec(navigator.userAgent);
-if (desktop !== null) document.documentElement.classList.add("desktop", `desktop-${desktop[1]}`);
+if (desktop !== null) {
+  document.documentElement.classList.add("desktop", `desktop-${desktop[1]}`);
+}
 
 followSystemColorScheme();
 startBotNotifications((botId) => void router.navigate({ to: "/bots/$botId", params: { botId } }));

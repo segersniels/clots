@@ -22,10 +22,14 @@ const run = <A>(program: Effect.Effect<A, never, BotRepository | ProjectReposito
     webDevPort: undefined,
     tailnet: false,
   });
-  const sql = MigrationsLayer.pipe(Layer.provideMerge(SqliteClient.layer({ filename: ":memory:" })));
+  const sql = MigrationsLayer.pipe(
+    Layer.provideMerge(SqliteClient.layer({ filename: ":memory:" })),
+  );
   const repositories = Layer.mergeAll(BotRepository.layer, ProjectRepository.layer);
 
-  return Effect.runPromise(program.pipe(Effect.provide(repositories.pipe(Layer.provide(sql), Layer.provide(config)))));
+  return Effect.runPromise(
+    program.pipe(Effect.provide(repositories.pipe(Layer.provide(sql), Layer.provide(config)))),
+  );
 };
 
 test("a removed project moves its bots to no project, and a bot that left its directory forgets the session", async () => {

@@ -5,7 +5,13 @@ import { dirname, join } from "node:path";
 
 import type { StoredBot } from "../bots/BotRepository.ts";
 import { runtimePaths } from "../paths.ts";
-import { closeChrome, realAgentBrowser, SCREEN_SIZE, stopLoading, type BotChrome } from "./BotChrome.ts";
+import {
+  closeChrome,
+  realAgentBrowser,
+  SCREEN_SIZE,
+  stopLoading,
+  type BotChrome,
+} from "./BotChrome.ts";
 import { installBrowser, installedBrowser } from "./BrowserInstall.ts";
 
 /** The directory that holds the real `agent-browser` CLI. */
@@ -24,7 +30,10 @@ const MAC_BROWSERS = [
 ];
 
 /** The Chrome of the host, which clots prefers to its own Chrome for Testing. */
-const systemBrowser = Bun.which("chromium") ?? Bun.which("google-chrome") ?? MAC_BROWSERS.find((path) => existsSync(path));
+const systemBrowser =
+  Bun.which("chromium") ??
+  Bun.which("google-chrome") ??
+  MAC_BROWSERS.find((path) => existsSync(path));
 
 /** The platform part of a normal Chrome user agent on each host system. */
 const PLATFORM_TOKENS: Partial<Record<NodeJS.Platform, string>> = {
@@ -39,11 +48,15 @@ const PLATFORM_TOKENS: Partial<Record<NodeJS.Platform, string>> = {
  */
 const normalUserAgent = (executable: string | undefined) => {
   const platform = PLATFORM_TOKENS[process.platform];
-  if (executable === undefined || platform === undefined) return undefined;
+  if (executable === undefined || platform === undefined) {
+    return undefined;
+  }
 
   const version = Bun.spawnSync([executable, "--version"], { stderr: "ignore" }).stdout.toString();
   const major = /(\d+)\.\d+\.\d+/.exec(version)?.[1];
-  if (major === undefined) return undefined;
+  if (major === undefined) {
+    return undefined;
+  }
 
   return `Mozilla/5.0 (${platform}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${major}.0.0.0 Safari/537.36`;
 };
@@ -59,7 +72,9 @@ let userAgent = normalUserAgent(executable);
  * covers a server that started without it, such as a source checkout or an older installation.
  */
 export const ensureBrowser = Effect.promise(async () => {
-  if (executable !== undefined) return;
+  if (executable !== undefined) {
+    return;
+  }
 
   executable = await installBrowser();
   userAgent = normalUserAgent(executable);
@@ -76,7 +91,9 @@ export const browserProfile = (bot: StoredBot) => join(bot.workingDirectory, ".b
 
 /** Describes the bot's own Chrome, or `undefined` when agent-browser launches its own. */
 export const botChrome = (bot: StoredBot): BotChrome | undefined =>
-  executable === undefined ? undefined : { executable, port: devToolsPort(bot), profile: browserProfile(bot), userAgent };
+  executable === undefined
+    ? undefined
+    : { executable, port: devToolsPort(bot), profile: browserProfile(bot), userAgent };
 
 /**
  * Builds the variables that give a bot its own browser: one agent-browser session, one persistent
@@ -136,35 +153,53 @@ export const closeBrowser = (bot: StoredBot) =>
 const commandFor = (action: BrowserAction, target: string | undefined) => {
   const targetArgs = target === undefined ? [] : [target];
 
-  if (action === "newTab") return ["tab", "new"];
-  if (action === "closeTab") return ["tab", "close", ...targetArgs];
+  if (action === "newTab") {
+    return ["tab", "new"];
+  }
+
+  if (action === "closeTab") {
+    return ["tab", "close", ...targetArgs];
+  }
 
   // A bot can resize its page, for example to check a phone layout. Scale 2 keeps the frames sharp, as the Chrome flags do.
-  if (action === "resetViewport") return ["set", "viewport", String(SCREEN_SIZE.width), String(SCREEN_SIZE.height), "2"];
+  if (action === "resetViewport") {
+    return ["set", "viewport", String(SCREEN_SIZE.width), String(SCREEN_SIZE.height), "2"];
+  }
 
   return [action, ...targetArgs];
 };
 
 /** Navigates the bot's browser for the take-over toolbar. A browser that hangs does not block the caller for long. */
-export const navigateBrowser = (bot: StoredBot, action: BrowserAction, target: string | undefined) =>
+export const navigateBrowser = (
+  bot: StoredBot,
+  action: BrowserAction,
+  target: string | undefined,
+) =>
   Effect.promise(async () => {
     // agent-browser runs one command at a time, so a stop goes to the page over DevTools, past the navigation that waits.
     if (action === "stop") {
-      if (executable !== undefined && target !== undefined) await stopLoading(devToolsPort(bot), target);
+      if (executable !== undefined && target !== undefined) {
+        await stopLoading(devToolsPort(bot), target);
+      }
 
       return;
     }
 
     // An address or a tab without its target has nowhere to go. A close without a tab would close the current one.
-    if ((action === "open" || action === "tab" || action === "closeTab") && target === undefined) return;
+    if ((action === "open" || action === "tab" || action === "closeTab") && target === undefined) {
+      return;
+    }
 
     const args = commandFor(action, target);
 
     // The wrapper starts the bot's Chrome first, as it does for the bot's own commands.
-    const command = Bun.spawn([executable === undefined ? realAgentBrowser : join(clotsBin, "agent-browser"), ...args], {
-      env: { ...process.env, ...makeBrowserEnvironment(bot) },
-      stdout: "ignore",
-      stderr: "ignore",
-    });
+    const command = Bun.spawn(
+      [executable === undefined ? realAgentBrowser : join(clotsBin, "agent-browser"), ...args],
+      {
+        env: { ...process.env, ...makeBrowserEnvironment(bot) },
+        stdout: "ignore",
+        stderr: "ignore",
+      },
+    );
     await command.exited;
   }).pipe(Effect.timeout("60 seconds"), Effect.ignore);

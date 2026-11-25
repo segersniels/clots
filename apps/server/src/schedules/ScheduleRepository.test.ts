@@ -21,7 +21,9 @@ test("a cron expression that does not parse has no next run", () => {
 });
 
 test("an edited routine gets its new schedule and prompt, and stays paused", async () => {
-  const sql = MigrationsLayer.pipe(Layer.provideMerge(SqliteClient.layer({ filename: ":memory:" })));
+  const sql = MigrationsLayer.pipe(
+    Layer.provideMerge(SqliteClient.layer({ filename: ":memory:" })),
+  );
   const [edited] = await Effect.runPromise(
     Effect.gen(function* () {
       const schedules = yield* ScheduleRepository;
@@ -34,5 +36,10 @@ test("an edited routine gets its new schedule and prompt, and stays paused", asy
     }).pipe(Effect.provide(ScheduleRepository.layer.pipe(Layer.provideMerge(sql)))),
   );
 
-  expect(edited).toMatchObject({ cron: "0 18 * * 1-5", prompt: "/commit the day", paused: true, nextRunAt: 2 });
+  expect(edited).toMatchObject({
+    cron: "0 18 * * 1-5",
+    prompt: "/commit the day",
+    paused: true,
+    nextRunAt: 2,
+  });
 });

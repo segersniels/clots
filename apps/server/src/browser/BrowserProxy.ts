@@ -11,7 +11,11 @@ const PAGE_POLL_MS = 500;
 
 /** The tabs as agent-browser lists them, with the fields that clots takes from Chrome. */
 interface TabList {
-  readonly tabs: ReadonlyArray<{ readonly targetId: string; readonly title: string; readonly url: string }>;
+  readonly tabs: ReadonlyArray<{
+    readonly targetId: string;
+    readonly title: string;
+    readonly url: string;
+  }>;
 }
 
 /**
@@ -25,7 +29,9 @@ export const BrowserProxyLayer = HttpRouter.add(
     const bots = yield* BotRepository;
     const { botId } = yield* HttpRouter.params;
     const bot = yield* bots.find(botId as BotId);
-    if (bot === undefined) return HttpServerResponse.empty({ status: 404 });
+    if (bot === undefined) {
+      return HttpServerResponse.empty({ status: 404 });
+    }
 
     const socket = yield* request.upgrade;
     const writer = yield* socket.writer;
@@ -34,7 +40,9 @@ export const BrowserProxyLayer = HttpRouter.add(
 
     // The client acks each frame, so the browser never sends more than the link can carry.
     const upstream = yield* Effect.acquireRelease(
-      Effect.sync(() => new WebSocket(`ws://127.0.0.1:${bot.browserStreamPort}/?pacing=ack&maxFps=10`)),
+      Effect.sync(
+        () => new WebSocket(`ws://127.0.0.1:${bot.browserStreamPort}/?pacing=ack&maxFps=10`),
+      ),
       (opened) => Effect.sync(() => opened.close()),
     );
 
@@ -49,7 +57,9 @@ export const BrowserProxyLayer = HttpRouter.add(
     let sent = "";
 
     const sendTabs = async () => {
-      if (listed === undefined) return;
+      if (listed === undefined) {
+        return;
+      }
 
       const pages = await readPages(devToolsPort(bot));
       const tabs = listed.tabs.map((tab) => {
@@ -59,7 +69,9 @@ export const BrowserProxyLayer = HttpRouter.add(
       });
       const text = JSON.stringify({ ...listed, tabs });
 
-      if (text === sent) return;
+      if (text === sent) {
+        return;
+      }
 
       sent = text;
       send(text);
@@ -93,7 +105,9 @@ export const BrowserProxyLayer = HttpRouter.add(
     const forwardInput = Effect.gen(function* () {
       while (true) {
         for (const chunk of yield* reader.pull) {
-          if (typeof chunk === "string" && upstream.readyState === WebSocket.OPEN) upstream.send(chunk);
+          if (typeof chunk === "string" && upstream.readyState === WebSocket.OPEN) {
+            upstream.send(chunk);
+          }
         }
       }
     });

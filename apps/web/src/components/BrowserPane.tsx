@@ -1,5 +1,13 @@
 import { BROWSER_STREAM_PATH, type BotId } from "@clots/contracts";
-import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type MouseEvent, type WheelEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ClipboardEvent,
+  type KeyboardEvent,
+  type MouseEvent,
+  type WheelEvent,
+} from "react";
 
 import { SquareIcon } from "lucide-react";
 
@@ -71,7 +79,10 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
   const socket = useRef<WebSocket | null>(null);
   // The section keeps the last frame while it closes, so the card does not go blank as it leaves.
   const lastFrame = useRef(frame);
-  if (frame !== null) lastFrame.current = frame;
+  if (frame !== null) {
+    lastFrame.current = frame;
+  }
+
   // Frames in the bot's own page size can arrive while the take-over resets it, and must not change the window.
   const resettingViewport = useRef(false);
   // The socket opens again after a drop, and the new one must ask for the same frame rate.
@@ -80,7 +91,9 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
 
   /** Asks the stream for the frame rate that fits: smooth while the operator controls the page. */
   const sendFrameRate = (opened: WebSocket) =>
-    opened.send(JSON.stringify({ type: "config", maxFps: takeOverNow.current ? TAKE_OVER_FPS : PREVIEW_FPS }));
+    opened.send(
+      JSON.stringify({ type: "config", maxFps: takeOverNow.current ? TAKE_OVER_FPS : PREVIEW_FPS }),
+    );
   const screen = useRef<HTMLImageElement>(null);
 
   useEffect(() => {
@@ -102,17 +115,25 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
           setAddress(listed.find((tab) => tab.active)?.url ?? "");
         }
 
-        if (message.type === "url") setAddress(message.url);
+        if (message.type === "url") {
+          setAddress(message.url);
+        }
 
         if (message.type === "command" && NAVIGATIONS.has(message.action)) {
           setNavigations((running) => new Set(running).add(message.id));
         }
 
         if (message.type === "result") {
-          setNavigations((running) => (running.has(message.id) ? new Set([...running].filter((id) => id !== message.id)) : running));
+          setNavigations((running) =>
+            running.has(message.id)
+              ? new Set([...running].filter((id) => id !== message.id))
+              : running,
+          );
         }
 
-        if (message.type !== "frame") return;
+        if (message.type !== "frame") {
+          return;
+        }
 
         setFrame(`data:image/jpeg;base64,${message.data}`);
         setPageWidth(message.metadata.deviceWidth);
@@ -127,7 +148,9 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
         setAddress("");
         setNavigations(new Set());
         setStopping(false);
-        if (!closed) retry = setTimeout(connect, RECONNECT_DELAY_MS);
+        if (!closed) {
+          retry = setTimeout(connect, RECONNECT_DELAY_MS);
+        }
       });
     };
     connect();
@@ -141,7 +164,9 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
 
   useEffect(() => {
     const opened = socket.current;
-    if (opened?.readyState !== WebSocket.OPEN) return;
+    if (opened?.readyState !== WebSocket.OPEN) {
+      return;
+    }
 
     sendFrameRate(opened);
   }, [takeOver]);
@@ -176,7 +201,9 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
   /** Follows the shape of the page, and keeps it, so the next take-over of this bot opens at that size. */
   const followFrameShape = (image: HTMLImageElement) => {
     const ratio = image.naturalWidth / image.naturalHeight;
-    if (resettingViewport.current || Math.abs(ratio - frameRatio) < 0.001) return;
+    if (resettingViewport.current || Math.abs(ratio - frameRatio) < 0.001) {
+      return;
+    }
 
     setFrameRatio(ratio);
     try {
@@ -187,7 +214,9 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
   };
 
   const send = (message: object) => {
-    if (takeOver && socket.current?.readyState === WebSocket.OPEN) socket.current.send(JSON.stringify(message));
+    if (takeOver && socket.current?.readyState === WebSocket.OPEN) {
+      socket.current.send(JSON.stringify(message));
+    }
   };
 
   const sendMouse = (eventType: string) => (event: MouseEvent<HTMLImageElement>) => {
@@ -218,14 +247,18 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
   };
 
   const sendKey = (eventType: string) => (event: KeyboardEvent) => {
-    if (!takeOver) return;
+    if (!takeOver) {
+      return;
+    }
 
     // The bot's browser runs on Linux, so a Mac shortcut such as Command+A must arrive as Control+A.
     const control = event.ctrlKey || (OPERATOR_ON_MAC && event.metaKey);
     const meta = event.metaKey && !OPERATOR_ON_MAC;
 
     // The page's own clipboard is on the server. The paste shortcut stays here, so `pasteText` gets this clipboard.
-    if (control && event.key.toLowerCase() === "v") return;
+    if (control && event.key.toLowerCase() === "v") {
+      return;
+    }
 
     event.preventDefault();
     send({
@@ -233,11 +266,14 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
       eventType,
       key: event.key,
       code: event.code,
-      modifiers: (event.altKey ? 1 : 0) | (control ? 2 : 0) | (meta ? 4 : 0) | (event.shiftKey ? 8 : 0),
+      modifiers:
+        (event.altKey ? 1 : 0) | (control ? 2 : 0) | (meta ? 4 : 0) | (event.shiftKey ? 8 : 0),
       // A key without text, such as an arrow, works only with its key code.
       windowsVirtualKeyCode: event.keyCode,
       // Only a printable key inserts text, and not as part of a shortcut.
-      ...(eventType === "keyDown" && event.key.length === 1 && !control && !meta ? { text: event.key } : {}),
+      ...(eventType === "keyDown" && event.key.length === 1 && !control && !meta
+        ? { text: event.key }
+        : {}),
     });
   };
 
@@ -247,7 +283,10 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
 
     for (const character of event.clipboardData.getData("text/plain").replaceAll("\r\n", "\n")) {
       // A line break is an Enter press. Every other character arrives as typed text.
-      const key = character === "\n" ? { key: "Enter", code: "Enter", windowsVirtualKeyCode: 13, text: "\r" } : { key: character, text: character };
+      const key =
+        character === "\n"
+          ? { key: "Enter", code: "Enter", windowsVirtualKeyCode: 13, text: "\r" }
+          : { key: character, text: character };
       send({ type: "input_keyboard", eventType: "keyDown", modifiers: 0, ...key });
       send({ type: "input_keyboard", eventType: "keyUp", modifiers: 0, key: key.key });
     }
@@ -264,7 +303,13 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
               <p>{botName}'s screen</p>
               <p className="text-[0.8125rem] text-muted-foreground">Live. Click to take over.</p>
             </div>
-            <Button variant="secondary" size="sm" disabled={stopping} onClick={stopBrowser} className="rounded-full">
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={stopping}
+              onClick={stopBrowser}
+              className="rounded-full"
+            >
               <SquareIcon />
               {stopping ? "Stopping…" : "Stop"}
             </Button>
@@ -303,9 +348,18 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
               <BrowserToolbar>
                 <BrowserNavigation
                   loading={navigations.size > 0}
-                  onNavigate={(action) => navigate(action, action === "stop" ? tabs.find((tab) => tab.active)?.targetId : undefined)}
+                  onNavigate={(action) =>
+                    navigate(
+                      action,
+                      action === "stop" ? tabs.find((tab) => tab.active)?.targetId : undefined,
+                    )
+                  }
                 />
-                <AddressBar address={address} loading={navigations.size > 0} onOpen={(typed) => navigate("open", typed)} />
+                <AddressBar
+                  address={address}
+                  loading={navigations.size > 0}
+                  onOpen={(typed) => navigate("open", typed)}
+                />
                 <GiveBackButton bot={bot} />
               </BrowserToolbar>
               <BrowserViewport botName={botName} frameRatio={frameRatio} live={frame !== null}>

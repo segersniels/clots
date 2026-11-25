@@ -17,9 +17,13 @@ function SetupApp() {
   const [screen, setScreen] = useState<SetupScreen>(startScreen);
   const choose = () => setScreen("choose");
 
-  if (screen === "local") return <LocalSetup onBack={choose} />;
+  if (screen === "local") {
+    return <LocalSetup onBack={choose} />;
+  }
 
-  if (screen === "remote") return <RemoteSetup onBack={choose} />;
+  if (screen === "remote") {
+    return <RemoteSetup onBack={choose} />;
+  }
 
   return <ChooseScreen onChoose={setScreen} />;
 }

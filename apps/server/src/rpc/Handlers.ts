@@ -41,13 +41,19 @@ export const HandlersLayer = ClotsRpcs.toLayer(
     const requireBot = (botId: BotId) =>
       bots
         .find(botId)
-        .pipe(Effect.flatMap((bot) => (bot === undefined ? Effect.fail(new BotNotFound({ botId })) : Effect.succeed(bot))));
+        .pipe(
+          Effect.flatMap((bot) =>
+            bot === undefined ? Effect.fail(new BotNotFound({ botId })) : Effect.succeed(bot),
+          ),
+        );
 
     const summarize = (bot: StoredBot): BotSummary => {
       const live = sessions.live(bot.id);
       const idleLine = bot.lastMessageText ?? "No messages yet";
       const backgroundLine =
-        live.tasks.length === 1 ? `In the background: ${live.tasks[0]!.description}` : `${live.tasks.length} tasks in the background`;
+        live.tasks.length === 1
+          ? `In the background: ${live.tasks[0]!.description}`
+          : `${live.tasks.length} tasks in the background`;
       const statusLine = {
         // The list shows plain text, so the markdown marks of a reply go away. Work in the background comes first.
         idle: shorten(
@@ -98,7 +104,9 @@ export const HandlersLayer = ClotsRpcs.toLayer(
 
       CreateProject: ({ name, directory }) =>
         Effect.gen(function* () {
-          if (directory === null || directory.trim() === "") return yield* projects.create(name, null);
+          if (directory === null || directory.trim() === "") {
+            return yield* projects.create(name, null);
+          }
 
           // The operator types the path, often with `~` for the home directory.
           const absolute = resolve(directory.trim().replace(/^~(?=$|\/)/, homedir()));
@@ -129,7 +137,9 @@ export const HandlersLayer = ClotsRpcs.toLayer(
           yield* bots.setProject(botId, projectId);
 
           // The running sessions belong to the old directory.
-          yield* Effect.forEach([botId, ...clones.map((clone) => clone.id)], (id) => sessions.stop(id));
+          yield* Effect.forEach([botId, ...clones.map((clone) => clone.id)], (id) =>
+            sessions.stop(id),
+          );
           yield* PubSub.publish(sessions.statusChanges, undefined);
         }),
 
@@ -147,7 +157,9 @@ export const HandlersLayer = ClotsRpcs.toLayer(
         requireBot(botId).pipe(Effect.flatMap((bot) => navigateBrowser(bot, action, target))),
 
       ReorderBots: ({ botIds }) =>
-        bots.reorder(botIds).pipe(Effect.andThen(PubSub.publish(sessions.statusChanges, undefined)), Effect.asVoid),
+        bots
+          .reorder(botIds)
+          .pipe(Effect.andThen(PubSub.publish(sessions.statusChanges, undefined)), Effect.asVoid),
 
       SetBotUnread: ({ botId, unread }) =>
         requireBot(botId).pipe(
@@ -164,8 +176,8 @@ export const HandlersLayer = ClotsRpcs.toLayer(
           Effect.tap(() => PubSub.publish(sessions.statusChanges, undefined)),
         ),
 
-      DeleteBot: ({ botId }) => requireBot(botId).pipe(Effect.flatMap((bot) => sessions.deleteBot(bot))),
-
+      DeleteBot: ({ botId }) =>
+        requireBot(botId).pipe(Effect.flatMap((bot) => sessions.deleteBot(bot))),
 
       SetBotModel: ({ botId, model }) =>
         requireBot(botId).pipe(
@@ -185,11 +197,15 @@ export const HandlersLayer = ClotsRpcs.toLayer(
             const stored = yield* bots.messagesAfter(botId, afterSequence);
             const replayedThrough = stored.at(-1)?.sequence ?? afterSequence;
 
-            return Stream.fromIterable(stored.map((message) => ({ _tag: "Message" as const, message }))).pipe(
+            return Stream.fromIterable(
+              stored.map((message) => ({ _tag: "Message" as const, message })),
+            ).pipe(
               Stream.concat(Stream.make({ _tag: "Live" as const, state: sessions.live(botId) })),
               Stream.concat(
                 Stream.fromSubscription(subscription).pipe(
-                  Stream.filter((event) => event._tag !== "Message" || event.message.sequence > replayedThrough),
+                  Stream.filter(
+                    (event) => event._tag !== "Message" || event.message.sequence > replayedThrough,
+                  ),
                 ),
               ),
             );
@@ -208,20 +224,28 @@ export const HandlersLayer = ClotsRpcs.toLayer(
         ),
 
       SendMessage: ({ botId, text, attachments }) =>
-        requireBot(botId).pipe(Effect.flatMap((bot) => sessions.send(bot, "user", text, attachments))),
+        requireBot(botId).pipe(
+          Effect.flatMap((bot) => sessions.send(bot, "user", text, attachments)),
+        ),
 
-      InterruptBot: ({ botId }) => requireBot(botId).pipe(Effect.andThen(sessions.interrupt(botId))),
+      InterruptBot: ({ botId }) =>
+        requireBot(botId).pipe(Effect.andThen(sessions.interrupt(botId))),
 
       ResolveApproval: ({ botId, approvalId, decision }) =>
-        requireBot(botId).pipe(Effect.andThen(sessions.resolveApproval(botId, approvalId, decision))),
+        requireBot(botId).pipe(
+          Effect.andThen(sessions.resolveApproval(botId, approvalId, decision)),
+        ),
 
       ResolveHandoff: ({ botId, handoffId }) =>
         requireBot(botId).pipe(Effect.andThen(sessions.resolveHandoff(botId, handoffId))),
 
       ResolveLoginRequest: ({ botId, requestId, decision }) =>
-        requireBot(botId).pipe(Effect.andThen(sessions.resolveLoginRequest(botId, requestId, decision))),
+        requireBot(botId).pipe(
+          Effect.andThen(sessions.resolveLoginRequest(botId, requestId, decision)),
+        ),
 
-      FindLogins: ({ botId, url }) => requireBot(botId).pipe(Effect.flatMap((bot) => sessions.findLogins(bot, url))),
+      FindLogins: ({ botId, url }) =>
+        requireBot(botId).pipe(Effect.flatMap((bot) => sessions.findLogins(bot, url))),
 
       CopyLogin: ({ botId, fromBotId, url }) =>
         Effect.all([requireBot(botId), requireBot(fromBotId)]).pipe(
@@ -235,7 +259,9 @@ export const HandlersLayer = ClotsRpcs.toLayer(
             list.length > 0
               ? Effect.void
               : bots.find(botId).pipe(
-                  Effect.flatMap((bot) => (bot === undefined ? Effect.void : sessions.loadSkills(bot))),
+                  Effect.flatMap((bot) =>
+                    bot === undefined ? Effect.void : sessions.loadSkills(bot),
+                  ),
                   Effect.forkDetach,
                   Effect.asVoid,
                 ),
@@ -262,7 +288,9 @@ export const HandlersLayer = ClotsRpcs.toLayer(
           const bot = yield* requireBot(botId);
           const reason = saveBotSkill(bot, skill, previousName);
 
-          if (reason !== undefined) return yield* new InvalidSkill({ name: skill.name, reason });
+          if (reason !== undefined) {
+            return yield* new InvalidSkill({ name: skill.name, reason });
+          }
 
           yield* sessions.checkOwnSkills(bot);
         }),
@@ -272,18 +300,23 @@ export const HandlersLayer = ClotsRpcs.toLayer(
           const bot = yield* requireBot(botId);
           const reason = deleteBotSkill(bot, name);
 
-          if (reason !== undefined) return yield* new InvalidSkill({ name, reason });
+          if (reason !== undefined) {
+            return yield* new InvalidSkill({ name, reason });
+          }
 
           yield* sessions.checkOwnSkills(bot);
         }),
 
-      WatchSchedules: ({ botId }) => watch(schedules.list(botId), Stream.fromPubSub(schedules.changes)),
+      WatchSchedules: ({ botId }) =>
+        watch(schedules.list(botId), Stream.fromPubSub(schedules.changes)),
 
       CreateSchedule: ({ botId, cron, prompt }) =>
         Effect.gen(function* () {
           yield* requireBot(botId);
           const next = nextRunAt(cron, Date.now());
-          if (next === undefined) return yield* new InvalidCron({ cron });
+          if (next === undefined) {
+            return yield* new InvalidCron({ cron });
+          }
 
           return yield* schedules.create(botId, cron, prompt, next);
         }),
@@ -291,7 +324,9 @@ export const HandlersLayer = ClotsRpcs.toLayer(
       UpdateSchedule: ({ id, cron, prompt }) =>
         Effect.gen(function* () {
           const next = nextRunAt(cron, Date.now());
-          if (next === undefined) return yield* new InvalidCron({ cron });
+          if (next === undefined) {
+            return yield* new InvalidCron({ cron });
+          }
 
           yield* schedules.update(id, cron, prompt, next);
         }),
@@ -314,7 +349,8 @@ export const HandlersLayer = ClotsRpcs.toLayer(
             // The service starts the new binary when this process ends. The pause lets the answer reach the client first.
             setTimeout(() => process.exit(0), 500);
           },
-          catch: (error) => new UpdateFailed({ message: error instanceof Error ? error.message : String(error) }),
+          catch: (error) =>
+            new UpdateFailed({ message: error instanceof Error ? error.message : String(error) }),
         }),
     };
   }),

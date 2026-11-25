@@ -19,12 +19,18 @@ function Home() {
   const firstBot = useStore(client.bots)[0]?.id;
 
   useEffect(() => {
-    if (wide && firstBot !== undefined) void navigate({ to: "/bots/$botId", params: { botId: firstBot }, replace: true });
+    if (wide && firstBot !== undefined) {
+      void navigate({ to: "/bots/$botId", params: { botId: firstBot }, replace: true });
+    }
   }, [wide, firstBot, navigate]);
 
-  if (!wide) return <BotList />;
+  if (!wide) {
+    return <BotList />;
+  }
 
-  if (firstBot !== undefined) return null;
+  if (firstBot !== undefined) {
+    return null;
+  }
 
   return (
     <div className="window-drag flex h-full items-center justify-center">

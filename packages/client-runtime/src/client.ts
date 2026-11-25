@@ -18,7 +18,15 @@ import {
   type MessageHit,
   type BotSkill,
 } from "@clots/contracts";
-import { Context, Effect, Fiber, Layer, ManagedRuntime, Schedule as RetrySchedule, Stream } from "effect";
+import {
+  Context,
+  Effect,
+  Fiber,
+  Layer,
+  ManagedRuntime,
+  Schedule as RetrySchedule,
+  Stream,
+} from "effect";
 import { RpcClient, RpcClientError, RpcSerialization } from "effect/rpc";
 import { Socket } from "effect/socket";
 
@@ -42,9 +50,13 @@ export interface ClotsClient {
   saveBotSkill(botId: BotId, skill: BotSkill, previousName?: string): Promise<void>;
   deleteBotSkill(botId: BotId, name: string): Promise<void>;
   createBot(
-    bot: Pick<Bot, "name" | "instructions" | "color" | "shape"> & Partial<Pick<Bot, "projectId">> & { readonly skills?: ReadonlyArray<BotSkill> },
+    bot: Pick<Bot, "name" | "instructions" | "color" | "shape"> &
+      Partial<Pick<Bot, "projectId">> & { readonly skills?: ReadonlyArray<BotSkill> },
   ): Promise<Bot>;
-  updateBot(botId: BotId, changes: Partial<Pick<Bot, "name" | "instructions" | "color" | "shape">>): Promise<void>;
+  updateBot(
+    botId: BotId,
+    changes: Partial<Pick<Bot, "name" | "instructions" | "color" | "shape">>,
+  ): Promise<void>;
   setBotModel(botId: BotId, model: BotModel): Promise<void>;
   setBotUnread(botId: BotId, unread: boolean): Promise<void>;
   /** Puts the bots of one sidebar group in this order. */
@@ -82,9 +94,10 @@ export interface ClotsClient {
   dispose(): Promise<void>;
 }
 
-class Rpc extends Context.Service<Rpc, RpcClient.FromGroup<typeof ClotsRpcs, RpcClientError.RpcClientError>>()(
-  "clots/client-runtime/Rpc",
-) {
+class Rpc extends Context.Service<
+  Rpc,
+  RpcClient.FromGroup<typeof ClotsRpcs, RpcClientError.RpcClientError>
+>()("clots/client-runtime/Rpc") {
   static readonly layer = Layer.effect(Rpc, RpcClient.make(ClotsRpcs));
 }
 
@@ -131,7 +144,9 @@ export const makeClotsClient = (origin: string): ClotsClient => {
         Effect.service(Rpc).pipe(
           Effect.flatMap((rpc) =>
             Stream.suspend(() => subscribe(rpc, store.get())).pipe(
-              Stream.runForEach((value) => Effect.sync(() => set((current) => apply(current, value)))),
+              Stream.runForEach((value) =>
+                Effect.sync(() => set((current) => apply(current, value))),
+              ),
             ),
           ),
           Effect.ignore,
@@ -169,7 +184,9 @@ export const makeClotsClient = (origin: string): ClotsClient => {
 
     thread: (botId) => {
       const existing = threads.get(botId);
-      if (existing !== undefined) return existing;
+      if (existing !== undefined) {
+        return existing;
+      }
 
       const store = makeStreamStore(
         emptyThread,
@@ -200,7 +217,9 @@ export const makeClotsClient = (origin: string): ClotsClient => {
 
     schedules: (botId) => {
       const existing = schedules.get(botId);
-      if (existing !== undefined) return existing;
+      if (existing !== undefined) {
+        return existing;
+      }
 
       const store = makeStreamStore<ReadonlyArray<Schedule>, ReadonlyArray<Schedule>>(
         [],
@@ -214,7 +233,9 @@ export const makeClotsClient = (origin: string): ClotsClient => {
 
     skills: (botId) => {
       const existing = skills.get(botId);
-      if (existing !== undefined) return existing;
+      if (existing !== undefined) {
+        return existing;
+      }
 
       const store = makeStreamStore<ReadonlyArray<Skill>, ReadonlyArray<Skill>>(
         [],
@@ -228,7 +249,9 @@ export const makeClotsClient = (origin: string): ClotsClient => {
 
     botSkills: (botId) => {
       const existing = botSkills.get(botId);
-      if (existing !== undefined) return existing;
+      if (existing !== undefined) {
+        return existing;
+      }
 
       const store = makeStreamStore<ReadonlyArray<BotSkill> | null, ReadonlyArray<BotSkill>>(
         null,
@@ -241,7 +264,9 @@ export const makeClotsClient = (origin: string): ClotsClient => {
     },
 
     saveBotSkill: (botId, skill, previousName) =>
-      call((rpc) => rpc.SaveBotSkill({ botId, skill, ...(previousName === undefined ? {} : { previousName }) })),
+      call((rpc) =>
+        rpc.SaveBotSkill({ botId, skill, ...(previousName === undefined ? {} : { previousName }) }),
+      ),
     deleteBotSkill: (botId, name) => call((rpc) => rpc.DeleteBotSkill({ botId, name })),
 
     createBot: (bot) => call((rpc) => rpc.CreateBot(bot)),
@@ -255,10 +280,13 @@ export const makeClotsClient = (origin: string): ClotsClient => {
     reorderBots: (botIds) => call((rpc) => rpc.ReorderBots({ botIds })),
     stopBrowser: (botId) => call((rpc) => rpc.StopBrowser({ botId })),
     navigateBrowser: (botId, action, target) =>
-      call((rpc) => rpc.NavigateBrowser({ botId, action, ...(target === undefined ? {} : { target }) })),
+      call((rpc) =>
+        rpc.NavigateBrowser({ botId, action, ...(target === undefined ? {} : { target }) }),
+      ),
     duplicateBot: (botId) => call((rpc) => rpc.DuplicateBot({ botId })),
     deleteBot: (botId) => call((rpc) => rpc.DeleteBot({ botId })),
-    sendMessage: (botId, text, attachments = []) => call((rpc) => rpc.SendMessage({ botId, text, attachments })),
+    sendMessage: (botId, text, attachments = []) =>
+      call((rpc) => rpc.SendMessage({ botId, text, attachments })),
     interruptBot: (botId) => call((rpc) => rpc.InterruptBot({ botId })),
     resolveApproval: (botId, approvalId, decision) =>
       call((rpc) => rpc.ResolveApproval({ botId, approvalId, decision })),
@@ -267,7 +295,8 @@ export const makeClotsClient = (origin: string): ClotsClient => {
     copyLogin: (botId, fromBotId, url) => call((rpc) => rpc.CopyLogin({ botId, fromBotId, url })),
     resolveLoginRequest: (botId, requestId, decision) =>
       call((rpc) => rpc.ResolveLoginRequest({ botId, requestId, decision })),
-    createSchedule: (botId, cron, prompt) => call((rpc) => rpc.CreateSchedule({ botId, cron, prompt })),
+    createSchedule: (botId, cron, prompt) =>
+      call((rpc) => rpc.CreateSchedule({ botId, cron, prompt })),
     updateSchedule: (id, cron, prompt) => call((rpc) => rpc.UpdateSchedule({ id, cron, prompt })),
     setSchedulePaused: (id, paused) => call((rpc) => rpc.SetSchedulePaused({ id, paused })),
     deleteSchedule: (id) => call((rpc) => rpc.DeleteSchedule({ id })),

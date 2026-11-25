@@ -12,7 +12,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from "@/components/ui/context-menu";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 
 import { client } from "../client.ts";
 import { NewBotDialog } from "./CreateDialog.tsx";
@@ -22,10 +28,11 @@ const ICON = "text-muted-foreground";
 
 /** Tells the operator what happens to the bots and the folder of a project that they delete. */
 function describeDelete(project: Project, botCount: number) {
-  const bots = {
-    0: "The project has no bots.",
-    1: "Its bot moves to Personal and keeps its thread.",
-  }[botCount] ?? `Its ${botCount} bots move to Personal and keep their threads.`;
+  const bots =
+    {
+      0: "The project has no bots.",
+      1: "Its bot moves to Personal and keeps its thread.",
+    }[botCount] ?? `Its ${botCount} bots move to Personal and keep their threads.`;
   const folder = project.directory === null ? "" : " The folder on disk stays.";
 
   return `${bots}${folder} You cannot undo this.`;

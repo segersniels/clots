@@ -1,4 +1,14 @@
-import type { Attachment, Bot, BotId, BotModel, Message, MessageHit, MessageRole, Skill, TraceStep } from "@clots/contracts";
+import type {
+  Attachment,
+  Bot,
+  BotId,
+  BotModel,
+  Message,
+  MessageHit,
+  MessageRole,
+  Skill,
+  TraceStep,
+} from "@clots/contracts";
 
 /** The fields that the operator chooses for a new bot. */
 export type NewBot = Pick<Bot, "name" | "instructions" | "color" | "shape">;
@@ -20,7 +30,8 @@ const DEFAULT_MODEL: BotModel = "opus";
  * is 1000 higher. A server on another port, such as a test server, gets a range of its own below the
  * operator's, so its bots never reach the browser of one of the operator's bots.
  */
-const firstBrowserStreamPort = (serverPort: number) => (serverPort === DEFAULT_PORT ? 48100 : 40000 + (serverPort % 100) * 10);
+const firstBrowserStreamPort = (serverPort: number) =>
+  serverPort === DEFAULT_PORT ? 48100 : 40000 + (serverPort % 100) * 10;
 
 /** A bot with the host fields that clients do not see. */
 export interface StoredBot extends Bot {
@@ -64,7 +75,9 @@ export class BotRepository extends Context.Service<
     readonly list: Effect.Effect<ReadonlyArray<StoredBot>>;
     find(botId: BotId): Effect.Effect<StoredBot | undefined>;
     /** Creates a bot with the default model and no project, unless a copy brings its own. */
-    create(bot: NewBot & Partial<Pick<Bot, "model" | "projectId" | "clonedFrom">>): Effect.Effect<StoredBot>;
+    create(
+      bot: NewBot & Partial<Pick<Bot, "model" | "projectId" | "clonedFrom">>,
+    ): Effect.Effect<StoredBot>;
     /** Deletes the bot, its thread, its routines and its notes directory. */
     remove(bot: StoredBot): Effect.Effect<void>;
     setUnread(botId: BotId, unread: boolean): Effect.Effect<void>;
@@ -102,7 +115,8 @@ export class BotRepository extends Context.Service<
       const sql = yield* SqlClient.SqlClient;
       const config = yield* ClotsConfig;
 
-      const select = (where: Statement.Fragment) => sql<BotRow>`
+      const select = (where: Statement.Fragment) =>
+        sql<BotRow>`
         SELECT
           bots.id,
           bots.name,
@@ -184,12 +198,17 @@ export class BotRepository extends Context.Service<
         }).pipe(
           sql.withTransaction,
           // The rows go first, so a failed delete never leaves a bot without its notes.
-          Effect.andThen(Effect.sync(() => rmSync(bot.workingDirectory, { recursive: true, force: true }))),
+          Effect.andThen(
+            Effect.sync(() => rmSync(bot.workingDirectory, { recursive: true, force: true })),
+          ),
           Effect.orDie,
         );
 
       const setUnread = (botId: BotId, unread: boolean) =>
-        sql`UPDATE threads SET unread = ${unread ? 1 : 0} WHERE bot_id = ${botId}`.pipe(Effect.asVoid, Effect.orDie);
+        sql`UPDATE threads SET unread = ${unread ? 1 : 0} WHERE bot_id = ${botId}`.pipe(
+          Effect.asVoid,
+          Effect.orDie,
+        );
 
       const setSdkSessionId = (botId: BotId, sdkSessionId: string) =>
         sql`UPDATE threads SET sdk_session_id = ${sdkSessionId} WHERE bot_id = ${botId}`.pipe(
@@ -198,10 +217,16 @@ export class BotRepository extends Context.Service<
         );
 
       const setClaudePid = (botId: BotId, pid: number | null) =>
-        sql`UPDATE threads SET claude_pid = ${pid} WHERE bot_id = ${botId}`.pipe(Effect.asVoid, Effect.orDie);
+        sql`UPDATE threads SET claude_pid = ${pid} WHERE bot_id = ${botId}`.pipe(
+          Effect.asVoid,
+          Effect.orDie,
+        );
 
       const setSyncedUuid = (botId: BotId, uuid: string) =>
-        sql`UPDATE threads SET synced_uuid = ${uuid} WHERE bot_id = ${botId}`.pipe(Effect.asVoid, Effect.orDie);
+        sql`UPDATE threads SET synced_uuid = ${uuid} WHERE bot_id = ${botId}`.pipe(
+          Effect.asVoid,
+          Effect.orDie,
+        );
 
       const update = (botId: BotId, { name, instructions, color, shape }: BotChanges) =>
         sql`
@@ -219,8 +244,10 @@ export class BotRepository extends Context.Service<
 
       const setProject = (botId: BotId, projectId: string | null) =>
         Effect.gen(function* () {
-          // Claude Code stores a session under its directory, so the old session cannot resume in a new one.
-          // A move between projects with the same directory, or with none, keeps the session.
+          /**
+           * Claude Code stores a session under its directory, so the old session cannot resume in a new one.
+           * A move between projects with the same directory, or with none, keeps the session.
+           */
           yield* sql`
             UPDATE threads SET sdk_session_id = NULL
             WHERE bot_id IN (SELECT id FROM bots WHERE id = ${botId} OR cloned_from = ${botId})
@@ -295,7 +322,9 @@ export class BotRepository extends Context.Service<
           .map((word) => `"${word.replaceAll('"', '""')}"*`)
           .join(" ");
 
-        if (match === "") return Effect.succeed([]);
+        if (match === "") {
+          return Effect.succeed([]);
+        }
 
         return sql<MessageHit>`
           SELECT threads.bot_id AS botId, messages.id AS messageId, messages.text, messages.created_at AS createdAt
@@ -310,12 +339,17 @@ export class BotRepository extends Context.Service<
 
       const skills = (botId: BotId) =>
         sql<{ readonly skills: string }>`SELECT skills FROM threads WHERE bot_id = ${botId}`.pipe(
-          Effect.map((rows): ReadonlyArray<Skill> => (rows[0] === undefined ? [] : JSON.parse(rows[0].skills))),
+          Effect.map((rows): ReadonlyArray<Skill> =>
+            rows[0] === undefined ? [] : JSON.parse(rows[0].skills),
+          ),
           Effect.orDie,
         );
 
       const setSkills = (botId: BotId, list: ReadonlyArray<Skill>) =>
-        sql`UPDATE threads SET skills = ${JSON.stringify(list)} WHERE bot_id = ${botId}`.pipe(Effect.asVoid, Effect.orDie);
+        sql`UPDATE threads SET skills = ${JSON.stringify(list)} WHERE bot_id = ${botId}`.pipe(
+          Effect.asVoid,
+          Effect.orDie,
+        );
 
       return BotRepository.of({
         list,

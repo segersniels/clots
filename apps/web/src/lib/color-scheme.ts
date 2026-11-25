@@ -24,7 +24,10 @@ export const currentTheme = () => theme;
 
 /** Sets the `dark` class, which the shadcn theme reads, from the theme and the system setting. */
 const applyColorScheme = () =>
-  document.documentElement.classList.toggle("dark", theme === "dark" || (theme === "system" && prefersDark.matches));
+  document.documentElement.classList.toggle(
+    "dark",
+    theme === "dark" || (theme === "system" && prefersDark.matches),
+  );
 
 /** Keeps the `dark` class in step with the theme of this device and the system setting. */
 export const followSystemColorScheme = () => {

@@ -11,7 +11,9 @@ export const formatClock = (time: number) => clock.format(time);
 /** Formats a length of time, for example "3m 24s" or "12s". */
 export const formatDuration = (milliseconds: number) => {
   const seconds = Math.max(1, Math.round(milliseconds / 1000));
-  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 60) {
+    return `${seconds}s`;
+  }
 
   return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 };
@@ -20,9 +22,17 @@ export const formatDuration = (milliseconds: number) => {
 export const formatRecent = (time: number, now = Date.now()) => {
   const startOfToday = new Date(now).setHours(0, 0, 0, 0);
 
-  if (time >= startOfToday) return clock.format(time);
-  if (time >= startOfToday - DAY_MS) return "Yesterday";
-  if (time >= startOfToday - 6 * DAY_MS) return weekday.format(time);
+  if (time >= startOfToday) {
+    return clock.format(time);
+  }
+
+  if (time >= startOfToday - DAY_MS) {
+    return "Yesterday";
+  }
+
+  if (time >= startOfToday - 6 * DAY_MS) {
+    return weekday.format(time);
+  }
 
   return date.format(time);
 };
@@ -30,10 +40,17 @@ export const formatRecent = (time: number, now = Date.now()) => {
 /** Formats the day of a coming time: "Today", "Tomorrow", then a short weekday such as "Mon". */
 export const formatNextDay = (time: number, now = Date.now()) => {
   // Rounding keeps a day that daylight saving time makes 23 or 25 hours long at one day.
-  const days = Math.round((new Date(time).setHours(0, 0, 0, 0) - new Date(now).setHours(0, 0, 0, 0)) / DAY_MS);
+  const days = Math.round(
+    (new Date(time).setHours(0, 0, 0, 0) - new Date(now).setHours(0, 0, 0, 0)) / DAY_MS,
+  );
 
-  if (days <= 0) return "Today";
-  if (days === 1) return "Tomorrow";
+  if (days <= 0) {
+    return "Today";
+  }
+
+  if (days === 1) {
+    return "Tomorrow";
+  }
 
   return shortWeekday.format(time);
 };
@@ -43,7 +60,10 @@ export const formatReset = (time: number, now = Date.now()) => {
   const minutes = Math.max(1, Math.round((time - now) / 60_000));
 
   if (minutes < 6 * 60) {
-    const parts = [Math.floor(minutes / 60) > 0 ? `${Math.floor(minutes / 60)} h` : "", minutes % 60 > 0 ? `${minutes % 60} min` : ""];
+    const parts = [
+      Math.floor(minutes / 60) > 0 ? `${Math.floor(minutes / 60)} h` : "",
+      minutes % 60 > 0 ? `${minutes % 60} min` : "",
+    ];
 
     return `Resets in ${parts.filter((part) => part !== "").join(" ")}`;
   }
@@ -69,7 +89,9 @@ const AGO_UNITS: ReadonlyArray<[Intl.RelativeTimeFormatUnit, number]> = [
 export const formatAgo = (time: number, now = Date.now()) => {
   const elapsed = now - time;
   const unit = AGO_UNITS.find(([, length]) => elapsed >= length);
-  if (unit === undefined) return "just now";
+  if (unit === undefined) {
+    return "just now";
+  }
 
   return ago.format(-Math.floor(elapsed / unit[1]), unit[0]);
 };

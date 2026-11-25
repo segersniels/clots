@@ -1,6 +1,20 @@
 import { Character } from "@clots/character";
-import type { ApprovalDecision, BotId, BotSummary, LoginRequest, MessageRole, PendingApproval, TraceStep } from "@clots/contracts";
-import { ArrowRightIcon, CheckIcon, CircleAlertIcon, CircleCheckIcon, LoaderCircleIcon } from "lucide-react";
+import type {
+  ApprovalDecision,
+  BotId,
+  BotSummary,
+  LoginRequest,
+  MessageRole,
+  PendingApproval,
+  TraceStep,
+} from "@clots/contracts";
+import {
+  ArrowRightIcon,
+  CheckIcon,
+  CircleAlertIcon,
+  CircleCheckIcon,
+  LoaderCircleIcon,
+} from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
@@ -53,8 +67,10 @@ const ENTER =
   "transition-[opacity,translate] duration-200 ease-out starting:translate-y-2 starting:opacity-0 motion-reduce:starting:translate-y-0";
 
 /** The label above a message on the operator's side that the operator did not type. */
-const SENDER_LABELS: Partial<Record<MessageRole, string>> = { routine: "Routine", bot: "Bot message" };
-
+const SENDER_LABELS: Partial<Record<MessageRole, string>> = {
+  routine: "Routine",
+  bot: "Bot message",
+};
 
 /** Shows something that the bot says or asks, on the bot's side of the thread. */
 function FromBot({ children }: { children: ReactNode }) {
@@ -73,7 +89,15 @@ function FromBot({ children }: { children: ReactNode }) {
  * Shows the tool calls of the bot as one closed summary line, which opens into the steps. The line
  * shimmers while a step runs.
  */
-function Steps({ steps, title, running }: { steps: ReadonlyArray<TraceStep>; title: string; running: boolean }) {
+function Steps({
+  steps,
+  title,
+  running,
+}: {
+  steps: ReadonlyArray<TraceStep>;
+  title: string;
+  running: boolean;
+}) {
   // Before the first tool call, such as while the bot thinks, there is nothing to open.
   if (steps.length === 0) {
     return (
@@ -96,7 +120,11 @@ function Steps({ steps, title, running }: { steps: ReadonlyArray<TraceStep>; tit
         <TraceCollapsibleContent keepMounted>
           <Trace>
             {steps.map((step) => (
-              <TraceLine key={step.id} {...(step.status === "running" ? { status: "running" as const } : {})} className={ENTER}>
+              <TraceLine
+                key={step.id}
+                {...(step.status === "running" ? { status: "running" as const } : {})}
+                className={ENTER}
+              >
                 <TraceIcon>
                   {step.status === "running" ? (
                     <LoaderCircleIcon className="animate-spin motion-reduce:animate-none" />
@@ -115,7 +143,8 @@ function Steps({ steps, title, running }: { steps: ReadonlyArray<TraceStep>; tit
 }
 
 function Approval({ botId, approval }: { botId: BotId; approval: PendingApproval }) {
-  const resolve = (decision: ApprovalDecision) => client.resolveApproval(botId, approval.id, decision);
+  const resolve = (decision: ApprovalDecision) =>
+    client.resolveApproval(botId, approval.id, decision);
 
   return (
     <FromBot>
@@ -139,9 +168,18 @@ function Approval({ botId, approval }: { botId: BotId; approval: PendingApproval
 }
 
 /** Asks the operator to copy another bot's login into this bot's browser, and shows how the copy goes. */
-function LoginRequestCard({ botId, target, request }: { botId: BotId; target: BotSummary; request: LoginRequest }) {
+function LoginRequestCard({
+  botId,
+  target,
+  request,
+}: {
+  botId: BotId;
+  target: BotSummary;
+  request: LoginRequest;
+}) {
   const { from } = request;
-  const resolve = (decision: "allow" | "skip") => client.resolveLoginRequest(botId, request.id, decision);
+  const resolve = (decision: "allow" | "skip") =>
+    client.resolveLoginRequest(botId, request.id, decision);
 
   if (request.state === "done") {
     return (
@@ -175,8 +213,8 @@ function LoginRequestCard({ botId, target, request }: { botId: BotId; target: Bo
           </span>
         </p>
         <p className="mt-1.5 text-[12.5px] leading-normal text-muted-foreground">
-          Copies this site's cookies and saved data. {target.name} never sees them. {from.name} logged in{" "}
-          {formatAgo(from.updatedAt)}. {LOGIN_RISK}
+          Copies this site's cookies and saved data. {target.name} never sees them. {from.name}{" "}
+          logged in {formatAgo(from.updatedAt)}. {LOGIN_RISK}
         </p>
       </div>
       {request.state === "failed" && (
@@ -217,7 +255,9 @@ function OlderMessagesLoader({ hasOlder, onLoad }: { hasOlder: boolean; onLoad: 
       return;
     }
 
-    if (hasOlder && leftTheTop.current) onLoad();
+    if (hasOlder && leftTheTop.current) {
+      onLoad();
+    }
   }, [hasOlder, canScrollUp, onLoad]);
 
   return null;
@@ -232,8 +272,11 @@ function ScrollToMessage({ messageId, onScrolled }: { messageId: string; onScrol
 
   useEffect(() => {
     let frame = requestAnimationFrame(function scrollWhenReady() {
-      if (scrollToMessage(messageId, { align: "center" })) onScrolled();
-      else frame = requestAnimationFrame(scrollWhenReady);
+      if (scrollToMessage(messageId, { align: "center" })) {
+        onScrolled();
+      } else {
+        frame = requestAnimationFrame(scrollWhenReady);
+      }
     });
 
     return () => cancelAnimationFrame(frame);
@@ -266,8 +309,14 @@ export function Chat({
   const [cached] = useState(() => (thread.synced ? null : readCachedThread(botId)));
   const messages = thread.synced || cached === null ? thread.messages : cached;
   // The messages that the thread shows first stay still. Only later ones that arrive live ease in.
-  const shownThrough = useRef(thread.synced ? thread.lastSequence : (cached?.at(-1)?.sequence ?? null));
-  if (shownThrough.current === null && thread.synced) shownThrough.current = thread.lastSequence;
+  const shownThrough = useRef(
+    thread.synced ? thread.lastSequence : (cached?.at(-1)?.sequence ?? null),
+  );
+
+  if (shownThrough.current === null && thread.synced) {
+    shownThrough.current = thread.lastSequence;
+  }
+
   // Only a thread with nothing to show yet fades in. A thread in memory or in the cache is there at once.
   const [loadsLate] = useState(!thread.synced && cached === null);
   const { live } = thread;
@@ -275,32 +324,45 @@ export function Chat({
   // A thread without messages asks for the instructions. The first message fades it out.
   const empty = thread.synced && messages.length === 0;
   const [emptyShown, setEmptyShown] = useState(false);
-  if (empty && !emptyShown) setEmptyShown(true);
+  if (empty && !emptyShown) {
+    setEmptyShown(true);
+  }
 
   const [shownCount, setShownCount] = useState(MESSAGES_PER_PAGE);
   const firstShown = Math.max(0, messages.length - shownCount);
 
   // The synced thread is the one to show at the next start.
   useEffect(() => {
-    if (thread.synced) saveCachedThread(botId, thread.messages);
+    if (thread.synced) {
+      saveCachedThread(botId, thread.messages);
+    }
   }, [botId, thread.synced, thread.messages]);
   // A stable callback, so that one visit to the top loads one page and not one per render.
   const showOlder = useCallback(() => setShownCount((count) => count + MESSAGES_PER_PAGE), []);
   const [highlightedId, setHighlightedId] = useState<string>();
 
-  const jumpIndex = jumpTo === undefined || !thread.synced ? -1 : messages.findIndex((message) => message.id === jumpTo);
+  const jumpIndex =
+    jumpTo === undefined || !thread.synced
+      ? -1
+      : messages.findIndex((message) => message.id === jumpTo);
 
   // A search result opens the thread at its message. An older message first needs enough pages on screen.
   useEffect(() => {
-    if (jumpIndex < 0) return;
+    if (jumpIndex < 0) {
+      return;
+    }
 
     const pagesNeeded = Math.ceil((messages.length - jumpIndex) / MESSAGES_PER_PAGE);
 
-    if (pagesNeeded * MESSAGES_PER_PAGE > shownCount) setShownCount(pagesNeeded * MESSAGES_PER_PAGE);
+    if (pagesNeeded * MESSAGES_PER_PAGE > shownCount) {
+      setShownCount(pagesNeeded * MESSAGES_PER_PAGE);
+    }
   }, [jumpIndex]);
 
   useEffect(() => {
-    if (highlightedId === undefined) return;
+    if (highlightedId === undefined) {
+      return;
+    }
 
     const timer = setTimeout(() => setHighlightedId(undefined), JUMP_HIGHLIGHT_MS);
 
@@ -317,11 +379,15 @@ export function Chat({
   const thinking = live.status === "working" && runningStep === undefined;
   // The line keeps the last tasks while it closes, so it does not go blank before it is gone.
   const shownTasks = useRef(live.tasks);
-  if (live.tasks.length > 0) shownTasks.current = live.tasks;
+  if (live.tasks.length > 0) {
+    shownTasks.current = live.tasks;
+  }
 
   // The login card keeps the last request while it leaves, so it does not vanish at once.
   const [shownLogin, setShownLogin] = useState(live.loginRequest);
-  if (live.loginRequest !== null && live.loginRequest !== shownLogin) setShownLogin(live.loginRequest);
+  if (live.loginRequest !== null && live.loginRequest !== shownLogin) {
+    setShownLogin(live.loginRequest);
+  }
 
   const loginLeaving = live.loginRequest === null;
 
@@ -330,7 +396,13 @@ export function Chat({
    * subscription replays, such as the ones a hidden window missed, appear at once with the rest.
    */
   const entrance = (sequence: number) => {
-    if (shownThrough.current === null || sequence <= shownThrough.current || sequence <= thread.replayedThrough) return "";
+    if (
+      shownThrough.current === null ||
+      sequence <= shownThrough.current ||
+      sequence <= thread.replayedThrough
+    ) {
+      return "";
+    }
 
     return ENTER;
   };
@@ -359,22 +431,33 @@ export function Chat({
             />
           )}
           {/* The thread runs under the floating header and fades out there. The top padding clears the header. */}
-          <MessageScrollerViewport preserveScrollOnPrepend className="[mask-image:linear-gradient(to_bottom,transparent,black_4rem)]">
+          <MessageScrollerViewport
+            preserveScrollOnPrepend
+            className="[mask-image:linear-gradient(to_bottom,transparent,black_4rem)]"
+          >
             <MessageScrollerContent className="gap-1.5 px-4 pt-16 pb-3">
               {messages.slice(firstShown).map((message, offset) => {
                 // The full history still decides the time labels and the spacing at the first shown message.
                 const index = firstShown + offset;
                 const previous = messages[index - 1];
-                const showsTime = previous === undefined || message.createdAt - previous.createdAt > TIME_LABEL_GAP_MS;
+                const showsTime =
+                  previous === undefined ||
+                  message.createdAt - previous.createdAt > TIME_LABEL_GAP_MS;
                 const fromBot = message.role === "assistant" || message.role === "trace";
                 // Messages from the same side sit close together. A change of side gets more room.
-                const changesSide = previous !== undefined && (previous.role === "assistant" || previous.role === "trace") !== fromBot;
+                const changesSide =
+                  previous !== undefined &&
+                  (previous.role === "assistant" || previous.role === "trace") !== fromBot;
                 const enter = entrance(message.sequence);
 
                 // A compaction or a settings change is no message but a divider: the bot works differently after it.
                 if (message.role === "compact" || message.role === "settings") {
                   return (
-                    <MessageScrollerItem key={message.id} messageId={message.id} className={`py-3 ${enter}`}>
+                    <MessageScrollerItem
+                      key={message.id}
+                      messageId={message.id}
+                      className={`py-3 ${enter}`}
+                    >
                       <p className="flex items-center gap-3 text-[0.6875rem] text-muted-foreground before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">
                         {message.text}
                       </p>
@@ -411,7 +494,9 @@ export function Chat({
                     className={`${changesSide && !showsTime ? "pt-3" : ""} ${enter}`}
                   >
                     {showsTime && (
-                      <p className="py-3 text-center text-[0.6875rem] text-muted-foreground">{formatClock(message.createdAt)}</p>
+                      <p className="py-3 text-center text-[0.6875rem] text-muted-foreground">
+                        {formatClock(message.createdAt)}
+                      </p>
                     )}
 
                     {fromBot ? (
@@ -422,14 +507,23 @@ export function Chat({
                       <Message align="end">
                         <MessageContent>
                           {SENDER_LABELS[message.role] !== undefined && (
-                            <MessageHeader className="justify-end">{SENDER_LABELS[message.role]}</MessageHeader>
+                            <MessageHeader className="justify-end">
+                              {SENDER_LABELS[message.role]}
+                            </MessageHeader>
                           )}
                           <MessageAttachments message={message} />
                           {/* A message can be files only. */}
                           {message.text !== "" && (
-                            <Bubble align="end" variant={SENDER_LABELS[message.role] === undefined ? "default" : "outline"}>
+                            <Bubble
+                              align="end"
+                              variant={
+                                SENDER_LABELS[message.role] === undefined ? "default" : "outline"
+                              }
+                            >
                               {/* Streamdown colors links with the primary color, which is the color of this bubble. */}
-                              <BubbleContent className={`${BUBBLE} [&_[data-streamdown=link]]:text-current`}>
+                              <BubbleContent
+                                className={`${BUBBLE} [&_[data-streamdown=link]]:text-current`}
+                              >
                                 <Markdown references={{ known, bots }}>{message.text}</Markdown>
                               </BubbleContent>
                             </Bubble>
@@ -453,7 +547,11 @@ export function Chat({
               )}
 
               {live.approvals.map((approval) => (
-                <MessageScrollerItem key={approval.id} messageId={approval.id} className={`pt-3 ${ENTER}`}>
+                <MessageScrollerItem
+                  key={approval.id}
+                  messageId={approval.id}
+                  className={`pt-3 ${ENTER}`}
+                >
                   <Approval botId={botId} approval={approval} />
                 </MessageScrollerItem>
               ))}
@@ -463,7 +561,10 @@ export function Chat({
                   <FromBot>
                     <p className="font-medium">Take over {botName}'s screen</p>
                     <p className="mt-1 text-sm text-muted-foreground">{live.handoff.reason}</p>
-                    <Button className="mt-4" onClick={() => client.resolveHandoff(botId, live.handoff!.id)}>
+                    <Button
+                      className="mt-4"
+                      onClick={() => client.resolveHandoff(botId, live.handoff!.id)}
+                    >
                       I am done
                     </Button>
                   </FromBot>
@@ -474,29 +575,36 @@ export function Chat({
                 <MessageScrollerItem messageId={shownLogin.id} className={`pt-3 ${ENTER}`}>
                   <div
                     inert={loginLeaving}
-                    onTransitionEnd={(event) => event.target === event.currentTarget && loginLeaving && setShownLogin(null)}
+                    onTransitionEnd={(event) =>
+                      event.target === event.currentTarget && loginLeaving && setShownLogin(null)
+                    }
                     className={`transition-[opacity,translate] duration-200 ease-out ${loginLeaving ? "translate-y-2 opacity-0 motion-reduce:translate-y-0" : ""}`}
                   >
                     <LoginRequestCard botId={botId} target={bot} request={shownLogin} />
                   </div>
                 </MessageScrollerItem>
               )}
-
             </MessageScrollerContent>
           </MessageScrollerViewport>
           <MessageScrollerButton />
           {emptyShown && bot !== undefined && (
             <div
               inert={!empty}
-              onTransitionEnd={(event) => event.target === event.currentTarget && !empty && setEmptyShown(false)}
+              onTransitionEnd={(event) =>
+                event.target === event.currentTarget && !empty && setEmptyShown(false)
+              }
               className={`absolute inset-0 flex items-center justify-center px-4 pt-16 pb-3 transition-opacity duration-200 ease-out ${empty ? "" : "opacity-0"}`}
             >
-              <EmptyThread bot={bot} focusOnOpen={justCreated} onDone={() => composer.current?.focus()} />
+              <EmptyThread
+                bot={bot}
+                focusOnOpen={justCreated}
+                onDone={() => composer.current?.focus()}
+              />
             </div>
           )}
         </MessageScroller>
 
-        {/*
+        {/**
           Work in the background, such as a subagent, can outlive the turn. The line stays until the work ends.
           The side padding sits outside the Collapse, because its focus ring margin would otherwise widen the panel.
         */}
@@ -504,7 +612,11 @@ export function Chat({
           <Collapse open={live.tasks.length > 0}>
             <div className="pb-2">
               <Steps
-                steps={shownTasks.current.map((task) => ({ id: task.id, title: task.description, status: "running" as const }))}
+                steps={shownTasks.current.map((task) => ({
+                  id: task.id,
+                  title: task.description,
+                  status: "running" as const,
+                }))}
                 title={backgroundTitle}
                 running
               />
@@ -513,7 +625,13 @@ export function Chat({
         </div>
 
         {/* The composer sits inside the provider, so that sending can make the thread follow its end again. */}
-        <Composer ref={composer} botId={botId} botName={botName} status={live.status} autoFocus={!justCreated} />
+        <Composer
+          ref={composer}
+          botId={botId}
+          botName={botName}
+          status={live.status}
+          autoFocus={!justCreated}
+        />
       </MessageScrollerProvider>
     </>
   );

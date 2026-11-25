@@ -34,11 +34,18 @@ export const sidecarIsBuilt = () => existsSync(SIDECAR_BINARY);
  */
 const stopPreviousSidecar = (pidFile: string) => {
   const pid = Number(existsSync(pidFile) ? readFileSync(pidFile, "utf8") : Number.NaN);
-  if (!Number.isInteger(pid)) return;
+  if (!Number.isInteger(pid)) {
+    return;
+  }
 
   // The operating system reuses process ids, so check that this one is still a sidecar.
-  const command = Bun.spawnSync(["ps", "-p", String(pid), "-o", "comm="]).stdout.toString().trim();
-  if (command === "clots-sidecar") process.kill(pid);
+  const command = Bun.spawnSync(["ps", "-p", String(pid), "-o", "comm="])
+    .stdout.toString()
+    .trim();
+
+  if (command === "clots-sidecar") {
+    process.kill(pid);
+  }
 };
 
 /** Runs the sidecar for as long as the server runs. Without a built sidecar, clots stays local. */
@@ -57,7 +64,9 @@ export const SidecarLayer = Layer.effectDiscard(
     }
 
     if (!sidecarIsBuilt()) {
-      yield* Effect.logWarning("The sidecar is not built, so clots is reachable on this machine only.");
+      yield* Effect.logWarning(
+        "The sidecar is not built, so clots is reachable on this machine only.",
+      );
 
       return;
     }

@@ -50,7 +50,12 @@ function MarkdownCodeBlock({ code, language }: { code: string; language: string 
   );
 }
 
-function MarkdownCode({ node: _node, className, children, ...props }: ComponentProps<"code"> & ExtraProps) {
+function MarkdownCode({
+  node: _node,
+  className,
+  children,
+  ...props
+}: ComponentProps<"code"> & ExtraProps) {
   // Streamdown marks fenced code with `data-block`. Everything else is inline code.
   if (!("data-block" in props)) {
     return (
@@ -79,7 +84,9 @@ const prepareTyped = (text: string, known: KnownNames) => {
   const outsideCode = (part: string) =>
     splitReferences(part, known)
       .map(({ text: piece, reference }) => {
-        if (reference === null) return piece.replaceAll(/(?<!\n)\n(?!\n)/g, "  \n");
+        if (reference === null) {
+          return piece.replaceAll(/(?<!\n)\n(?!\n)/g, "  \n");
+        }
 
         chips.push(reference);
 
@@ -112,10 +119,18 @@ export function Markdown({ children, references }: { children: string; reference
 
   /** Draws the inline code that names a chip as that chip. All other code renders as code. */
   const ChipOrCode = (props: ComponentProps<"code"> & ExtraProps) => {
-    const chip = typeof props.children === "string" && props.children.startsWith(CHIP_MARK) ? chips[Number(props.children.slice(1))] : undefined;
-    if (chip === undefined) return <MarkdownCode {...props} />;
+    const chip =
+      typeof props.children === "string" && props.children.startsWith(CHIP_MARK)
+        ? chips[Number(props.children.slice(1))]
+        : undefined;
 
-    const bot = references.bots.find((candidate) => chip.kind === "bot" && candidate.name === chip.name);
+    if (chip === undefined) {
+      return <MarkdownCode {...props} />;
+    }
+
+    const bot = references.bots.find(
+      (candidate) => chip.kind === "bot" && candidate.name === chip.name,
+    );
 
     return <ReferenceChip kind={chip.kind} name={chip.name} bot={bot} />;
   };

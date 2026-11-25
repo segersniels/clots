@@ -115,7 +115,17 @@ export class ProjectDirectoryNotFound extends Schema.TaggedError<ProjectDirector
  * tab id from the stream, and `stop` the target id of the page that loads. `newTab` and `resetViewport`
  * take none.
  */
-export const BrowserAction = Schema.Literals(["back", "forward", "reload", "stop", "open", "tab", "newTab", "closeTab", "resetViewport"]);
+export const BrowserAction = Schema.Literals([
+  "back",
+  "forward",
+  "reload",
+  "stop",
+  "open",
+  "tab",
+  "newTab",
+  "closeTab",
+  "resetViewport",
+]);
 export type BrowserAction = typeof BrowserAction.Type;
 
 export class ClotsRpcs extends RpcGroup.make(

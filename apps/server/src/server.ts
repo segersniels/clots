@@ -33,7 +33,9 @@ const SqlLayer = Layer.unwrap(
 
 const ServicesLayer = Layer.mergeAll(SchedulerLayer, SidecarLayer, HandlersLayer).pipe(
   Layer.provideMerge(BotSessions.layer),
-  Layer.provideMerge(Layer.mergeAll(BotRepository.layer, ScheduleRepository.layer, ProjectRepository.layer)),
+  Layer.provideMerge(
+    Layer.mergeAll(BotRepository.layer, ScheduleRepository.layer, ProjectRepository.layer),
+  ),
   Layer.provide(SqlLayer),
 );
 
@@ -46,7 +48,9 @@ const RpcLayer = RpcServer.layer(ClotsRpcs).pipe(
 const WebLayer = Layer.unwrap(
   Effect.gen(function* () {
     const { webRoot } = yield* ClotsConfig;
-    if (webRoot === undefined) return Layer.empty;
+    if (webRoot === undefined) {
+      return Layer.empty;
+    }
 
     return HttpStaticServer.layer({ root: webRoot, spa: true });
   }),
@@ -60,7 +64,10 @@ export const ServerLayer = Layer.unwrap(
     // The download runs in the background, so the server answers at once.
     yield* Effect.forkDetach(ensureBrowser);
 
-    return HttpRouter.serve(Layer.mergeAll(RpcLayer, BrowserProxyLayer, AttachmentRouteLayer, WebLayer), { disableLogger: true }).pipe(
+    return HttpRouter.serve(
+      Layer.mergeAll(RpcLayer, BrowserProxyLayer, AttachmentRouteLayer, WebLayer),
+      { disableLogger: true },
+    ).pipe(
       Layer.provide(ServicesLayer),
       Layer.provide(BunHttpServer.layer({ hostname: "127.0.0.1", port: config.port })),
     );

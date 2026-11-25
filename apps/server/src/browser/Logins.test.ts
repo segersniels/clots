@@ -17,7 +17,13 @@ const chromeTime = (time: number) => (time + 11_644_473_600_000) * 1000;
 const botWithCookies = (
   id: string,
   projectId: string | null,
-  cookies: ReadonlyArray<{ host: string; name: string; httpOnly?: boolean; updatedAt?: number; expiresAt?: number }>,
+  cookies: ReadonlyArray<{
+    host: string;
+    name: string;
+    httpOnly?: boolean;
+    updatedAt?: number;
+    expiresAt?: number;
+  }>,
 ) => {
   const workingDirectory = join(home, id);
   mkdirSync(join(workingDirectory, ".browser-profile", "Default"), { recursive: true });
@@ -69,11 +75,19 @@ test("a login source is a bot of the same project with cookies that the target l
     { host: "github.com", name: "_gh_sess", updatedAt: Date.now() - 2000 },
     { host: ".github.com", name: "user_session", updatedAt: Date.now() - 2000 },
   ]);
-  const writer = botWithCookies("writer", "p1", [{ host: ".github.com", name: "user_session", updatedAt: Date.now() - 1000 }]);
+  const writer = botWithCookies("writer", "p1", [
+    { host: ".github.com", name: "user_session", updatedAt: Date.now() - 1000 },
+  ]);
   const anonymous = botWithCookies("anonymous", "p1", [{ host: "github.com", name: "_gh_sess" }]);
-  const elsewhere = botWithCookies("elsewhere", "p2", [{ host: ".github.com", name: "user_session" }]);
+  const elsewhere = botWithCookies("elsewhere", "p2", [
+    { host: ".github.com", name: "user_session" },
+  ]);
 
-  const sources = await findLoginSources(target, [target, scout, writer, anonymous, elsewhere], "https://github.com/login");
+  const sources = await findLoginSources(
+    target,
+    [target, scout, writer, anonymous, elsewhere],
+    "https://github.com/login",
+  );
 
   expect(sources.map((source) => source.bot.name)).toEqual(["writer", "scout"]);
 });

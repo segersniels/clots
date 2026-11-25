@@ -3,13 +3,27 @@ import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { botPlugins, botSkillsSignature, deleteBotSkill, readBotSkills, saveBotSkill, showOwnSkills, toOwnSkills, writeBotSkills } from "./BotPlugin.ts";
+import {
+  botPlugins,
+  botSkillsSignature,
+  deleteBotSkill,
+  readBotSkills,
+  saveBotSkill,
+  showOwnSkills,
+  toOwnSkills,
+  writeBotSkills,
+} from "./BotPlugin.ts";
 import type { StoredBot } from "./BotRepository.ts";
 
 /** Makes a bot with a new, empty notes directory. Only the directory matters here. */
-const newBot = () => ({ workingDirectory: mkdtempSync(join(tmpdir(), "clots-plugin-")) }) as StoredBot;
+const newBot = () =>
+  ({ workingDirectory: mkdtempSync(join(tmpdir(), "clots-plugin-")) }) as StoredBot;
 
-const seo = { name: "SEO", description: "When a page needs search traffic: titles, links.", body: "\nCheck the title.\n" };
+const seo = {
+  name: "SEO",
+  description: "When a page needs search traffic: titles, links.",
+  body: "\nCheck the title.\n",
+};
 
 test("a bot without skills gets no plugin", () => {
   const bot = newBot();
@@ -25,7 +39,9 @@ test("writes the skills as the bot's own plugin", () => {
   const folder = join(bot.workingDirectory, "plugin");
 
   expect(botPlugins(bot)).toEqual([{ type: "local", path: folder }]);
-  expect(JSON.parse(readFileSync(join(folder, ".claude-plugin", "plugin.json"), "utf8"))).toEqual({ name: "bot" });
+  expect(JSON.parse(readFileSync(join(folder, ".claude-plugin", "plugin.json"), "utf8"))).toEqual({
+    name: "bot",
+  });
   expect(readFileSync(join(folder, "skills", "seo", "SKILL.md"), "utf8")).toBe(
     '---\nname: seo\ndescription: "When a page needs search traffic: titles, links."\n---\n\nCheck the title.\n',
   );
@@ -50,16 +66,22 @@ test("a prompt names the bot's own skills in full", () => {
   const bot = newBot();
   writeBotSkills(bot, [seo]);
 
-  expect(toOwnSkills(bot, "/seo the docs, then /review and /seo.")).toBe("/bot:seo the docs, then /review and /bot:seo.");
+  expect(toOwnSkills(bot, "/seo the docs, then /review and /seo.")).toBe(
+    "/bot:seo the docs, then /review and /bot:seo.",
+  );
   expect(toOwnSkills(bot, "see a/seo or /seop or /bot:seo")).toBe("see a/seo or /seop or /bot:seo");
 });
 
 test("the first own skill of a bot without a template makes its plugin", () => {
   const bot = newBot();
 
-  expect(saveBotSkill(bot, { name: "seo", description: "Titles: short.", body: "Check the title." })).toBeUndefined();
+  expect(
+    saveBotSkill(bot, { name: "seo", description: "Titles: short.", body: "Check the title." }),
+  ).toBeUndefined();
   expect(botPlugins(bot)).toHaveLength(1);
-  expect(readBotSkills(bot)).toEqual([{ name: "seo", description: "Titles: short.", body: "Check the title." }]);
+  expect(readBotSkills(bot)).toEqual([
+    { name: "seo", description: "Titles: short.", body: "Check the title." },
+  ]);
 });
 
 test("a skill name must be a slug without path parts", () => {
@@ -84,13 +106,20 @@ test("a rename moves the folder with its other files, and an edit keeps the bot'
   const bot = newBot();
   writeBotSkills(bot, [seo]);
   const folder = join(bot.workingDirectory, "plugin", "skills");
-  writeFileSync(join(folder, "seo", "SKILL.md"), "---\nname: seo\nallowed-tools:\n  - Read\ndescription: old\n---\nOld steps.\n");
+  writeFileSync(
+    join(folder, "seo", "SKILL.md"),
+    "---\nname: seo\nallowed-tools:\n  - Read\ndescription: old\n---\nOld steps.\n",
+  );
   writeFileSync(join(folder, "seo", "notes.md"), "kept");
 
-  expect(saveBotSkill(bot, { name: "search", description: "New.", body: "New steps." }, "seo")).toBeUndefined();
+  expect(
+    saveBotSkill(bot, { name: "search", description: "New.", body: "New steps." }, "seo"),
+  ).toBeUndefined();
   expect(existsSync(join(folder, "seo"))).toBe(false);
   expect(readFileSync(join(folder, "search", "notes.md"), "utf8")).toBe("kept");
-  expect(readFileSync(join(folder, "search", "SKILL.md"), "utf8")).toBe('---\nname: search\ndescription: "New."\nallowed-tools:\n  - Read\n---\n\nNew steps.\n');
+  expect(readFileSync(join(folder, "search", "SKILL.md"), "utf8")).toBe(
+    '---\nname: search\ndescription: "New."\nallowed-tools:\n  - Read\n---\n\nNew steps.\n',
+  );
   expect(saveBotSkill(bot, { name: "x", description: "d", body: "b" }, "seo")).toBe("missing");
 });
 

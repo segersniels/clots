@@ -13,7 +13,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -50,7 +56,11 @@ const SAVE_FAILURES = {
 } as const;
 
 const failureOf = (error: unknown) =>
-  typeof error === "object" && error !== null && "reason" in error && typeof error.reason === "string" && error.reason in SAVE_FAILURES
+  typeof error === "object" &&
+  error !== null &&
+  "reason" in error &&
+  typeof error.reason === "string" &&
+  error.reason in SAVE_FAILURES
     ? SAVE_FAILURES[error.reason as keyof typeof SAVE_FAILURES]
     : "The skill could not be saved.";
 
@@ -81,13 +91,25 @@ function SkillForm({
   const [failure, setFailure] = useState<string | null>(null);
   const finished = { name: finishName(name), description: description.trim(), body: body.trim() };
   const taken = finished.name !== skill?.name && ownNames.has(finished.name);
-  const changed = skill === undefined || finished.name !== skill.name || finished.description !== skill.description || finished.body !== skill.body;
-  const canSave = finished.name !== "" && finished.description !== "" && finished.body !== "" && changed && !taken && !saving;
+  const changed =
+    skill === undefined ||
+    finished.name !== skill.name ||
+    finished.description !== skill.description ||
+    finished.body !== skill.body;
+  const canSave =
+    finished.name !== "" &&
+    finished.description !== "" &&
+    finished.body !== "" &&
+    changed &&
+    !taken &&
+    !saving;
 
   const save = async (event: FormEvent) => {
     event.preventDefault();
 
-    if (!canSave) return;
+    if (!canSave) {
+      return;
+    }
 
     setSaving(true);
 
@@ -100,16 +122,23 @@ function SkillForm({
     }
   };
 
-  // The capture phase runs before the steps field, which would otherwise make a new line.
+  /** The capture phase runs before the steps field, which would otherwise make a new line. */
   const saveOnShortcut = (event: KeyboardEvent) => {
-    if (event.key !== "Enter" || !(event.metaKey || event.ctrlKey)) return;
+    if (event.key !== "Enter" || !(event.metaKey || event.ctrlKey)) {
+      return;
+    }
 
     event.preventDefault();
     form.current?.requestSubmit();
   };
 
   return (
-    <form ref={form} onSubmit={save} onKeyDownCapture={saveOnShortcut} className="mt-4 flex flex-col gap-4">
+    <form
+      ref={form}
+      onSubmit={save}
+      onKeyDownCapture={saveOnShortcut}
+      className="mt-4 flex flex-col gap-4"
+    >
       <SkillPreview bot={bot} name={finished.name} when={finished.description} />
 
       <div className="flex flex-col gap-1.5">
@@ -165,7 +194,9 @@ function SkillForm({
           onChange={(event) => setBody(event.target.value)}
           autoFocus={skill !== undefined}
           spellCheck={false}
-          placeholder={"1. Read the current pricing page.\n2. List what changes, and why.\n3. Show me the new copy before you publish."}
+          placeholder={
+            "1. Read the current pricing page.\n2. List what changes, and why.\n3. Show me the new copy before you publish."
+          }
           className={`max-h-[300px] min-h-[148px] resize-none overflow-y-auto ${THIN_SCROLLBAR} px-3 py-2.5 text-[13.5px] leading-[1.55] md:text-[13.5px] ${DIALOG_FIELD}`}
         />
       </div>
@@ -176,9 +207,18 @@ function SkillForm({
         </p>
       )}
 
-      <CreateDialogFooter submitLabel={skill === undefined ? "Add skill" : "Save"} disabled={!canSave} className="mt-1">
+      <CreateDialogFooter
+        submitLabel={skill === undefined ? "Add skill" : "Save"}
+        disabled={!canSave}
+        className="mt-1"
+      >
         {skill !== undefined && (
-          <Button type="button" variant="ghost" onClick={onDelete} className="order-3 text-destructive hover:text-destructive sm:order-none sm:mr-auto sm:-ml-2">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={onDelete}
+            className="order-3 text-destructive hover:text-destructive sm:order-none sm:mr-auto sm:-ml-2"
+          >
             Delete
           </Button>
         )}
@@ -217,7 +257,9 @@ function SkillRow({
   }, []);
 
   useEffect(() => {
-    if (!ringing) return;
+    if (!ringing) {
+      return;
+    }
 
     const timer = setTimeout(() => setRinging(false), RING_MS);
 
@@ -238,9 +280,15 @@ function SkillRow({
             <BoxIcon className="row-span-2 size-[17px] text-skill" />
             <span className="col-start-2 truncate">
               {skill.name}
-              {replaces && <span className="ml-1.5 rounded-md bg-muted px-1.5 py-px align-[1px] text-[11.5px] text-muted-foreground">replaces yours</span>}
+              {replaces && (
+                <span className="ml-1.5 rounded-md bg-muted px-1.5 py-px align-[1px] text-[11.5px] text-muted-foreground">
+                  replaces yours
+                </span>
+              )}
             </span>
-            <span className="col-start-2 row-start-2 truncate text-[0.8125rem] text-muted-foreground">{skill.description}</span>
+            <span className="col-start-2 row-start-2 truncate text-[0.8125rem] text-muted-foreground">
+              {skill.description}
+            </span>
           </button>
           <DropdownMenu>
             <DropdownMenuTrigger
@@ -280,18 +328,27 @@ function SkillRow({
 export function BotSkills({ bot }: { bot: BotSummary }) {
   const own = useStore(client.botSkills(bot.id));
   const listed = useStore(client.skills(bot.id));
-  const [editing, setEditing] = useState<{ skill: BotSkill | undefined; round: number } | null>(null);
+  const [editing, setEditing] = useState<{ skill: BotSkill | undefined; round: number } | null>(
+    null,
+  );
   const [dialogOpen, setDialogOpen] = useState(false);
   const [removing, setRemoving] = useState<ReadonlySet<string>>(new Set());
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
   // The skills of the first list are not new. Each later skill is new once.
   const seen = useRef<Set<string> | null>(null);
-  if (seen.current === null && own !== null) seen.current = new Set(own.map((skill) => skill.name));
+  if (seen.current === null && own !== null) {
+    seen.current = new Set(own.map((skill) => skill.name));
+  }
 
   const ownNames = new Set((own ?? []).map((skill) => skill.name));
-  const replacing = new Set(listed.filter((skill) => skill.replaces === true).map((skill) => skill.name));
+  const replacing = new Set(
+    listed.filter((skill) => skill.replaces === true).map((skill) => skill.name),
+  );
   // An operator skill of an own skill's name is not listed, but the own skill marks it.
-  const operatorNames = new Set([...listed.filter((skill) => !ownNames.has(skill.name)).map((skill) => skill.name), ...replacing]);
+  const operatorNames = new Set([
+    ...listed.filter((skill) => !ownNames.has(skill.name)).map((skill) => skill.name),
+    ...replacing,
+  ]);
 
   const openEditor = (skill: BotSkill | undefined) => {
     setEditing({ skill, round: (editing?.round ?? 0) + 1 });
@@ -314,19 +371,29 @@ export function BotSkills({ bot }: { bot: BotSummary }) {
 
   // A row reads whether it is new when it mounts, so the names count as seen after that render.
   useEffect(() => {
-    for (const skill of own ?? []) seen.current?.add(skill.name);
+    for (const skill of own ?? []) {
+      seen.current?.add(skill.name);
+    }
   }, [own]);
 
   return (
     <section className="flex flex-col gap-1">
       <div className="flex h-7 items-center justify-between">
         <h2 className={PANE_LABEL}>Skills</h2>
-        <Button variant="ghost" size="icon-sm" aria-label="New skill" className="text-muted-foreground" onClick={() => openEditor(undefined)}>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="New skill"
+          className="text-muted-foreground"
+          onClick={() => openEditor(undefined)}
+        >
           <PlusIcon />
         </Button>
       </div>
 
-      {own !== null && own.length === 0 && <p className={PANE_EMPTY}>No skills yet. Add one, or ask {bot.name} to write one.</p>}
+      {own !== null && own.length === 0 && (
+        <p className={PANE_EMPTY}>No skills yet. Add one, or ask {bot.name} to write one.</p>
+      )}
 
       {own !== null && own.length > 0 && (
         <div className="-mb-1">
@@ -344,7 +411,12 @@ export function BotSkills({ bot }: { bot: BotSummary }) {
         </div>
       )}
 
-      <CreateDialog title={editing?.skill === undefined ? "New skill" : "Edit skill"} open={dialogOpen} onOpenChange={setDialogOpen} className="sm:max-w-[520px]">
+      <CreateDialog
+        title={editing?.skill === undefined ? "New skill" : "Edit skill"}
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        className="sm:max-w-[520px]"
+      >
         {editing !== null && (
           <SkillForm
             key={editing.round}
@@ -361,11 +433,16 @@ export function BotSkills({ bot }: { bot: BotSummary }) {
         )}
       </CreateDialog>
 
-      <AlertDialog open={confirmingDelete !== null} onOpenChange={(open) => !open && setConfirmingDelete(null)}>
+      <AlertDialog
+        open={confirmingDelete !== null}
+        onOpenChange={(open) => !open && setConfirmingDelete(null)}
+      >
         <AlertDialogContent size="sm">
           <AlertDialogHeader>
             <AlertDialogTitle>Delete {confirmingDelete}?</AlertDialogTitle>
-            <AlertDialogDescription>{bot.name} stops using this skill, and its folder is deleted. You cannot undo this.</AlertDialogDescription>
+            <AlertDialogDescription>
+              {bot.name} stops using this skill, and its folder is deleted. You cannot undo this.
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>

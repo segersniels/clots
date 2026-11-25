@@ -26,12 +26,18 @@ const execFileAsync = promisify(execFile);
  */
 const readLoginShellPath = () => {
   const marker = "__CLOTS_PATH__";
-  const result = spawnSync(process.env.SHELL ?? "/bin/zsh", ["-ilc", `printf '${marker}%s${marker}' "$PATH"`], {
-    encoding: "utf8",
-    timeout: 5000,
-  });
+  const result = spawnSync(
+    process.env.SHELL ?? "/bin/zsh",
+    ["-ilc", `printf '${marker}%s${marker}' "$PATH"`],
+    {
+      encoding: "utf8",
+      timeout: 5000,
+    },
+  );
 
-  return new RegExp(`${marker}(.*)${marker}`).exec(result.stdout ?? "")?.[1] ?? process.env.PATH ?? "";
+  return (
+    new RegExp(`${marker}(.*)${marker}`).exec(result.stdout ?? "")?.[1] ?? process.env.PATH ?? ""
+  );
 };
 
 let loginShellPath: string | undefined;
@@ -49,16 +55,20 @@ const which = (command: string) =>
     .map((directory) => join(directory, command))
     .find((path) => existsSync(path));
 
-const run = (command: string, args: ReadonlyArray<string>, timeout = 60_000) => execFileAsync(command, [...args], { env: environment(), timeout });
+const run = (command: string, args: ReadonlyArray<string>, timeout = 60_000) =>
+  execFileAsync(command, [...args], { env: environment(), timeout });
 
 /** Shortens a path in the home folder to `~/…` for the checklist. */
-const tildify = (path: string) => (path.startsWith(homedir()) ? `~${path.slice(homedir().length)}` : path);
+const tildify = (path: string) =>
+  path.startsWith(homedir()) ? `~${path.slice(homedir().length)}` : path;
 
 const ok = (detail: string): SetupCheck => ({ status: "ok", detail });
 const MISSING: SetupCheck = { status: "missing" };
 
 const checkClaude = async (claude: string | undefined) => {
-  if (claude === undefined) return MISSING;
+  if (claude === undefined) {
+    return MISSING;
+  }
 
   const { stdout } = await run(claude, ["--version"]);
 
@@ -67,13 +77,17 @@ const checkClaude = async (claude: string | undefined) => {
 
 /** Asks Claude Code for its login. clots supports the subscription login only. */
 const checkLogin = async (claude: string | undefined) => {
-  if (claude === undefined) return MISSING;
+  if (claude === undefined) {
+    return MISSING;
+  }
 
   try {
     const { stdout } = await run(claude, ["auth", "status"]);
     const login = JSON.parse(stdout) as { loggedIn?: boolean; authMethod?: string };
 
-    return login.loggedIn === true && login.authMethod === "claude.ai" ? ok("Logged in with a Claude subscription") : MISSING;
+    return login.loggedIn === true && login.authMethod === "claude.ai"
+      ? ok("Logged in with a Claude subscription")
+      : MISSING;
   } catch {
     return MISSING;
   }
@@ -88,9 +102,17 @@ const serverAnswers = () =>
 /** Runs every check that a local clots server needs. */
 export const runChecks = async (): Promise<SetupChecks> => {
   const claude = which("claude");
-  const [claudeCheck, login, server] = await Promise.all([checkClaude(claude), checkLogin(claude), serverAnswers()]);
+  const [claudeCheck, login, server] = await Promise.all([
+    checkClaude(claude),
+    checkLogin(claude),
+    serverAnswers(),
+  ]);
 
-  return { claude: claudeCheck, login, server: server ? ok(`Running at ${LOCAL_SERVER_URL}`) : MISSING };
+  return {
+    claude: claudeCheck,
+    login,
+    server: server ? ok(`Running at ${LOCAL_SERVER_URL}`) : MISSING,
+  };
 };
 
 let login: ChildProcess | undefined;
@@ -100,7 +122,9 @@ export const loginClaude = () =>
   new Promise<void>((resolve) => {
     const claude = which("claude");
 
-    if (claude === undefined) return resolve();
+    if (claude === undefined) {
+      return resolve();
+    }
 
     login = spawn(claude, ["auth", "login"], { env: environment(), stdio: "ignore" });
     login.once("exit", () => resolve());
@@ -128,7 +152,9 @@ const bundledClots = () =>
  * Installs the bundled `clots` and starts it as a background service without Tailscale, then
  * waits until the server answers. The log keeps each command's output for the error details.
  */
-export const installServer = async (onStep: (step: InstallStep) => void): Promise<InstallResult> => {
+export const installServer = async (
+  onStep: (step: InstallStep) => void,
+): Promise<InstallResult> => {
   const log: Array<string> = [];
   const runLogged = async (command: string, args: ReadonlyArray<string>, timeout?: number) => {
     log.push(`$ ${tildify(command)} ${args.join(" ")}`);
@@ -150,7 +176,9 @@ export const installServer = async (onStep: (step: InstallStep) => void): Promis
     onStep("health");
     const deadline = Date.now() + HEALTH_TIMEOUT_MS;
     while (!(await serverAnswers())) {
-      if (Date.now() > deadline) throw new Error(`The server did not answer at ${LOCAL_SERVER_URL}.`);
+      if (Date.now() > deadline) {
+        throw new Error(`The server did not answer at ${LOCAL_SERVER_URL}.`);
+      }
 
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
@@ -161,7 +189,10 @@ export const installServer = async (onStep: (step: InstallStep) => void): Promis
     log.push(failure.stdout?.trim() ?? "", failure.stderr?.trim() ?? "");
 
     // `clots up` explains its own failures in a line that starts with ✗.
-    const explanation = failure.stdout?.split("\n").find((line) => line.startsWith("✗"))?.slice(2);
+    const explanation = failure.stdout
+      ?.split("\n")
+      .find((line) => line.startsWith("✗"))
+      ?.slice(2);
 
     return {
       ok: false,

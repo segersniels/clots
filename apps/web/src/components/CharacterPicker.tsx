@@ -48,7 +48,11 @@ export function CharacterPicker({
 
       {/* The circles wrap onto centered rows, or two rows of five when compact, with room for the ring around the chosen color. */}
       <div
-        className={compact ? "mx-auto grid w-[216px] grid-cols-[repeat(5,1.5rem)] justify-between gap-y-3.5" : "flex flex-wrap justify-center gap-x-4 gap-y-3"}
+        className={
+          compact
+            ? "mx-auto grid w-[216px] grid-cols-[repeat(5,1.5rem)] justify-between gap-y-3.5"
+            : "flex flex-wrap justify-center gap-x-4 gap-y-3"
+        }
         role="radiogroup"
         aria-label="Color"
       >
@@ -65,7 +69,10 @@ export function CharacterPicker({
               background: COLOR_HEX[option],
               outlineStyle: "solid",
               // A soft ring marks the chosen color without competing with it.
-              outlineColor: option === color ? "color-mix(in oklab, var(--foreground) 40%, transparent)" : "transparent",
+              outlineColor:
+                option === color
+                  ? "color-mix(in oklab, var(--foreground) 40%, transparent)"
+                  : "transparent",
             }}
           />
         ))}

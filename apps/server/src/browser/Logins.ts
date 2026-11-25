@@ -33,7 +33,9 @@ const siteOfHost = (host: string) => {
 export const siteOf = (url: string) => {
   const parsed = URL.parse(url);
 
-  if (parsed === null || (parsed.protocol !== "https:" && parsed.protocol !== "http:")) return undefined;
+  if (parsed === null || (parsed.protocol !== "https:" && parsed.protocol !== "http:")) {
+    return undefined;
+  }
 
   return siteOfHost(parsed.hostname);
 };
@@ -68,7 +70,9 @@ const readCookieFile = (file: string) => {
 export const readLogins = (profile: string): ReadonlyMap<string, SiteLogin> => {
   const file = join(profile, "Default", "Cookies");
 
-  if (!existsSync(file)) return new Map();
+  if (!existsSync(file)) {
+    return new Map();
+  }
 
   let rows: ReadonlyArray<CookieRow>;
   try {
@@ -115,7 +119,9 @@ interface Cookie {
 
 /** A DevTools connection to the browser target of one Chrome. */
 const connect = async (port: number) => {
-  const version = (await (await fetch(`http://127.0.0.1:${port}/json/version`)).json()) as { webSocketDebuggerUrl: string };
+  const version = (await (await fetch(`http://127.0.0.1:${port}/json/version`)).json()) as {
+    webSocketDebuggerUrl: string;
+  };
   const socket = new WebSocket(version.webSocketDebuggerUrl);
   await new Promise((resolve, reject) => {
     socket.onopen = resolve;
@@ -123,21 +129,29 @@ const connect = async (port: number) => {
   });
 
   let lastId = 0;
-  const replies = new Map<number, { resolve: (result: any) => void; reject: (error: Error) => void }>();
+  const replies = new Map<
+    number,
+    { resolve: (result: any) => void; reject: (error: Error) => void }
+  >();
   const listeners = new Set<(event: { method: string; params: any; sessionId?: string }) => void>();
 
   socket.onmessage = ({ data }) => {
     const message = JSON.parse(String(data));
     if (message.id === undefined) {
-      for (const listener of listeners) listener(message);
+      for (const listener of listeners) {
+        listener(message);
+      }
 
       return;
     }
 
     const reply = replies.get(message.id);
     replies.delete(message.id);
-    if (message.error === undefined) reply?.resolve(message.result);
-    else reply?.reject(new Error(message.error.message));
+    if (message.error === undefined) {
+      reply?.resolve(message.result);
+    } else {
+      reply?.reject(new Error(message.error.message));
+    }
   };
 
   const send = (method: string, params: object = {}, sessionId?: string): Promise<any> =>
@@ -156,17 +170,32 @@ type Connection = Awaited<ReturnType<typeof connect>>;
  * Runs `use` in a hidden page of the origin whose requests all get an empty page, so the page has
  * the origin's localStorage while the site itself never loads.
  */
-const inEmptyPage = async <A>(browser: Connection, origin: string, use: (evaluate: (expression: string) => Promise<any>) => Promise<A>) => {
-  const { targetId } = await browser.send("Target.createTarget", { url: "about:blank", background: true, hidden: true });
+const inEmptyPage = async <A>(
+  browser: Connection,
+  origin: string,
+  use: (evaluate: (expression: string) => Promise<any>) => Promise<A>,
+) => {
+  const { targetId } = await browser.send("Target.createTarget", {
+    url: "about:blank",
+    background: true,
+    hidden: true,
+  });
 
   try {
     const { sessionId } = await browser.send("Target.attachToTarget", { targetId, flatten: true });
     const answerEmpty = (event: { method: string; params: any; sessionId?: string }) => {
-      if (event.method !== "Fetch.requestPaused" || event.sessionId !== sessionId) return;
+      if (event.method !== "Fetch.requestPaused" || event.sessionId !== sessionId) {
+        return;
+      }
 
       void browser.send(
         "Fetch.fulfillRequest",
-        { requestId: event.params.requestId, responseCode: 200, responseHeaders: [{ name: "Content-Type", value: "text/html" }], body: "" },
+        {
+          requestId: event.params.requestId,
+          responseCode: 200,
+          responseHeaders: [{ name: "Content-Type", value: "text/html" }],
+          body: "",
+        },
         sessionId,
       );
     };
@@ -176,7 +205,9 @@ const inEmptyPage = async <A>(browser: Connection, origin: string, use: (evaluat
 
     const loaded = new Promise<void>((resolve) => {
       const onLoad = (event: { method: string; sessionId?: string }) => {
-        if (event.method !== "Page.loadEventFired" || event.sessionId !== sessionId) return;
+        if (event.method !== "Page.loadEventFired" || event.sessionId !== sessionId) {
+          return;
+        }
 
         browser.listeners.delete(onLoad);
         resolve();
@@ -188,9 +219,15 @@ const inEmptyPage = async <A>(browser: Connection, origin: string, use: (evaluat
     browser.listeners.delete(answerEmpty);
 
     return await use(async (expression) => {
-      const { result, exceptionDetails } = await browser.send("Runtime.evaluate", { expression, returnByValue: true }, sessionId);
+      const { result, exceptionDetails } = await browser.send(
+        "Runtime.evaluate",
+        { expression, returnByValue: true },
+        sessionId,
+      );
 
-      if (exceptionDetails !== undefined) throw new Error(exceptionDetails.text);
+      if (exceptionDetails !== undefined) {
+        throw new Error(exceptionDetails.text);
+      }
 
       return result.value;
     });
@@ -200,7 +237,21 @@ const inEmptyPage = async <A>(browser: Connection, origin: string, use: (evaluat
 };
 
 /** Builds the DevTools parameters that set a cookie again as it was. A cookie without a leading dot belongs to its host only. */
-const toCookieParam = ({ name, value, domain, path, expires, httpOnly, secure, session, sameSite, priority, sourceScheme, sourcePort, partitionKey }: Cookie) => ({
+const toCookieParam = ({
+  name,
+  value,
+  domain,
+  path,
+  expires,
+  httpOnly,
+  secure,
+  session,
+  sameSite,
+  priority,
+  sourceScheme,
+  sourcePort,
+  partitionKey,
+}: Cookie) => ({
   name,
   value,
   path,
@@ -212,7 +263,9 @@ const toCookieParam = ({ name, value, domain, path, expires, httpOnly, secure, s
   sourcePort,
   partitionKey,
   ...(session ? {} : { expires }),
-  ...(domain.startsWith(".") ? { domain } : { url: `${secure ? "https" : "http"}://${domain}${path}` }),
+  ...(domain.startsWith(".")
+    ? { domain }
+    : { url: `${secure ? "https" : "http"}://${domain}${path}` }),
 });
 
 /**
@@ -223,7 +276,9 @@ const toCookieParam = ({ name, value, domain, path, expires, httpOnly, secure, s
 export const copyLogin = async (source: BotChrome, target: BotChrome, url: string) => {
   const site = siteOf(url);
 
-  if (site === undefined) throw new Error("The page is not on a website.");
+  if (site === undefined) {
+    throw new Error("The page is not on a website.");
+  }
 
   const origin = new URL(url).origin;
   const sourceRan = await isRunning(source.port);
@@ -233,31 +288,46 @@ export const copyLogin = async (source: BotChrome, target: BotChrome, url: strin
   const to = await connect(target.port);
 
   try {
-    const { cookies } = (await from.send("Storage.getCookies")) as { cookies: ReadonlyArray<Cookie> };
+    const { cookies } = (await from.send("Storage.getCookies")) as {
+      cookies: ReadonlyArray<Cookie>;
+    };
     const siteCookies = cookies.filter((cookie) => siteOfHost(cookie.domain) === site);
 
-    if (siteCookies.length === 0) throw new Error(`The other bot has no login on ${site} anymore.`);
+    if (siteCookies.length === 0) {
+      throw new Error(`The other bot has no login on ${site} anymore.`);
+    }
 
-    const storage = (await inEmptyPage(from, origin, (evaluate) => evaluate("Object.entries(localStorage)"))) as ReadonlyArray<[string, string]>;
+    const storage = (await inEmptyPage(from, origin, (evaluate) =>
+      evaluate("Object.entries(localStorage)"),
+    )) as ReadonlyArray<[string, string]>;
 
     await to.send("Storage.setCookies", { cookies: siteCookies.map(toCookieParam) });
     if (storage.length > 0) {
       await inEmptyPage(to, origin, (evaluate) =>
-        evaluate(`for (const [key, value] of ${JSON.stringify(storage)}) localStorage.setItem(key, value)`),
+        evaluate(
+          `for (const [key, value] of ${JSON.stringify(storage)}) localStorage.setItem(key, value)`,
+        ),
       );
     }
 
     for (const page of await readPages(target.port)) {
-      if (siteOf(page.url) !== site) continue;
+      if (siteOf(page.url) !== site) {
+        continue;
+      }
 
-      const { sessionId } = await to.send("Target.attachToTarget", { targetId: page.targetId, flatten: true });
+      const { sessionId } = await to.send("Target.attachToTarget", {
+        targetId: page.targetId,
+        flatten: true,
+      });
       await to.send("Page.reload", {}, sessionId);
       await to.send("Target.detachFromTarget", { sessionId });
     }
   } finally {
     from.close();
     to.close();
-    if (!sourceRan) await closeChrome(source.port, source.profile);
+    if (!sourceRan) {
+      await closeChrome(source.port, source.profile);
+    }
   }
 };
 
@@ -267,14 +337,22 @@ export const copyLogin = async (source: BotChrome, target: BotChrome, url: strin
  * misses a login of the last moments.
  */
 const liveLoginNames = async (port: number, site: string) => {
-  if (!(await isRunning(port))) return undefined;
+  if (!(await isRunning(port))) {
+    return undefined;
+  }
 
   const browser = await connect(port);
 
   try {
-    const { cookies } = (await browser.send("Storage.getCookies")) as { cookies: ReadonlyArray<Cookie> };
+    const { cookies } = (await browser.send("Storage.getCookies")) as {
+      cookies: ReadonlyArray<Cookie>;
+    };
 
-    return new Set(cookies.filter((cookie) => cookie.httpOnly && siteOfHost(cookie.domain) === site).map((cookie) => cookie.name));
+    return new Set(
+      cookies
+        .filter((cookie) => cookie.httpOnly && siteOfHost(cookie.domain) === site)
+        .map((cookie) => cookie.name),
+    );
   } finally {
     browser.close();
   }
@@ -285,17 +363,29 @@ const liveLoginNames = async (port: number, site: string) => {
  * first. A bot counts when it has HttpOnly cookies there that the target lacks, so a site's
  * anonymous cookies, which the target gets on its first visit, do not hide another bot's login.
  */
-export const findLoginSources = async (target: StoredBot, bots: ReadonlyArray<StoredBot>, url: string) => {
+export const findLoginSources = async (
+  target: StoredBot,
+  bots: ReadonlyArray<StoredBot>,
+  url: string,
+) => {
   const site = siteOf(url);
-  if (site === undefined) return [];
+  if (site === undefined) {
+    return [];
+  }
 
   const own =
-    (await liveLoginNames(devToolsPort(target), site)) ?? readLogins(browserProfile(target)).get(site)?.names ?? new Set<string>();
+    (await liveLoginNames(devToolsPort(target), site)) ??
+    readLogins(browserProfile(target)).get(site)?.names ??
+    new Set<string>();
   const sources = bots.flatMap((bot) => {
-    if (bot.id === target.id || bot.projectId !== target.projectId) return [];
+    if (bot.id === target.id || bot.projectId !== target.projectId) {
+      return [];
+    }
 
     const login = readLogins(browserProfile(bot)).get(site);
-    if (login === undefined || [...login.names].every((name) => own.has(name))) return [];
+    if (login === undefined || [...login.names].every((name) => own.has(name))) {
+      return [];
+    }
 
     return [{ bot, updatedAt: login.updatedAt }];
   });

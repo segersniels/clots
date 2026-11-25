@@ -24,14 +24,95 @@ const CAST: {
   wide?: boolean;
   tall?: boolean;
 }[] = [
-  { shape: "tumble", color: "red", mood: "idle", left: "12%", top: "24%", size: 104, tilt: "-6deg", delay: "-1s", wide: true },
-  { shape: "bud", color: "pink", mood: "working", left: "30%", top: "9%", size: 62, tilt: "5deg", delay: "-3s", tall: true },
-  { shape: "bean", color: "blue", mood: "waiting", left: "73%", top: "11%", size: 78, tilt: "-4deg", delay: "-5s" },
-  { shape: "grape", color: "green", mood: "idle", left: "89%", top: "30%", size: 112, tilt: "6deg", delay: "-2s", wide: true },
-  { shape: "dollop", color: "amber", mood: "working", left: "8%", top: "72%", size: 88, tilt: "4deg", delay: "-4s", wide: true },
-  { shape: "stack", color: "purple", mood: "idle", left: "24%", top: "88%", size: 58, tilt: "-5deg", delay: "-6s", wide: true, tall: true },
-  { shape: "twin", color: "teal", mood: "working", left: "80%", top: "84%", size: 96, tilt: "-3deg", delay: "-2.5s", wide: true },
-  { shape: "puddle", color: "orange", mood: "idle", left: "93%", top: "66%", size: 60, tilt: "5deg", delay: "-0.5s", wide: true, tall: true },
+  {
+    shape: "tumble",
+    color: "red",
+    mood: "idle",
+    left: "12%",
+    top: "24%",
+    size: 104,
+    tilt: "-6deg",
+    delay: "-1s",
+    wide: true,
+  },
+  {
+    shape: "bud",
+    color: "pink",
+    mood: "working",
+    left: "30%",
+    top: "9%",
+    size: 62,
+    tilt: "5deg",
+    delay: "-3s",
+    tall: true,
+  },
+  {
+    shape: "bean",
+    color: "blue",
+    mood: "waiting",
+    left: "73%",
+    top: "11%",
+    size: 78,
+    tilt: "-4deg",
+    delay: "-5s",
+  },
+  {
+    shape: "grape",
+    color: "green",
+    mood: "idle",
+    left: "89%",
+    top: "30%",
+    size: 112,
+    tilt: "6deg",
+    delay: "-2s",
+    wide: true,
+  },
+  {
+    shape: "dollop",
+    color: "amber",
+    mood: "working",
+    left: "8%",
+    top: "72%",
+    size: 88,
+    tilt: "4deg",
+    delay: "-4s",
+    wide: true,
+  },
+  {
+    shape: "stack",
+    color: "purple",
+    mood: "idle",
+    left: "24%",
+    top: "88%",
+    size: 58,
+    tilt: "-5deg",
+    delay: "-6s",
+    wide: true,
+    tall: true,
+  },
+  {
+    shape: "twin",
+    color: "teal",
+    mood: "working",
+    left: "80%",
+    top: "84%",
+    size: 96,
+    tilt: "-3deg",
+    delay: "-2.5s",
+    wide: true,
+  },
+  {
+    shape: "puddle",
+    color: "orange",
+    mood: "idle",
+    left: "93%",
+    top: "66%",
+    size: 60,
+    tilt: "5deg",
+    delay: "-0.5s",
+    wide: true,
+    tall: true,
+  },
 ];
 
 const DOWNLOAD_URL = "https://github.com/segersniels/clots/releases/latest/download/Clots.dmg";
@@ -41,9 +122,11 @@ const REPOSITORY_URL = "https://github.com/segersniels/clots";
 export default function Home() {
   const [hops, setHops] = useState(() => CAST.map(() => 0));
 
-  // The whole cast hops once, one after the other, when the pointer reaches the download button.
+  /** The whole cast hops once, one after the other, when the pointer reaches the download button. */
   const hopAll = () =>
-    CAST.forEach((_, index) => setTimeout(() => setHops((counts) => counts.with(index, counts[index]! + 1)), index * 40));
+    CAST.forEach((_, index) =>
+      setTimeout(() => setHops((counts) => counts.with(index, counts[index]! + 1)), index * 40),
+    );
 
   return (
     <main className="relative grid h-dvh place-items-center overflow-hidden px-[max(20px,env(safe-area-inset-left))] py-6 text-center">
@@ -56,9 +139,22 @@ export default function Home() {
               clot.wide && "max-[820px]:hidden",
               clot.tall && "[@media(max-height:640px)]:hidden",
             )}
-            style={{ left: clot.left, top: clot.top, animationDelay: clot.delay, "--tilt": clot.tilt } as React.CSSProperties}
+            style={
+              {
+                left: clot.left,
+                top: clot.top,
+                animationDelay: clot.delay,
+                "--tilt": clot.tilt,
+              } as React.CSSProperties
+            }
           >
-            <Character shape={clot.shape} color={clot.color} mood={clot.mood} size={clot.size} hops={hops[index]!} />
+            <Character
+              shape={clot.shape}
+              color={clot.color}
+              mood={clot.mood}
+              size={clot.size}
+              hops={hops[index]!}
+            />
           </div>
         ))}
       </div>
@@ -68,8 +164,8 @@ export default function Home() {
           Bots that never stop working
         </h1>
         <p className="mx-auto mt-[26px] max-w-[33rem] text-[clamp(17px,2vw,20px)] leading-normal text-pretty text-muted-foreground">
-          Claude bots with their own instructions, memory, browser and routines. Run them on a machine that stays on, and they
-          keep going while you are away.
+          Claude bots with their own instructions, memory, browser and routines. Run them on a
+          machine that stays on, and they keep going while you are away.
         </p>
         <Button
           nativeButton={false}
@@ -90,7 +186,9 @@ export default function Home() {
             <ArrowUpRight className="size-[13px]" />
           </a>
         </div>
-        <p className="mt-3.5 text-[13px] text-muted-foreground opacity-80">Needs Claude Code with a Claude subscription</p>
+        <p className="mt-3.5 text-[13px] text-muted-foreground opacity-80">
+          Needs Claude Code with a Claude subscription
+        </p>
       </div>
     </main>
   );

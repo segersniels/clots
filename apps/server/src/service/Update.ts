@@ -9,7 +9,9 @@ import { INSTALL_DIRECTORY, installBundle } from "./Install.ts";
 import { serviceIsRunning } from "./Service.ts";
 
 /** The latest clots release on GitHub. A fork can point this at its own releases. */
-const LATEST_RELEASE_URL = process.env.CLOTS_RELEASES_URL ?? "https://api.github.com/repos/segersniels/clots/releases/latest";
+const LATEST_RELEASE_URL =
+  process.env.CLOTS_RELEASES_URL ??
+  "https://api.github.com/repos/segersniels/clots/releases/latest";
 
 /** How long a release check stays valid. GitHub allows 60 unauthenticated API calls per hour. */
 const CHECK_INTERVAL_MS = 60 * 60_000;
@@ -35,9 +37,13 @@ let lastCheck: { readonly at: number; readonly release: Release | undefined } | 
 
 /** Fetches the latest release, at most once per check interval. Returns `undefined` when GitHub does not answer. */
 export const latestRelease = async (): Promise<Release | undefined> => {
-  if (lastCheck !== undefined && Date.now() - lastCheck.at < CHECK_INTERVAL_MS) return lastCheck.release;
+  if (lastCheck !== undefined && Date.now() - lastCheck.at < CHECK_INTERVAL_MS) {
+    return lastCheck.release;
+  }
 
-  const release = await fetch(LATEST_RELEASE_URL, { headers: { "User-Agent": "clots", Accept: "application/vnd.github+json" } })
+  const release = await fetch(LATEST_RELEASE_URL, {
+    headers: { "User-Agent": "clots", Accept: "application/vnd.github+json" },
+  })
     .then((response) => (response.ok ? (response.json() as Promise<GitHubRelease>) : undefined))
     .then((found) =>
       found === undefined
@@ -45,7 +51,8 @@ export const latestRelease = async (): Promise<Release | undefined> => {
         : {
             version: found.tag_name.replace(/^v/, ""),
             url: found.html_url,
-            bundleUrl: found.assets.find((asset) => asset.name === `${BUNDLE_NAME}.tar.gz`)?.browser_download_url,
+            bundleUrl: found.assets.find((asset) => asset.name === `${BUNDLE_NAME}.tar.gz`)
+              ?.browser_download_url,
           },
     )
     .catch(() => undefined);
@@ -59,17 +66,26 @@ export const latestRelease = async (): Promise<Release | undefined> => {
  * Tells whether this server can replace itself: it must be the installed binary, and the
  * background service must run it, so that the service starts the new version.
  */
-export const canUpdateServer = () => runsInstalled && dirname(process.execPath) === INSTALL_DIRECTORY && serviceIsRunning();
+export const canUpdateServer = () =>
+  runsInstalled && dirname(process.execPath) === INSTALL_DIRECTORY && serviceIsRunning();
 
 /** Returns the latest release when this server can install it, or explains why it cannot. */
 export const availableServerUpdate = async () => {
   const release = await latestRelease();
 
-  if (release === undefined) throw new Error("GitHub did not answer. Try again later.");
+  if (release === undefined) {
+    throw new Error("GitHub did not answer. Try again later.");
+  }
 
-  if (!isNewerVersion(release.version, CLOTS_VERSION)) throw new Error(`clots ${CLOTS_VERSION} is the latest version.`);
+  if (!isNewerVersion(release.version, CLOTS_VERSION)) {
+    throw new Error(`clots ${CLOTS_VERSION} is the latest version.`);
+  }
 
-  if (!canUpdateServer()) throw new Error("This server does not run as an installed service, so it cannot update itself.");
+  if (!canUpdateServer()) {
+    throw new Error(
+      "This server does not run as an installed service, so it cannot update itself.",
+    );
+  }
 
   return release;
 };
@@ -79,21 +95,29 @@ export const availableServerUpdate = async () => {
  * restarts the server afterwards, because the running process keeps the old binary.
  */
 export const installRelease = async (release: Release) => {
-  if (release.bundleUrl === undefined) throw new Error(`Release ${release.version} has no build for ${process.platform}-${process.arch}.`);
+  if (release.bundleUrl === undefined) {
+    throw new Error(
+      `Release ${release.version} has no build for ${process.platform}-${process.arch}.`,
+    );
+  }
 
   const download = mkdtempSync(join(tmpdir(), "clots-update-"));
 
   try {
     const response = await fetch(release.bundleUrl);
 
-    if (!response.ok) throw new Error(`The download failed with HTTP ${response.status}.`);
+    if (!response.ok) {
+      throw new Error(`The download failed with HTTP ${response.status}.`);
+    }
 
     const archive = join(download, `${BUNDLE_NAME}.tar.gz`);
     await Bun.write(archive, response);
 
     const extract = Bun.spawnSync(["tar", "-xzf", archive, "-C", download], { stderr: "pipe" });
 
-    if (extract.exitCode !== 0) throw new Error(`The archive did not unpack: ${extract.stderr.toString().trim()}`);
+    if (extract.exitCode !== 0) {
+      throw new Error(`The archive did not unpack: ${extract.stderr.toString().trim()}`);
+    }
 
     installBundle(join(download, BUNDLE_NAME));
   } finally {
@@ -105,11 +129,16 @@ export const installRelease = async (release: Release) => {
 export const updateInfo = async () => {
   const release = await latestRelease();
 
-  if (release === undefined) return { current: CLOTS_VERSION, serverUpdate: false };
+  if (release === undefined) {
+    return { current: CLOTS_VERSION, serverUpdate: false };
+  }
 
   return {
     current: CLOTS_VERSION,
     latest: { version: release.version, url: release.url },
-    serverUpdate: isNewerVersion(release.version, CLOTS_VERSION) && release.bundleUrl !== undefined && canUpdateServer(),
+    serverUpdate:
+      isNewerVersion(release.version, CLOTS_VERSION) &&
+      release.bundleUrl !== undefined &&
+      canUpdateServer(),
   };
 };

@@ -1,7 +1,24 @@
 import { Character } from "@clots/character";
 import type { BotSummary } from "@clots/contracts";
-import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, CopyIcon, ExternalLinkIcon, LockIcon, PlusIcon, RotateCwIcon, XIcon } from "lucide-react";
-import { useEffect, useState, type CSSProperties, type KeyboardEvent, type ReactNode, type RefObject } from "react";
+import {
+  CheckIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  CopyIcon,
+  ExternalLinkIcon,
+  LockIcon,
+  PlusIcon,
+  RotateCwIcon,
+  XIcon,
+} from "lucide-react";
+import {
+  useEffect,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+  type ReactNode,
+  type RefObject,
+} from "react";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -37,7 +54,9 @@ function splitAddress(address: string) {
   try {
     const url = new URL(address);
 
-    if (!url.protocol.startsWith("http")) return { secure: false, host: address, rest: "" };
+    if (!url.protocol.startsWith("http")) {
+      return { secure: false, host: address, rest: "" };
+    }
 
     return {
       secure: url.protocol === "https:",
@@ -65,18 +84,28 @@ function tabName(tab: BrowserTab) {
 
 /** Shows the name of a tab. A new name, such as the title that a page sets after it loads, crossfades over the old one. */
 function TabName({ name }: { name: string }) {
-  const [names, setNames] = useState<{ current: string; previous: string | null }>({ current: name, previous: null });
+  const [names, setNames] = useState<{ current: string; previous: string | null }>({
+    current: name,
+    previous: null,
+  });
 
-  if (names.current !== name) setNames({ current: name, previous: names.current });
+  if (names.current !== name) {
+    setNames({ current: name, previous: names.current });
+  }
 
   // A tab that opens shows its name at once. Only a change fades.
-  const fadeIn = names.previous === null ? "" : "transition-opacity duration-150 ease-out starting:opacity-0";
+  const fadeIn =
+    names.previous === null ? "" : "transition-opacity duration-150 ease-out starting:opacity-0";
 
   return (
     <span className="relative min-w-0">
       {/* The old name lies over the new one, so the tab takes the width of the new name. */}
       {names.previous !== null && (
-        <span key={names.previous} aria-hidden className="absolute inset-0 truncate opacity-0 transition-opacity duration-150 ease-out starting:opacity-100">
+        <span
+          key={names.previous}
+          aria-hidden
+          className="absolute inset-0 truncate opacity-0 transition-opacity duration-150 ease-out starting:opacity-100"
+        >
           {names.previous}
         </span>
       )}
@@ -169,7 +198,9 @@ export function BrowserTabStrip({
           <div
             key={tab.tabId}
             className={`group/tab flex h-8 max-w-[220px] min-w-0 items-center rounded-t-[10px] text-[13px] transition-colors duration-150 ${
-              tab.active ? "bg-popover text-foreground" : "text-muted-foreground hover:text-foreground"
+              tab.active
+                ? "bg-popover text-foreground"
+                : "text-muted-foreground hover:text-foreground"
             }`}
           >
             <button
@@ -187,7 +218,14 @@ export function BrowserTabStrip({
             </button>
             {/* The last tab stays: a window without a page has nothing to take over. */}
             {tabs.length > 1 && (
-              <Button variant="ghost" size="icon-xs" aria-label={`Close ${tabName(tab)}`} title="Close tab" className="mr-1 shrink-0" onClick={() => onClose(tab)}>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                aria-label={`Close ${tabName(tab)}`}
+                title="Close tab"
+                className="mr-1 shrink-0"
+                onClick={() => onClose(tab)}
+              >
                 <XIcon />
               </Button>
             )}
@@ -195,7 +233,14 @@ export function BrowserTabStrip({
         ))}
       </div>
       {/* The tabs sit on the bottom edge. The margin puts the + on the same middle line as their names. */}
-      <Button variant="ghost" size="icon-xs" aria-label="New tab" title="New tab" className="mb-1 shrink-0 text-muted-foreground" onClick={onNew}>
+      <Button
+        variant="ghost"
+        size="icon-xs"
+        aria-label="New tab"
+        title="New tab"
+        className="mb-1 shrink-0 text-muted-foreground"
+        onClick={onNew}
+      >
         <PlusIcon />
       </Button>
     </div>
@@ -217,18 +262,42 @@ export function BrowserNavigation({
 }) {
   return (
     <div className="flex items-center [&_svg]:size-[17px]">
-      <Button variant="ghost" size="icon" aria-label="Back" title="Back" onClick={() => onNavigate("back")}>
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label="Back"
+        title="Back"
+        onClick={() => onNavigate("back")}
+      >
         <ChevronLeftIcon />
       </Button>
-      <Button variant="ghost" size="icon" aria-label="Forward" title="Forward" onClick={() => onNavigate("forward")}>
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label="Forward"
+        title="Forward"
+        onClick={() => onNavigate("forward")}
+      >
         <ChevronRightIcon />
       </Button>
       {loading ? (
-        <Button variant="ghost" size="icon" aria-label="Stop" title="Stop" onClick={() => onNavigate("stop")}>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Stop"
+          title="Stop"
+          onClick={() => onNavigate("stop")}
+        >
           <XIcon />
         </Button>
       ) : (
-        <Button variant="ghost" size="icon" aria-label="Reload" title="Reload" onClick={() => onNavigate("reload")}>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Reload"
+          title="Reload"
+          onClick={() => onNavigate("reload")}
+        >
           <RotateCwIcon />
         </Button>
       )}
@@ -237,13 +306,23 @@ export function BrowserNavigation({
 }
 
 /** Shows the page's address. A click turns it into a field: Enter opens what the operator typed, Escape keeps the address. */
-export function AddressBar({ address, loading, onOpen }: { address: string; loading: boolean; onOpen: (address: string) => void }) {
+export function AddressBar({
+  address,
+  loading,
+  onOpen,
+}: {
+  address: string;
+  loading: boolean;
+  onOpen: (address: string) => void;
+}) {
   const [typed, setTyped] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const { secure, host, rest } = splitAddress(address);
 
   useEffect(() => {
-    if (!copied) return;
+    if (!copied) {
+      return;
+    }
 
     const timer = setTimeout(() => setCopied(false), COPIED_MS);
 
@@ -256,9 +335,13 @@ export function AddressBar({ address, loading, onOpen }: { address: string; load
   };
 
   const finish = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Enter" && typed !== null && typed.trim() !== "") onOpen(toAddress(typed));
+    if (event.key === "Enter" && typed !== null && typed.trim() !== "") {
+      onOpen(toAddress(typed));
+    }
 
-    if (event.key === "Enter" || event.key === "Escape") event.currentTarget.blur();
+    if (event.key === "Enter" || event.key === "Escape") {
+      event.currentTarget.blur();
+    }
   };
 
   return (
@@ -267,7 +350,9 @@ export function AddressBar({ address, loading, onOpen }: { address: string; load
         typed === null ? "bg-muted/60" : "bg-popover ring-2 ring-attention"
       }`}
     >
-      <LockIcon className={`size-3.5 shrink-0 text-muted-foreground ${secure ? "" : "invisible"}`} />
+      <LockIcon
+        className={`size-3.5 shrink-0 text-muted-foreground ${secure ? "" : "invisible"}`}
+      />
 
       {typed === null ? (
         <>

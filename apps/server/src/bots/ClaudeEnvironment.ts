@@ -45,7 +45,11 @@ export const makeClaudeEnvironment = (
 
 /** Builds the path of the folder where `claude` keeps the transcripts of one working directory. */
 const transcriptFolder = (directory: string) =>
-  join(process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude"), "projects", directory.replaceAll(/[^a-zA-Z0-9]/g, "-"));
+  join(
+    process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude"),
+    "projects",
+    directory.replaceAll(/[^a-zA-Z0-9]/g, "-"),
+  );
 
 /**
  * Deletes the transcripts that `claude` kept for a bot. The folder of the notes directory belongs
@@ -53,7 +57,9 @@ const transcriptFolder = (directory: string) =>
  */
 export const removeClaudeTranscripts = (bot: StoredBot) => {
   rmSync(transcriptFolder(bot.workingDirectory), { recursive: true, force: true });
-  if (bot.projectDirectory === null || bot.sdkSessionId === null) return;
+  if (bot.projectDirectory === null || bot.sdkSessionId === null) {
+    return;
+  }
 
   const projectFolder = transcriptFolder(bot.projectDirectory);
   rmSync(join(projectFolder, `${bot.sdkSessionId}.jsonl`), { force: true });

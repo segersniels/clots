@@ -1,5 +1,13 @@
 import { pointer, prefersReducedMotion, type Animated } from "./frameLoop.ts";
-import { MAX_LOBES, NO_FIT, SHAPE_GEOMETRY, shapeFit, type CharacterShape, type Lobe, type ShapeFit } from "./traits.ts";
+import {
+  MAX_LOBES,
+  NO_FIT,
+  SHAPE_GEOMETRY,
+  shapeFit,
+  type CharacterShape,
+  type Lobe,
+  type ShapeFit,
+} from "./traits.ts";
 
 /** States what the character does now. The motion shows it, so a list needs no spinner. */
 export type CharacterMood = "idle" | "working" | "waiting";
@@ -29,7 +37,10 @@ const BLINK_MS = 160;
 const EYE_REACH = { x: 3.4, y: 3 };
 
 /** The squash of an idle breath. The browser animates it, so an idle character costs no drawing. */
-const IDLE_BREATH: Keyframe[] = [{ transform: "scale(1.012, 0.978)" }, { transform: "scale(0.988, 1.022)" }];
+const IDLE_BREATH: Keyframe[] = [
+  { transform: "scale(1.012, 0.978)" },
+  { transform: "scale(0.988, 1.022)" },
+];
 
 /** The length of half an idle breath, in or out. */
 const IDLE_BREATH_MS = 1700;
@@ -42,7 +53,9 @@ export function paddedLobes(shape: CharacterShape): Lobe[] {
   const lobes = [...SHAPE_GEOMETRY[shape].lobes];
   const [cx, cy] = lobes[0]!;
 
-  while (lobes.length < MAX_LOBES) lobes.push([cx, cy, 0]);
+  while (lobes.length < MAX_LOBES) {
+    lobes.push([cx, cy, 0]);
+  }
 
   return lobes;
 }
@@ -143,7 +156,9 @@ export class CharacterMotion implements Animated {
     const { mood, gaze } = this.props();
 
     // Only an idle character without a set gaze follows the pointer, so only it needs its position.
-    if (mood !== "idle" || gaze !== undefined || !pointer.seen) return;
+    if (mood !== "idle" || gaze !== undefined || !pointer.seen) {
+      return;
+    }
 
     const box = this.svg.getBoundingClientRect();
     this.center = { x: box.left + box.width / 2, y: box.top + box.height / 2 };
@@ -154,17 +169,26 @@ export class CharacterMotion implements Animated {
     const reduced = prefersReducedMotion();
     const t = now / 1000 + this.phase;
 
-    if (shape !== this.shape) this.startMorph(shape, now, reduced);
+    if (shape !== this.shape) {
+      this.startMorph(shape, now, reduced);
+    }
 
     if (hops !== this.hops) {
       this.hops = hops;
-      if (!reduced) this.hopStart = now;
+      if (!reduced) {
+        this.hopStart = now;
+      }
     }
 
     // A working or waiting character breathes in its own motion below.
     const breathesIdle = mood === "idle" && !reduced;
-    if (breathesIdle && this.idleBreath.playState !== "running") this.idleBreath.play();
-    if (!breathesIdle && this.idleBreath.playState === "running") this.idleBreath.cancel();
+    if (breathesIdle && this.idleBreath.playState !== "running") {
+      this.idleBreath.play();
+    }
+
+    if (!breathesIdle && this.idleBreath.playState === "running") {
+      this.idleBreath.cancel();
+    }
 
     // An idle character only draws for a blink or a look, so a page of idle characters costs almost no drawing.
     const target = this.aim(t, mood, gaze);
@@ -175,7 +199,11 @@ export class CharacterMotion implements Animated {
       now - this.blinkStart >= BLINK_MS &&
       now <= this.nextBlink &&
       Math.hypot(target.x - this.gaze.x, target.y - this.gaze.y) < GAZE_REST;
-    if (settled && this.atRest) return;
+
+    if (settled && this.atRest) {
+      return;
+    }
+
     this.atRest = settled;
 
     const lobes = this.lobesAt(now);
@@ -186,13 +214,18 @@ export class CharacterMotion implements Animated {
     const dropletAngle = reduced ? -0.8 : t * 2.4;
     const droplet: Lobe =
       mood === "working"
-        ? [bodyX + Math.cos(dropletAngle) * bodyR * 0.98, bodyY + Math.sin(dropletAngle) * bodyR * 0.98, Math.max(5.5, bodyR * 0.22)]
+        ? [
+            bodyX + Math.cos(dropletAngle) * bodyR * 0.98,
+            bodyY + Math.sin(dropletAngle) * bodyR * 0.98,
+            Math.max(5.5, bodyR * 0.22),
+          ]
         : [bodyX, bodyY, 0];
 
     for (const { grow, circles } of this.layers) {
       [...lobes, droplet].forEach(([cx, cy, r], index) => {
         const isSideLobe = index > 0 && index < MAX_LOBES && r > 0;
-        const wobble = !reduced && mood === "working" && isSideLobe ? Math.sin(t * 3 + index * 1.9) * 1.6 : 0;
+        const wobble =
+          !reduced && mood === "working" && isSideLobe ? Math.sin(t * 3 + index * 1.9) * 1.6 : 0;
         const circle = circles[index]!;
 
         circle.setAttribute("cx", String(cx + wobble));
@@ -203,7 +236,9 @@ export class CharacterMotion implements Animated {
 
     // The squash and the hop pivot on the bottom of the art, so the character stands on the ground.
     const fit = this.fitAt(now);
-    const { scaleX, scaleY, lift } = reduced ? { scaleX: 1, scaleY: 1, lift: 0 } : this.bounce(now, mood);
+    const { scaleX, scaleY, lift } = reduced
+      ? { scaleX: 1, scaleY: 1, lift: 0 }
+      : this.bounce(now, mood);
     this.root.setAttribute(
       "transform",
       `translate(50 ${fit.bottom - lift}) scale(${scaleX} ${scaleY}) translate(-50 -${fit.bottom}) ` +
@@ -234,7 +269,9 @@ export class CharacterMotion implements Animated {
     this.shape = shape;
     this.atRest = false;
 
-    if (reduced) return;
+    if (reduced) {
+      return;
+    }
 
     this.morphStart = now;
     this.hopStart = now;
@@ -252,7 +289,11 @@ export class CharacterMotion implements Animated {
     return this.toLobes.map(([cx, cy, r], index) => {
       const [fromX, fromY, fromR] = this.fromLobes[index]!;
 
-      return [lerp(fromX, cx, progress), lerp(fromY, cy, progress), Math.max(0, lerp(fromR, r, progress))];
+      return [
+        lerp(fromX, cx, progress),
+        lerp(fromY, cy, progress),
+        Math.max(0, lerp(fromR, r, progress)),
+      ];
     });
   }
 
@@ -274,7 +315,11 @@ export class CharacterMotion implements Animated {
   private eyesAt(now: number) {
     const progress = this.morphProgress(now);
 
-    return this.toEyes.map((value, index) => lerp(this.fromEyes[index]!, value, progress)) as [number, number, number];
+    return this.toEyes.map((value, index) => lerp(this.fromEyes[index]!, value, progress)) as [
+      number,
+      number,
+      number,
+    ];
   }
 
   /** Moves the sheen from the lobe of the old shape to the lobe of the new one, so it never jumps. */
@@ -319,15 +364,23 @@ export class CharacterMotion implements Animated {
 
   /** Works out where the eyes look, in box units from their resting place. */
   private aim(t: number, mood: CharacterMood, gaze: Gaze | undefined): Gaze {
-    if (gaze !== undefined) return { x: gaze.x * EYE_REACH.x, y: gaze.y * EYE_REACH.y };
+    if (gaze !== undefined) {
+      return { x: gaze.x * EYE_REACH.x, y: gaze.y * EYE_REACH.y };
+    }
 
     // A waiting character looks right at the operator.
-    if (mood === "waiting") return { x: 0, y: 0.6 };
+    if (mood === "waiting") {
+      return { x: 0, y: 0.6 };
+    }
 
     // A working character watches its droplet.
-    if (mood === "working") return { x: Math.cos(t * 2.4) * 2.6, y: Math.sin(t * 2.4) * 2.2 };
+    if (mood === "working") {
+      return { x: Math.cos(t * 2.4) * 2.6, y: Math.sin(t * 2.4) * 2.2 };
+    }
 
-    if (this.center === undefined) return { x: 0, y: 0 };
+    if (this.center === undefined) {
+      return { x: 0, y: 0 };
+    }
 
     const dx = pointer.x - this.center.x;
     const dy = pointer.y - this.center.y;
@@ -337,7 +390,15 @@ export class CharacterMotion implements Animated {
     return { x: (dx / distance) * EYE_REACH.x * reach, y: (dy / distance) * EYE_REACH.y * reach };
   }
 
-  private drawEyes(now: number, x: number, y: number, gap: number, target: Gaze, reduced: boolean, mood: CharacterMood) {
+  private drawEyes(
+    now: number,
+    x: number,
+    y: number,
+    gap: number,
+    target: Gaze,
+    reduced: boolean,
+    mood: CharacterMood,
+  ) {
     const ease = reduced ? 1 : 0.14;
     this.gaze.x += (target.x - this.gaze.x) * ease;
     this.gaze.y += (target.y - this.gaze.y) * ease;

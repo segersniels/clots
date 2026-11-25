@@ -25,9 +25,13 @@ function trackPointer(event: PointerEvent) {
 }
 
 function tick(now: number) {
-  for (const item of animated) item.measure();
+  for (const item of animated) {
+    item.measure();
+  }
 
-  for (const item of animated) item.draw(now);
+  for (const item of animated) {
+    item.draw(now);
+  }
 
   frame = animated.size > 0 ? requestAnimationFrame(tick) : 0;
 }
@@ -35,13 +39,19 @@ function tick(now: number) {
 /** Adds a character to the shared frame loop. The returned function removes it again. */
 export function animate(item: Animated) {
   // All characters share one loop and one pointer listener, however many the page shows.
-  if (animated.size === 0) addEventListener("pointermove", trackPointer, { passive: true });
+  if (animated.size === 0) {
+    addEventListener("pointermove", trackPointer, { passive: true });
+  }
 
   animated.add(item);
-  if (frame === 0) frame = requestAnimationFrame(tick);
+  if (frame === 0) {
+    frame = requestAnimationFrame(tick);
+  }
 
   return () => {
     animated.delete(item);
-    if (animated.size === 0) removeEventListener("pointermove", trackPointer);
+    if (animated.size === 0) {
+      removeEventListener("pointermove", trackPointer);
+    }
   };
 }

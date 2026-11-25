@@ -1,8 +1,23 @@
 import { useEffect, useId, useRef, useState } from "react";
 
-import { CharacterMotion, gooMatrix, paddedLobes, type CharacterMood, type Gaze, type MotionProps } from "./CharacterMotion.ts";
+import {
+  CharacterMotion,
+  gooMatrix,
+  paddedLobes,
+  type CharacterMood,
+  type Gaze,
+  type MotionProps,
+} from "./CharacterMotion.ts";
 import { animate } from "./frameLoop.ts";
-import { COLOR_HEX, MAX_LOBES, NO_FIT, SHAPE_GEOMETRY, shapeFit, type CharacterColor, type CharacterShape } from "./traits.ts";
+import {
+  COLOR_HEX,
+  MAX_LOBES,
+  NO_FIT,
+  SHAPE_GEOMETRY,
+  shapeFit,
+  type CharacterColor,
+  type CharacterShape,
+} from "./traits.ts";
 
 /** The lobes plus one slot for the droplet of a working character. */
 const CIRCLES = MAX_LOBES + 1;
@@ -72,17 +87,40 @@ export function Character({
     });
 
   return (
-    <svg ref={svg} viewBox="0 0 100 100" width={size} height={size} overflow="visible" aria-hidden className={className} style={{ flexShrink: 0 }}>
+    <svg
+      ref={svg}
+      viewBox="0 0 100 100"
+      width={size}
+      height={size}
+      overflow="visible"
+      aria-hidden
+      className={className}
+      style={{ flexShrink: 0 }}
+    >
       <defs>
         {/* Blurs the lobes together and cuts the blur off sharp, so they melt like liquid. */}
-        <filter id={`${id}-goo`} x="-40%" y="-40%" width="180%" height="180%" colorInterpolationFilters="sRGB">
+        <filter
+          id={`${id}-goo`}
+          x="-40%"
+          y="-40%"
+          width="180%"
+          height="180%"
+          colorInterpolationFilters="sRGB"
+        >
           <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur" />
           <feColorMatrix data-goo="" in="blur" mode="matrix" values={gooMatrix(24)} result="goo" />
           <feComposite in="SourceGraphic" in2="goo" operator="atop" />
         </filter>
 
         {selected !== undefined && (
-          <mask id={`${id}-ring`} maskUnits="userSpaceOnUse" x="-20" y="-20" width="140" height="140">
+          <mask
+            id={`${id}-ring`}
+            maskUnits="userSpaceOnUse"
+            x="-20"
+            y="-20"
+            width="140"
+            height="140"
+          >
             <g data-grow={RING.outer} filter={`url(#${id}-goo)`} fill="white">
               {circles(RING.outer)}
             </g>
@@ -93,7 +131,10 @@ export function Character({
         )}
       </defs>
 
-      <g data-root="" transform={`translate(50 50) scale(${fit.scale}) translate(${-fit.x} ${-fit.y})`}>
+      <g
+        data-root=""
+        transform={`translate(50 50) scale(${fit.scale}) translate(${-fit.x} ${-fit.y})`}
+      >
         {selected !== undefined && (
           <rect
             x="-20"
@@ -106,15 +147,31 @@ export function Character({
           />
         )}
 
-        <g data-grow="0" filter={`url(#${id}-goo)`} style={{ fill: COLOR_HEX[color], transition: "fill 350ms ease-out" }}>
+        <g
+          data-grow="0"
+          filter={`url(#${id}-goo)`}
+          style={{ fill: COLOR_HEX[color], transition: "fill 350ms ease-out" }}
+        >
           {circles(0)}
         </g>
 
         <ellipse data-sheen="" fill="white" opacity="0.2" />
 
         <g fill={EYE_COLOR}>
-          <ellipse data-eye="" cx={eyeX - eyeGap / 2} cy={eyeY} rx={(eyeGap / 12) * 4.3} ry={(eyeGap / 12) * 5.4} />
-          <ellipse data-eye="" cx={eyeX + eyeGap / 2} cy={eyeY} rx={(eyeGap / 12) * 4.3} ry={(eyeGap / 12) * 5.4} />
+          <ellipse
+            data-eye=""
+            cx={eyeX - eyeGap / 2}
+            cy={eyeY}
+            rx={(eyeGap / 12) * 4.3}
+            ry={(eyeGap / 12) * 5.4}
+          />
+          <ellipse
+            data-eye=""
+            cx={eyeX + eyeGap / 2}
+            cy={eyeY}
+            rx={(eyeGap / 12) * 4.3}
+            ry={(eyeGap / 12) * 5.4}
+          />
         </g>
       </g>
     </svg>

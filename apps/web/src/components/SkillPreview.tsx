@@ -62,7 +62,9 @@ export function SkillPreview({ bot, name, when }: { bot: BotSummary; name: strin
   });
 
   useEffect(() => {
-    if (reducedMotion) return;
+    if (reducedMotion) {
+      return;
+    }
 
     const stop = new AbortController();
     const pause = (ms: number) => wait(ms, stop.signal);
@@ -130,13 +132,19 @@ export function SkillPreview({ bot, name, when }: { bot: BotSummary; name: strin
           open={pickerOpen && !reducedMotion}
           label="Skills"
           items={[
-            { name: shown.name || NAME_PLACEHOLDER, description: shown.when || WHEN_PLACEHOLDER, icon: <BoxIcon className="text-skill" /> },
+            {
+              name: shown.name || NAME_PLACEHOLDER,
+              description: shown.when || WHEN_PLACEHOLDER,
+              icon: <BoxIcon className="text-skill" />,
+            },
           ]}
           activeIndex={0}
           emptyText=""
           onPick={() => {}}
           onHover={() => {}}
-          className={shown.name === "" ? "[&_[role=option]>span:first-of-type]:opacity-45" : undefined}
+          className={
+            shown.name === "" ? "[&_[role=option]>span:first-of-type]:opacity-45" : undefined
+          }
         />
         <div className="flex h-10 items-center overflow-hidden rounded-full border bg-popover px-3.5 text-sm whitespace-pre">
           {typed === EMPTY_DRAFT ? (

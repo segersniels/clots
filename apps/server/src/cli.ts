@@ -13,7 +13,13 @@ import { makeClaudeEnvironment } from "./bots/ClaudeEnvironment.ts";
 import { runsInstalled, runtimePaths } from "./paths.ts";
 import { ServerLayer } from "./server.ts";
 import { installBundle } from "./service/Install.ts";
-import { installService, removeService, restartService, serviceIsRunning, stopService } from "./service/Service.ts";
+import {
+  installService,
+  removeService,
+  restartService,
+  serviceIsRunning,
+  stopService,
+} from "./service/Service.ts";
 import { availableServerUpdate, installRelease } from "./service/Update.ts";
 import { CLOTS_VERSION } from "./version.ts";
 import { readSidecarStatus, sidecarIsBuilt } from "./sidecar/Sidecar.ts";
@@ -37,7 +43,9 @@ interface ClaudeLogin {
 
 /** Asks Claude Code for its login. clots never reads the tokens itself. */
 const readClaudeLogin = (): ClaudeLogin => {
-  const result = Bun.spawnSync(["claude", "auth", "status"], { env: makeClaudeEnvironment(process.env) });
+  const result = Bun.spawnSync(["claude", "auth", "status"], {
+    env: makeClaudeEnvironment(process.env),
+  });
 
   try {
     return JSON.parse(result.stdout.toString());
@@ -67,7 +75,9 @@ const ensureClaudeLogin = (): boolean => {
 
   // clots supports the subscription login only.
   if (!login.loggedIn || login.authMethod !== "claude.ai") {
-    console.log("✗ Claude has no subscription login. Run `claude auth login` and choose your Claude account.");
+    console.log(
+      "✗ Claude has no subscription login. Run `claude auth login` and choose your Claude account.",
+    );
 
     return false;
   }
@@ -92,18 +102,23 @@ const setUpBrowser = async () => {
 
   // Chrome for Testing has no build for Linux on ARM, so only a system Chromium works there.
   if (executable === undefined && process.platform === "linux" && process.arch === "arm64") {
-    console.log("! Chrome has no download for Linux on ARM. Install Chromium with your package manager, for example:\n  sudo apt install chromium");
+    console.log(
+      "! Chrome has no download for Linux on ARM. Install Chromium with your package manager, for example:\n  sudo apt install chromium",
+    );
+
     return;
   }
 
   if (executable === undefined) {
     console.log("! Chrome for the bots did not download. The server tries again when it starts.");
+
     return;
   }
 
   const problems = browserHostProblems(executable);
   if (problems.length === 0) {
     console.log("✓ Browser for the bots");
+
     return;
   }
 
@@ -114,10 +129,14 @@ const setUpBrowser = async () => {
 
 /** Starts the background service. A local server stays off the tailnet, so it needs no Tailscale login. */
 const up = async (local: boolean) => {
-  if (!ensureClaudeLogin()) process.exit(1);
+  if (!ensureClaudeLogin()) {
+    process.exit(1);
+  }
 
   if (!existsSync(runtimePaths.webRoot) || (!local && !sidecarIsBuilt())) {
-    console.log("✗ The web client or the sidecar is not built. Run `bun run build` in the clots checkout.");
+    console.log(
+      "✗ The web client or the sidecar is not built. Run `bun run build` in the clots checkout.",
+    );
     process.exit(1);
   }
 
@@ -131,10 +150,14 @@ const up = async (local: boolean) => {
   }
 
   installService();
-  console.log(`✓ Background service ${serviceIsRunning() ? "runs" : "is installed, but it does not run yet"}`);
+  console.log(
+    `✓ Background service ${serviceIsRunning() ? "runs" : "is installed, but it does not run yet"}`,
+  );
   console.log(`✓ Local address: http://127.0.0.1:${PORT}`);
 
-  if (local) return;
+  if (local) {
+    return;
+  }
 
   let shownAuthUrl: string | undefined;
   let toldAboutHttps = false;
@@ -149,14 +172,20 @@ const up = async (local: boolean) => {
       return;
     }
 
-    if (status?.state === "needs_login" && status.authUrl !== undefined && status.authUrl !== shownAuthUrl) {
+    if (
+      status?.state === "needs_login" &&
+      status.authUrl !== undefined &&
+      status.authUrl !== shownAuthUrl
+    ) {
       shownAuthUrl = status.authUrl;
       printWithQr("Log in to Tailscale to add clots to your tailnet:", status.authUrl);
     }
 
     if (status?.state === "needs_https" && !toldAboutHttps) {
       toldAboutHttps = true;
-      console.log("\nEnable HTTPS certificates for your tailnet: https://login.tailscale.com/admin/dns");
+      console.log(
+        "\nEnable HTTPS certificates for your tailnet: https://login.tailscale.com/admin/dns",
+      );
     }
 
     await Bun.sleep(1000);
@@ -174,7 +203,9 @@ const status = async () => {
   );
   const sidecar = readSidecarStatus(HOME);
 
-  console.log(`Claude login:  ${login.loggedIn ? `yes (${login.subscriptionType ?? login.authMethod})` : "no"}`);
+  console.log(
+    `Claude login:  ${login.loggedIn ? `yes (${login.subscriptionType ?? login.authMethod})` : "no"}`,
+  );
   console.log(`Service:       ${serviceIsRunning() ? "running" : "not running"}`);
   console.log(`Local server:  ${reachable ? `http://127.0.0.1:${PORT}` : "not reachable"}`);
   console.log(`Tailnet:       ${sidecar?.url ?? sidecar?.state ?? "sidecar has not started"}`);
@@ -192,20 +223,26 @@ const stop = (remove: boolean) => {
     process.exit(1);
   }
 
-  console.log(`✓ Background service ${remove ? "removed" : "stopped"}. Run \`clots up\` to start it again.`);
+  console.log(
+    `✓ Background service ${remove ? "removed" : "stopped"}. Run \`clots up\` to start it again.`,
+  );
 };
 
 /** Copies this build to the install folder, so the `clots` command works from any directory. */
 const install = () => {
   if (!runsInstalled) {
-    console.log("✗ Install a built binary: run `bun run build:cli`, then `dist/<platform>/clots install`.");
+    console.log(
+      "✗ Install a built binary: run `bun run build:cli`, then `dist/<platform>/clots install`.",
+    );
     process.exit(1);
   }
 
   const { command, onPath } = installBundle();
   console.log(`✓ Installed ${command}`);
 
-  if (!onPath) console.log(`  Add ${dirname(command)} to your PATH to run \`clots\` from any directory.`);
+  if (!onPath) {
+    console.log(`  Add ${dirname(command)} to your PATH to run \`clots\` from any directory.`);
+  }
 
   // The service still runs the binary that the new folder replaced.
   if (serviceIsRunning()) {

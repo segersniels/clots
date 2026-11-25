@@ -11,7 +11,10 @@ const TOOLS = join(process.env.CLOTS_HOME ?? join(homedir(), ".clots"), "tools")
 const BROWSERS = join(TOOLS, ".agent-browser/browsers");
 
 /** The Chrome executable inside a `chrome-<version>` folder on Linux and on macOS. */
-const EXECUTABLES = ["chrome", "Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"];
+const EXECUTABLES = [
+  "chrome",
+  "Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
+];
 
 /** The AppArmor profile that lets clots's own Chrome use its sandbox on Ubuntu 23.10 and later. */
 const APPARMOR_PROFILE = "/etc/apparmor.d/clots-chrome";
@@ -45,14 +48,19 @@ export const installBrowser = async () => {
  * it. clots cannot fix these itself, because each one needs root.
  */
 export const browserHostProblems = (executable: string) => {
-  if (process.platform !== "linux") return [];
+  if (process.platform !== "linux") {
+    return [];
+  }
 
   const problems: Array<{ problem: string; fix: string }> = [];
   const version = Bun.spawnSync([executable, "--version"], { stderr: "pipe" });
   const font = Bun.spawnSync(["fc-match", "--format=%{file}", "sans-serif"], { stderr: "ignore" });
 
   // agent-browser skips the download that it already made and installs the libraries and fonts with the package manager.
-  if (version.stderr.toString().includes("error while loading shared libraries") || font.stdout.toString().trim() === "") {
+  if (
+    version.stderr.toString().includes("error while loading shared libraries") ||
+    font.stdout.toString().trim() === ""
+  ) {
     problems.push({
       problem: "The host lacks libraries or fonts that Chrome needs.",
       fix: `HOME=${TOOLS} ${runtimePaths.agentBrowser} install --with-deps`,
@@ -80,7 +88,9 @@ export const browserHostProblems = (executable: string) => {
 /** Tells whether the kernel lets only programs with an AppArmor profile use user namespaces, as Ubuntu 23.10 and later do. */
 const usernsRestricted = () => {
   try {
-    return readFileSync("/proc/sys/kernel/apparmor_restrict_unprivileged_userns", "utf8").trim() === "1";
+    return (
+      readFileSync("/proc/sys/kernel/apparmor_restrict_unprivileged_userns", "utf8").trim() === "1"
+    );
   } catch {
     return false;
   }

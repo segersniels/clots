@@ -66,13 +66,17 @@ function BotPage() {
   // To open a bot is to read it, and so is coming back to the window that shows it.
   useEffect(() => {
     saveLastBot(botId);
-    if (visible) void client.setBotUnread(botId, false);
+    if (visible) {
+      void client.setBotUnread(botId, false);
+    }
   }, [botId, visible]);
 
   // The bot is gone, for example deleted on another device, so the app forgets it and goes home.
   const missing = bots.length > 0 && bot === undefined;
   useEffect(() => {
-    if (!missing) return;
+    if (!missing) {
+      return;
+    }
 
     saveLastBot(null);
     void navigate({ to: "/", replace: true });
@@ -80,41 +84,65 @@ function BotPage() {
 
   // A bot that the operator just created asks for its instructions in its thread, with the caret there.
   const createdBotId = useRef<BotId | null>(null);
-  if (takeCreatedBot(botId)) createdBotId.current = botId;
+  if (takeCreatedBot(botId)) {
+    createdBotId.current = botId;
+  }
 
   const toggleDetails = () => {
     const open = !detailsOpen;
-    if (open) setDetailsMounted(true);
+    if (open) {
+      setDetailsMounted(true);
+    }
+
     setDetailsOpen(open);
     savePaneOpen(DETAILS_OPEN_KEY, open);
 
     // A narrow window slides the pane with CSS alone.
-    if (!wide) return;
+    if (!wide) {
+      return;
+    }
 
     // Without the animation no transition ends, so the content leaves at once.
-    if (reduceMotion && !open) setDetailsMounted(false);
-    if (!reduceMotion) setAnimating(true);
+    if (reduceMotion && !open) {
+      setDetailsMounted(false);
+    }
 
-    if (open) details.current?.resize(detailsWidth.current);
-    else details.current?.collapse();
+    if (!reduceMotion) {
+      setAnimating(true);
+    }
+
+    if (open) {
+      details.current?.resize(detailsWidth.current);
+    } else {
+      details.current?.collapse();
+    }
   };
 
   // The bot list arrives a moment after the page opens.
-  if (bot === undefined) return null;
+  if (bot === undefined) {
+    return null;
+  }
 
   /** Brings the pane back to its default width, as a double-click on the divider does in most apps. */
   const resetDetailsWidth = () => {
-    if (Math.round(details.current?.getSize().inPixels ?? 0) === DEFAULT_DETAILS_WIDTH) return;
+    if (Math.round(details.current?.getSize().inPixels ?? 0) === DEFAULT_DETAILS_WIDTH) {
+      return;
+    }
 
     detailsWidth.current = DEFAULT_DETAILS_WIDTH;
     savePaneWidth(DETAILS_WIDTH_KEY, DEFAULT_DETAILS_WIDTH);
-    if (!reduceMotion) setAnimating(true);
+    if (!reduceMotion) {
+      setAnimating(true);
+    }
+
     details.current?.resize(DEFAULT_DETAILS_WIDTH);
   };
 
   const followDetailsWidth = ({ inPixels }: PanelSize) => {
     // The sizes during an animation are steps on the way, not a width that the operator chose.
-    if (animating) return;
+    if (animating) {
+      return;
+    }
 
     // A drag past the minimum width closes the pane.
     if (inPixels === 0 && detailsOpen) {
@@ -123,7 +151,9 @@ function BotPage() {
       savePaneOpen(DETAILS_OPEN_KEY, false);
     }
 
-    if (inPixels === 0) return;
+    if (inPixels === 0) {
+      return;
+    }
 
     detailsWidth.current = inPixels;
     savePaneWidth(DETAILS_WIDTH_KEY, inPixels);
@@ -131,10 +161,17 @@ function BotPage() {
 
   const finishTransition = (event: TransitionEvent) => {
     const columnMoved = event.propertyName === "flex-grow";
-    const paneSlid = (event.target as Element).id === "bot-details" && SLIDE_TRANSITIONS.includes(event.propertyName);
+    const paneSlid =
+      (event.target as Element).id === "bot-details" &&
+      SLIDE_TRANSITIONS.includes(event.propertyName);
 
-    if (columnMoved) setAnimating(false);
-    if ((columnMoved || paneSlid) && !detailsOpen) setDetailsMounted(false);
+    if (columnMoved) {
+      setAnimating(false);
+    }
+
+    if ((columnMoved || paneSlid) && !detailsOpen) {
+      setDetailsMounted(false);
+    }
   };
 
   // Without `min-w-0`, one long line in the thread makes this column wider than the window.
@@ -142,7 +179,14 @@ function BotPage() {
     <section className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col">
       {/* The header floats over the thread, which fades out below it. A scroll over the header still reaches the thread. */}
       <header className="window-drag pointer-events-none absolute inset-x-0 top-0 z-10 grid h-13 grid-cols-[1fr_auto_1fr] items-center px-3 *:pointer-events-auto">
-        <Button variant="ghost" size="icon" aria-label="All bots" className="md:hidden" nativeButton={false} render={<Link to="/" />}>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="All bots"
+          className="md:hidden"
+          nativeButton={false}
+          render={<Link to="/" />}
+        >
           <ArrowLeftIcon />
         </Button>
 
@@ -165,7 +209,9 @@ function BotPage() {
         botName={bot.name}
         justCreated={createdBotId.current === botId}
         jumpTo={jumpTo}
-        onJumped={() => void navigate({ to: "/bots/$botId", params: { botId }, search: {}, replace: true })}
+        onJumped={() =>
+          void navigate({ to: "/bots/$botId", params: { botId }, search: {}, replace: true })
+        }
       />
     </section>
   );
@@ -174,7 +220,13 @@ function BotPage() {
     <>
       <header className="window-drag flex h-13 shrink-0 items-center justify-between px-3">
         <ModelSelect bot={bot} />
-        <Button variant="secondary" size="icon" aria-label="Close details" className="rounded-full" onClick={toggleDetails}>
+        <Button
+          variant="secondary"
+          size="icon"
+          aria-label="Close details"
+          className="rounded-full"
+          onClick={toggleDetails}
+        >
           <XIcon />
         </Button>
       </header>
@@ -206,7 +258,9 @@ function BotPage() {
           id="bot-details"
           inert={!detailsOpen}
           className={`absolute inset-y-0 right-0 w-full overflow-hidden bg-background transition-[translate,opacity] duration-300 ease-drawer motion-reduce:duration-200 sm:w-72 ${
-            detailsOpen ? "" : "translate-x-full motion-reduce:translate-x-0 motion-reduce:opacity-0"
+            detailsOpen
+              ? ""
+              : "translate-x-full motion-reduce:translate-x-0 motion-reduce:opacity-0"
           }`}
         >
           <div className="flex h-full w-full flex-col border-l">{detailsContent}</div>
@@ -242,9 +296,16 @@ function BotPage() {
         groupResizeBehavior="preserve-pixel-size"
         onResize={followDetailsWidth}
       >
-        <aside id="bot-details" inert={!detailsOpen} className="h-full w-full overflow-hidden bg-background">
+        <aside
+          id="bot-details"
+          inert={!detailsOpen}
+          className="h-full w-full overflow-hidden bg-background"
+        >
           {/* While the column grows or shrinks, the content keeps its width, so it does not reflow on each frame. */}
-          <div className="flex h-full flex-col" style={{ width: animating ? detailsWidth.current : "100%" }}>
+          <div
+            className="flex h-full flex-col"
+            style={{ width: animating ? detailsWidth.current : "100%" }}
+          >
             {detailsContent}
           </div>
         </aside>

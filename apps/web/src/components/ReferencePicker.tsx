@@ -51,7 +51,9 @@ export function ReferencePicker({
         className,
       )}
     >
-      {items.length === 0 && <p className="px-2.5 py-2 text-[0.8125rem] text-muted-foreground">{emptyText}</p>}
+      {items.length === 0 && (
+        <p className="px-2.5 py-2 text-[0.8125rem] text-muted-foreground">{emptyText}</p>
+      )}
       {items.map((item, index) => (
         <Button
           key={item.name}
@@ -69,7 +71,9 @@ export function ReferencePicker({
         >
           {item.icon}
           <span className="shrink-0 font-medium">{item.name}</span>
-          <span className="min-w-0 truncate text-[0.8125rem] text-muted-foreground">{item.description}</span>
+          <span className="min-w-0 truncate text-[0.8125rem] text-muted-foreground">
+            {item.description}
+          </span>
         </Button>
       ))}
     </div>

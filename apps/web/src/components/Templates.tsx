@@ -18,10 +18,15 @@ function TemplateText({ text }: { text: string }) {
   let items: Array<string> = [];
 
   const endList = () => {
-    if (items.length === 0) return;
+    if (items.length === 0) {
+      return;
+    }
 
     blocks.push(
-      <ul key={blocks.length} className="grid list-disc gap-[3px] pl-[18px] marker:text-muted-foreground">
+      <ul
+        key={blocks.length}
+        className="grid list-disc gap-[3px] pl-[18px] marker:text-muted-foreground"
+      >
         {items.map((item, index) => (
           <li key={index}>{item}</li>
         ))}
@@ -39,8 +44,15 @@ function TemplateText({ text }: { text: string }) {
 
     endList();
 
-    if (line.startsWith("## ")) blocks.push(<h3 key={blocks.length} className="mt-2 -mb-0.5 font-semibold first:mt-0">{line.slice(3)}</h3>);
-    else if (line.trim() !== "") blocks.push(<p key={blocks.length}>{line}</p>);
+    if (line.startsWith("## ")) {
+      blocks.push(
+        <h3 key={blocks.length} className="mt-2 -mb-0.5 font-semibold first:mt-0">
+          {line.slice(3)}
+        </h3>,
+      );
+    } else if (line.trim() !== "") {
+      blocks.push(<p key={blocks.length}>{line}</p>);
+    }
   }
 
   endList();
@@ -52,12 +64,22 @@ function TemplateText({ text }: { text: string }) {
  * Lists the templates, one row each. The pointer and the arrow keys move one highlight, and Enter
  * or a click opens the template's page.
  */
-export function TemplateList({ templates, active, onOpen }: { templates: ReadonlyArray<BotTemplate>; active: boolean; onOpen: (template: BotTemplate) => void }) {
+export function TemplateList({
+  templates,
+  active,
+  onOpen,
+}: {
+  templates: ReadonlyArray<BotTemplate>;
+  active: boolean;
+  onOpen: (template: BotTemplate) => void;
+}) {
   const [highlighted, setHighlighted] = useState(0);
   const list = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (active) list.current?.focus({ preventScroll: true });
+    if (active) {
+      list.current?.focus({ preventScroll: true });
+    }
   }, [active]);
 
   const moveHighlight = (event: KeyboardEvent) => {
@@ -68,17 +90,22 @@ export function TemplateList({ templates, active, onOpen }: { templates: Readonl
       return;
     }
 
-    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") {
+      return;
+    }
 
     event.preventDefault();
-    const next = (highlighted + (event.key === "ArrowDown" ? 1 : -1) + templates.length) % templates.length;
+    const next =
+      (highlighted + (event.key === "ArrowDown" ? 1 : -1) + templates.length) % templates.length;
     setHighlighted(next);
     list.current?.children[next]?.scrollIntoView({ block: "nearest" });
   };
 
   return (
     <div className="flex h-full flex-col">
-      <p className="mt-1 mb-2.5 text-[13px] text-muted-foreground">Start from a ready-made bot. You can change everything later.</p>
+      <p className="mt-1 mb-2.5 text-[13px] text-muted-foreground">
+        Start from a ready-made bot. You can change everything later.
+      </p>
       <div
         ref={list}
         role="listbox"
@@ -102,7 +129,9 @@ export function TemplateList({ templates, active, onOpen }: { templates: Readonl
             <Character shape={template.shape} color={template.color} size={36} />
             <span className="min-w-0 flex-1">
               <span className="block leading-[1.3] font-medium">{template.name}</span>
-              <span className="line-clamp-2 text-[13px] leading-[1.35] text-muted-foreground">{template.description}</span>
+              <span className="line-clamp-2 text-[13px] leading-[1.35] text-muted-foreground">
+                {template.description}
+              </span>
             </span>
           </div>
         ))}
@@ -126,9 +155,13 @@ function SkillRow({ skill }: { skill: BotSkill }) {
         <BoxIcon className="mt-0.5 size-4 shrink-0 text-skill" />
         <span className="min-w-0 flex-1">
           <span className="block text-[13.5px] leading-[1.35] font-medium">{skill.name}</span>
-          <span className="block text-[12.5px] leading-[1.4] text-muted-foreground">{skill.description}</span>
+          <span className="block text-[12.5px] leading-[1.4] text-muted-foreground">
+            {skill.description}
+          </span>
         </span>
-        <ChevronDownIcon className={`mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform duration-200 ease-out ${open ? "rotate-180" : ""}`} />
+        <ChevronDownIcon
+          className={`mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform duration-200 ease-out ${open ? "rotate-180" : ""}`}
+        />
       </button>
       <Collapse open={open}>
         <div className="pr-3.5 pb-3 pl-10">
@@ -160,7 +193,9 @@ export function TemplatePage({
 
   // Each open starts at the top with a hop, and Enter uses the template.
   useEffect(() => {
-    if (!active) return;
+    if (!active) {
+      return;
+    }
 
     body.current?.scrollTo({ top: 0 });
     use.current?.focus({ preventScroll: true });
@@ -179,8 +214,12 @@ export function TemplatePage({
           <div className="flex h-[104px] items-end justify-center">
             <Character shape={template.shape} color={template.color} size={96} hops={hops} />
           </div>
-          <p className="mt-3.5 mb-0.5 text-[22px] font-semibold tracking-[-0.015em]">{template.name}</p>
-          <p className="mx-auto max-w-[330px] text-[13.5px] leading-[1.45] text-muted-foreground">{template.description}</p>
+          <p className="mt-3.5 mb-0.5 text-[22px] font-semibold tracking-[-0.015em]">
+            {template.name}
+          </p>
+          <p className="mx-auto max-w-[330px] text-[13.5px] leading-[1.45] text-muted-foreground">
+            {template.description}
+          </p>
         </div>
 
         <p className="mt-[22px] mb-[7px] px-1 text-[13px] text-muted-foreground">Instructions</p>
@@ -196,7 +235,10 @@ export function TemplatePage({
                 <SkillRow key={`${template.id}-${skill.name}`} skill={skill} />
               ))}
             </div>
-            <p className="mt-1.5 px-1 text-[12px] text-muted-foreground">Only this bot gets them. A skill loads when a task matches it, and you can edit them in the bot's details.</p>
+            <p className="mt-1.5 px-1 text-[12px] text-muted-foreground">
+              Only this bot gets them. A skill loads when a task matches it, and you can edit them
+              in the bot's details.
+            </p>
           </>
         )}
       </div>

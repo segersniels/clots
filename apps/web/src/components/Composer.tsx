@@ -1,6 +1,14 @@
 import { MAX_UPLOAD_BYTES, type BotId, type BotStatus, type Upload } from "@clots/contracts";
 import { ArrowUpIcon, FileTextIcon, PlusIcon, SquareIcon, XIcon } from "lucide-react";
-import { useEffect, useImperativeHandle, useRef, useState, type DragEvent, type FormEvent, type Ref } from "react";
+import {
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+  type DragEvent,
+  type FormEvent,
+  type Ref,
+} from "react";
 
 import {
   Attachment,
@@ -32,7 +40,9 @@ const draftFiles = new Map<BotId, ReadonlyArray<DraftFile>>();
 
 /** Formats a file size, for example "2.4 MB". */
 export const formatSize = (bytes: number) =>
-  bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  bytes < 1024 * 1024
+    ? `${Math.max(1, Math.round(bytes / 1024))} KB`
+    : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 
 /** Reads a file as base64, which is how a file travels in a message to the server. */
 const toUpload = async (file: File): Promise<Upload> => {
@@ -44,7 +54,11 @@ const toUpload = async (file: File): Promise<Upload> => {
     binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
   }
 
-  return { name: file.name, mediaType: file.type || "application/octet-stream", data: btoa(binary) };
+  return {
+    name: file.name,
+    mediaType: file.type || "application/octet-stream",
+    data: btoa(binary),
+  };
 };
 
 /** The message field of a thread. It takes text, and files by paste, by drop or from the file dialog. */
@@ -92,13 +106,18 @@ export function Composer({
   };
 
   const removeFile = (removed: DraftFile) => {
-    if (removed.previewUrl !== undefined) URL.revokeObjectURL(removed.previewUrl);
+    if (removed.previewUrl !== undefined) {
+      URL.revokeObjectURL(removed.previewUrl);
+    }
+
     setFiles((current) => current.filter((file) => file.id !== removed.id));
   };
 
   const send = async (event?: FormEvent) => {
     event?.preventDefault();
-    if (!canSend) return;
+    if (!canSend) {
+      return;
+    }
 
     // A sent message wants its answer in view, so the thread follows its end again, as the arrow button does.
     scrollToEnd({ behavior: "smooth" });
@@ -110,7 +129,11 @@ export function Composer({
     setTooLarge(false);
 
     try {
-      await client.sendMessage(botId, text, await Promise.all(sending.map((file) => toUpload(file.file))));
+      await client.sendMessage(
+        botId,
+        text,
+        await Promise.all(sending.map((file) => toUpload(file.file))),
+      );
     } catch {
       // A failed send keeps the message and its files, so the operator can send it again.
       field.current?.setText(text);
@@ -119,18 +142,29 @@ export function Composer({
       return;
     }
 
-    for (const file of sending) if (file.previewUrl !== undefined) URL.revokeObjectURL(file.previewUrl);
+    for (const file of sending) {
+      if (file.previewUrl !== undefined) {
+        URL.revokeObjectURL(file.previewUrl);
+      }
+    }
   };
 
   const dropFiles = (event: DragEvent) => {
-    if (event.dataTransfer.files.length === 0) return;
+    if (event.dataTransfer.files.length === 0) {
+      return;
+    }
 
     event.preventDefault();
     addFiles(event.dataTransfer.files);
   };
 
   return (
-    <form onSubmit={send} onDrop={dropFiles} onDragOver={(event) => event.preventDefault()} className="px-4 pb-4">
+    <form
+      onSubmit={send}
+      onDrop={dropFiles}
+      onDragOver={(event) => event.preventDefault()}
+      className="px-4 pb-4"
+    >
       <input
         ref={fileDialog}
         type="file"
@@ -167,14 +201,21 @@ export function Composer({
                   <AttachmentDescription>{formatSize(file.file.size)}</AttachmentDescription>
                 </AttachmentContent>
                 <AttachmentActions>
-                  <AttachmentAction aria-label={`Remove ${file.file.name}`} onClick={() => removeFile(file)}>
+                  <AttachmentAction
+                    aria-label={`Remove ${file.file.name}`}
+                    onClick={() => removeFile(file)}
+                  >
                     <XIcon />
                   </AttachmentAction>
                 </AttachmentActions>
               </Attachment>
             ))}
           </AttachmentGroup>
-          {tooLarge && <p className="px-3.5 pt-2 text-xs text-destructive">A file is larger than 10 MB and was left out.</p>}
+          {tooLarge && (
+            <p className="px-3.5 pt-2 text-xs text-destructive">
+              A file is larger than 10 MB and was left out.
+            </p>
+          )}
         </Collapse>
 
         {/* The wrapper draws the border, so the group itself has none. An empty draft must not gray it out. */}
