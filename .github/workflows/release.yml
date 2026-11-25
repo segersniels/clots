@@ -104,7 +104,7 @@ jobs:
 
           bunx electron-builder --mac --publish never -c.extraMetadata.version="$VERSION" "${unsigned[@]}"
           mv release/Clots.dmg release/*.zip release/*.blockmap release/latest-mac.yml ../..
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.runner }}
           path: |
@@ -119,7 +119,7 @@ jobs:
     needs: build
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v8
         with:
           path: assets
           merge-multiple: true
