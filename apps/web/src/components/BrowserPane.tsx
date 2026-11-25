@@ -1,7 +1,7 @@
 import { BROWSER_STREAM_PATH, type BotId } from "@clots/contracts";
 import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type MouseEvent, type WheelEvent } from "react";
 
-import { EyeOffIcon, SquareIcon } from "lucide-react";
+import { SquareIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
@@ -17,6 +17,7 @@ import {
   OWN_ESCAPE,
   type BrowserTab,
 } from "./BrowserWindow.tsx";
+import { PANE_LABEL } from "./BotSettings.tsx";
 import { Collapse } from "./Collapse.tsx";
 import { LoginBar } from "./LoginBar.tsx";
 
@@ -68,6 +69,9 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
   // The browser takes a moment to close. The button stays disabled until the stream ends.
   const [stopping, setStopping] = useState(false);
   const socket = useRef<WebSocket | null>(null);
+  // The section keeps the last frame while it closes, so the card does not go blank as it leaves.
+  const lastFrame = useRef(frame);
+  if (frame !== null) lastFrame.current = frame;
   // Frames in the bot's own page size can arrive while the take-over resets it, and must not change the window.
   const resettingViewport = useRef(false);
   // The socket opens again after a drop, and the new one must ask for the same frame rate.
@@ -250,30 +254,26 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
   };
 
   return (
-    <section className="flex flex-col gap-2">
-      <h2 className="px-1 text-[0.8125rem] text-muted-foreground">Computer</h2>
-      <div className="rounded-xl bg-muted/60 p-1.5">
-        <div className="flex items-center justify-between py-1 pr-1 pl-1.5">
-          <div>
-            <p>{botName}'s screen</p>
-            <p className="text-[0.8125rem] text-muted-foreground">{frame === null ? "Offline" : "Live. Click to take over."}</p>
-          </div>
-          {frame === null ? (
-            <EyeOffIcon className="mr-1.5 size-4 text-muted-foreground" />
-          ) : (
+    // An offline screen offers nothing to do, so the section shows only while the screen is live.
+    <Collapse open={frame !== null}>
+      <section className="flex flex-col gap-1 pt-5">
+        <h2 className={PANE_LABEL}>Computer</h2>
+        <div className="rounded-xl bg-muted/60 p-1.5">
+          <div className="flex items-center justify-between py-1 pr-1 pl-1">
+            <div>
+              <p>{botName}'s screen</p>
+              <p className="text-[0.8125rem] text-muted-foreground">Live. Click to take over.</p>
+            </div>
             <Button variant="secondary" size="sm" disabled={stopping} onClick={stopBrowser} className="rounded-full">
               <SquareIcon />
               {stopping ? "Stopping…" : "Stop"}
             </Button>
-          )}
-        </div>
+          </div>
 
-        {/* The screen opens under the card when the bot starts its browser. */}
-        <Collapse open={frame !== null}>
-          {frame !== null && (
+          {lastFrame.current !== null && (
             <div className="pt-1.5">
               <img
-                src={frame}
+                src={lastFrame.current}
                 alt={`${botName}'s screen`}
                 tabIndex={0}
                 draggable={false}
@@ -284,58 +284,58 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
               />
             </div>
           )}
-        </Collapse>
 
-        {bot !== undefined && (
-          <BrowserWindow
-            botName={botName}
-            open={takeOver}
-            onOpenChange={setTakeOver}
-            frameRatio={frameRatio}
-            initialFocus={screen}
-          >
-            {/* The strip is always there, so its + is in reach and the page does not move when a second tab opens. */}
-            <BrowserTabStrip
-              tabs={tabs}
-              onSelect={(tab) => navigate("tab", tab.tabId)}
-              onNew={() => navigate("newTab")}
-              onClose={(tab) => navigate("closeTab", tab.tabId)}
-            />
-            <BrowserToolbar>
-              <BrowserNavigation
-                loading={navigations.size > 0}
-                onNavigate={(action) => navigate(action, action === "stop" ? tabs.find((tab) => tab.active)?.targetId : undefined)}
+          {bot !== undefined && (
+            <BrowserWindow
+              botName={botName}
+              open={takeOver}
+              onOpenChange={setTakeOver}
+              frameRatio={frameRatio}
+              initialFocus={screen}
+            >
+              {/* The strip is always there, so its + is in reach and the page does not move when a second tab opens. */}
+              <BrowserTabStrip
+                tabs={tabs}
+                onSelect={(tab) => navigate("tab", tab.tabId)}
+                onNew={() => navigate("newTab")}
+                onClose={(tab) => navigate("closeTab", tab.tabId)}
               />
-              <AddressBar address={address} loading={navigations.size > 0} onOpen={(typed) => navigate("open", typed)} />
-              <GiveBackButton bot={bot} />
-            </BrowserToolbar>
-            <BrowserViewport botName={botName} frameRatio={frameRatio} live={frame !== null}>
-              {frame === null ? null : (
-                <>
-                  <img
-                    {...OWN_ESCAPE}
-                    ref={screen}
-                    src={frame}
-                    alt={`${botName}'s screen`}
-                    tabIndex={0}
-                    draggable={false}
-                    onMouseDown={sendMouse("mousePressed")}
-                    onMouseUp={sendMouse("mouseReleased")}
-                    onMouseMove={sendMouse("mouseMoved")}
-                    onWheel={sendWheel}
-                    onKeyDown={sendKey("keyDown")}
-                    onKeyUp={sendKey("keyUp")}
-                    onPaste={pasteText}
-                    // The page fits the window by its width, or by its height when it is tall.
-                    className="block max-h-(--page-max-height) max-w-full cursor-default outline-none"
-                  />
-                  <LoginBar botId={botId} botName={botName} address={address} />
-                </>
-              )}
-            </BrowserViewport>
-          </BrowserWindow>
-        )}
-      </div>
-    </section>
+              <BrowserToolbar>
+                <BrowserNavigation
+                  loading={navigations.size > 0}
+                  onNavigate={(action) => navigate(action, action === "stop" ? tabs.find((tab) => tab.active)?.targetId : undefined)}
+                />
+                <AddressBar address={address} loading={navigations.size > 0} onOpen={(typed) => navigate("open", typed)} />
+                <GiveBackButton bot={bot} />
+              </BrowserToolbar>
+              <BrowserViewport botName={botName} frameRatio={frameRatio} live={frame !== null}>
+                {frame === null ? null : (
+                  <>
+                    <img
+                      {...OWN_ESCAPE}
+                      ref={screen}
+                      src={frame}
+                      alt={`${botName}'s screen`}
+                      tabIndex={0}
+                      draggable={false}
+                      onMouseDown={sendMouse("mousePressed")}
+                      onMouseUp={sendMouse("mouseReleased")}
+                      onMouseMove={sendMouse("mouseMoved")}
+                      onWheel={sendWheel}
+                      onKeyDown={sendKey("keyDown")}
+                      onKeyUp={sendKey("keyUp")}
+                      onPaste={pasteText}
+                      // The page fits the window by its width, or by its height when it is tall.
+                      className="block max-h-(--page-max-height) max-w-full cursor-default outline-none"
+                    />
+                    <LoginBar botId={botId} botName={botName} address={address} />
+                  </>
+                )}
+              </BrowserViewport>
+            </BrowserWindow>
+          )}
+        </div>
+      </section>
+    </Collapse>
   );
 }

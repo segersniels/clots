@@ -17,9 +17,8 @@ import { client, useStore } from "../client.ts";
 import { BotIdentity, BotInstructions } from "../components/BotSettings.tsx";
 import { BrowserPane } from "../components/BrowserPane.tsx";
 import { Chat } from "../components/Chat.tsx";
-import { ModelPicker } from "../components/ModelPicker.tsx";
 import { takeCreatedBot } from "../components/CreateDialog.tsx";
-import { ProjectPicker } from "../components/ProjectPicker.tsx";
+import { ModelSelect } from "../components/ModelPicker.tsx";
 import { Routines } from "../components/Routines.tsx";
 import { BotSkills } from "../components/BotSkills.tsx";
 
@@ -173,7 +172,8 @@ function BotPage() {
 
   const detailsContent = (
     <>
-      <header className="window-drag flex h-13 shrink-0 items-center justify-end px-3">
+      <header className="window-drag flex h-13 shrink-0 items-center justify-between px-3">
+        <ModelSelect bot={bot} />
         <Button variant="secondary" size="icon" aria-label="Close details" className="rounded-full" onClick={toggleDetails}>
           <XIcon />
         </Button>
@@ -181,17 +181,15 @@ function BotPage() {
 
       {detailsMounted && (
         <ScrollArea className="min-h-0 flex-1">
-          <div className="flex flex-col gap-6 px-3 pb-4">
-            <BotIdentity key={botId} bot={bot} />
-            <BrowserPane key={`browser-${botId}`} botId={botId} botName={bot.name} />
-            <section className="flex flex-col gap-2">
-              <h2 className="px-1 text-[0.8125rem] text-muted-foreground">Project</h2>
-              <ProjectPicker projectId={bot.projectId} onChange={(projectId) => client.setBotProject(bot.id, projectId)} />
-            </section>
-            <ModelPicker bot={bot} />
-            <Routines botId={botId} />
+          <div className="flex flex-col gap-5 px-3 pb-4">
+            {/* The screen brings its own space above it, so a closed screen leaves no gap under the name. */}
+            <div>
+              <BotIdentity key={botId} bot={bot} />
+              <BrowserPane key={`browser-${botId}`} botId={botId} botName={bot.name} />
+            </div>
             <BotInstructions key={`instructions-${botId}`} bot={bot} />
             <BotSkills key={`skills-${botId}`} bot={bot} />
+            <Routines botId={botId} />
           </div>
         </ScrollArea>
       )}

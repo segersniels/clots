@@ -14,46 +14,6 @@ function useProjectOptions() {
   return [{ label: "Personal", value: PERSONAL }, ...projects.map((project) => ({ label: project.name, value: project.id }))];
 }
 
-/** Shows the "Works in" row that chooses the project of a bot. The bot works in the directory of that project. */
-export function ProjectPicker({
-  projectId,
-  onChange,
-}: {
-  projectId: string | null;
-  onChange: (projectId: string | null) => void;
-}) {
-  const projects = useStore(client.projects);
-  const options = useProjectOptions();
-  const directory = projects.find((project) => project.id === projectId)?.directory;
-
-  return (
-    <div className="rounded-xl bg-muted/60 py-1.5 pr-1.5 pl-3">
-      <div className="flex items-center justify-between">
-        <span>Works in</span>
-        <Select
-          items={options}
-          value={projectId ?? PERSONAL}
-          onValueChange={(value) => onChange(value === PERSONAL ? null : (value as string))}
-        >
-          <SelectTrigger size="sm" aria-label="Project" className="border-transparent bg-transparent dark:bg-transparent">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent align="end">
-            <SelectGroup>
-              {options.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-      </div>
-      {directory != null && <p className="truncate pb-1 font-mono text-xs text-muted-foreground">{directory}</p>}
-    </div>
-  );
-}
-
 /** Chooses the project of a bot with a small button, for a dialog footer. It shows only the name, without the path. */
 export function ProjectSelect({
   projectId,
