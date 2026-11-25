@@ -145,4 +145,4 @@ Without all five, such as in a fork, the app gets an ad-hoc signature and no not
 
 ## Copied code
 
-If you copy code or a file from another project nearly unchanged, credit the project in a comment. When its license requires the notice to travel with the copy, put the license file next to the copy, as `apps/web/src/assets/fonts/OFL.txt` does for the Allo font.
+If you copy code or a file from another project nearly unchanged, credit the project in a comment. When its license requires the notice to travel with the copy, put the license file next to the copy, as `apps/web/public/licenses/Allo-OFL.txt` does for the Allo font in the built app.

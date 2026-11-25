@@ -1,50 +1,8 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-
-/*
- * Allo by Josh Puckett, SIL Open Font License. The upright font is variable in weight, optical size
- * and roundness. The obliques are drawn per weight, so the browser does not slant the upright font.
- */
-@font-face {
-  font-family: "Allo";
-  font-style: normal;
-  font-weight: 100 900;
-  font-display: swap;
-  src: url("./assets/fonts/AlloVariable.woff2") format("woff2");
-}
-
-@font-face {
-  font-family: "Allo";
-  font-style: italic;
-  font-weight: 400;
-  font-display: swap;
-  src: url("./assets/fonts/Allo-Oblique.woff2") format("woff2");
-}
-
-@font-face {
-  font-family: "Allo";
-  font-style: italic;
-  font-weight: 500;
-  font-display: swap;
-  src: url("./assets/fonts/Allo-MediumOblique.woff2") format("woff2");
-}
-
-@font-face {
-  font-family: "Allo";
-  font-style: italic;
-  font-weight: 600;
-  font-display: swap;
-  src: url("./assets/fonts/Allo-SemiBoldOblique.woff2") format("woff2");
-}
-
-@font-face {
-  font-family: "Allo";
-  font-style: italic;
-  font-weight: 700;
-  font-display: swap;
-  src: url("./assets/fonts/Allo-BoldOblique.woff2") format("woff2");
-}
+/* Allo by Josh Puckett, SIL Open Font License: the variable font and an oblique per weight. */
+@import "allo-font";
 
 /*
  * Scales Arial to the size of Allo, so text does not move when Allo loads and replaces it. The
