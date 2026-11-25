@@ -23,7 +23,7 @@ export interface BotChrome {
 }
 
 /** Tells whether a Chrome answers on a DevTools port. */
-const isRunning = async (port: number) => {
+export const isRunning = async (port: number) => {
   try {
     return (await fetch(`http://127.0.0.1:${port}/json/version`)).ok;
   } catch {

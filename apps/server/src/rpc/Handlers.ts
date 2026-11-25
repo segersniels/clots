@@ -204,6 +204,16 @@ export const HandlersLayer = ClotsRpcs.toLayer(
       ResolveHandoff: ({ botId, handoffId }) =>
         requireBot(botId).pipe(Effect.andThen(sessions.resolveHandoff(botId, handoffId))),
 
+      ResolveLoginRequest: ({ botId, requestId, decision }) =>
+        requireBot(botId).pipe(Effect.andThen(sessions.resolveLoginRequest(botId, requestId, decision))),
+
+      FindLogins: ({ botId, url }) => requireBot(botId).pipe(Effect.flatMap((bot) => sessions.findLogins(bot, url))),
+
+      CopyLogin: ({ botId, fromBotId, url }) =>
+        Effect.all([requireBot(botId), requireBot(fromBotId)]).pipe(
+          Effect.flatMap(([bot, source]) => sessions.copyLogin(bot, source, url)),
+        ),
+
       WatchSkills: ({ botId }) =>
         watch(bots.skills(botId), Stream.fromPubSub(sessions.skillChanges)).pipe(
           // A bot that never ran has no list yet. A short session lists its skills in the background.

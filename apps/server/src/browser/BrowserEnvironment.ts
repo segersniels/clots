@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 
 import type { StoredBot } from "../bots/BotRepository.ts";
 import { runtimePaths } from "../paths.ts";
-import { closeChrome, realAgentBrowser, SCREEN_SIZE, stopLoading } from "./BotChrome.ts";
+import { closeChrome, realAgentBrowser, SCREEN_SIZE, stopLoading, type BotChrome } from "./BotChrome.ts";
 import { installBrowser, installedBrowser } from "./BrowserInstall.ts";
 
 /** The directory that holds the real `agent-browser` CLI. */
@@ -71,12 +71,19 @@ export const browserExecutable = () => executable;
 /** The DevTools port of the bot's own Chrome. */
 export const devToolsPort = (bot: StoredBot) => bot.browserStreamPort + DEVTOOLS_PORT_OFFSET;
 
+/** The Chrome profile of the bot, which keeps its logins. */
+export const browserProfile = (bot: StoredBot) => join(bot.workingDirectory, ".browser-profile");
+
+/** Describes the bot's own Chrome, or `undefined` when agent-browser launches its own. */
+export const botChrome = (bot: StoredBot): BotChrome | undefined =>
+  executable === undefined ? undefined : { executable, port: devToolsPort(bot), profile: browserProfile(bot), userAgent };
+
 /**
  * Builds the variables that give a bot its own browser: one agent-browser session, one persistent
  * profile for logins, and one fixed stream port that the clots server can find.
  */
 export const makeBrowserEnvironment = (bot: StoredBot): Record<string, string> => {
-  const profile = join(bot.workingDirectory, ".browser-profile");
+  const profile = browserProfile(bot);
   const shared = {
     AGENT_BROWSER_SESSION: bot.id,
     AGENT_BROWSER_STREAM_PORT: String(bot.browserStreamPort),

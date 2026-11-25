@@ -4,6 +4,7 @@ import {
   query,
   tool,
   type CanUseTool,
+  type HookCallback,
   type PermissionResult,
   type Query,
   type SDKMessage,
@@ -18,13 +19,16 @@ import type {
   BotId,
   BotModel,
   BotStatus,
+  LoginDecision,
+  LoginRequest,
+  LoginSource,
   MessageRole,
   ThreadEvent,
   ThreadLiveState,
   TraceStep,
   Upload,
 } from "@clots/contracts";
-import { MAX_UPLOAD_BYTES } from "@clots/contracts";
+import { LoginCopyFailed, MAX_UPLOAD_BYTES } from "@clots/contracts";
 import { Cause, Context, Deferred, Effect, Layer, PubSub, Queue, Scope, Stream } from "effect";
 import { spawn } from "node:child_process";
 import { copyFileSync, mkdirSync, statSync, writeFileSync } from "node:fs";
@@ -34,10 +38,24 @@ import { z } from "zod";
 import { ClotsConfig } from "../config.ts";
 import { HOST_TIME_ZONE, nextRunAt, ScheduleRepository } from "../schedules/ScheduleRepository.ts";
 import { BotRepository, type BotChanges, type StoredBot } from "./BotRepository.ts";
-import { closeBrowser, makeBrowserEnvironment } from "../browser/BrowserEnvironment.ts";
+import { readPages } from "../browser/BotChrome.ts";
+import { botChrome, closeBrowser, makeBrowserEnvironment } from "../browser/BrowserEnvironment.ts";
+import { copyLogin, findLoginSources, siteOf } from "../browser/Logins.ts";
 import { makeClaudeEnvironment, removeClaudeTranscripts, transcriptPath } from "./ClaudeEnvironment.ts";
 
 const HANDOFF_TOOL = "request_handoff";
+
+const LOGIN_TOOL = "request_login";
+
+/** How long the login card says that the copy worked before it leaves. */
+const LOGIN_DONE_MS = 1200;
+
+/** The longest wait for a login copy, which can start the other bot's Chrome first. */
+const LOGIN_COPY_TIMEOUT = "30 seconds";
+
+/** Joins bot names for a sentence: "Scout", "Scout and Writer", "Scout, Writer and Analyst". */
+const joinNames = (names: ReadonlyArray<string>) =>
+  names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
 
 /** The most characters of one message that `read_bot_thread` returns, so a long reply does not flood the reader. */
 const MAX_READ_MESSAGE_LENGTH = 1500;
@@ -124,6 +142,7 @@ const IDLE: ThreadLiveState = {
   steps: [],
   approvals: [],
   handoff: null,
+  loginRequest: null,
   tasks: [],
 };
 
@@ -143,6 +162,9 @@ interface BotRuntime {
   } | null;
   readonly approvals: Map<string, (decision: ApprovalDecision) => void>;
   finishHandoff: (() => void) | null;
+  finishLoginRequest: ((decision: LoginDecision) => void) | null;
+  /** The sites whose logins in other bots the bot heard about. It hears about each site once. */
+  readonly loginHints: Set<string>;
   /** The images that the running steps opened, by step id. The trace of those steps shows them. */
   readonly stepImages: Map<string, Attachment>;
   /** Who sent the latest prompt: the operator, a routine or another bot. A clone may delete itself only after the operator's. */
@@ -241,6 +263,11 @@ export class BotSessions extends Context.Service<
     setModel(botId: BotId, model: BotModel): Effect.Effect<void>;
     resolveApproval(botId: BotId, approvalId: string, decision: ApprovalDecision): Effect.Effect<void>;
     resolveHandoff(botId: BotId, handoffId: string): Effect.Effect<void>;
+    /** Lists the other bots of the bot's project that are logged in on the site of a page, latest first. */
+    findLogins(bot: StoredBot, url: string): Effect.Effect<ReadonlyArray<LoginSource>>;
+    /** Copies another bot's login on the site of a page into the bot's browser, for the take-over window. */
+    copyLogin(bot: StoredBot, source: StoredBot, url: string): Effect.Effect<void, LoginCopyFailed>;
+    resolveLoginRequest(botId: BotId, requestId: string, decision: LoginDecision): Effect.Effect<void>;
     live(botId: BotId): ThreadLiveState;
     events(botId: BotId): PubSub.PubSub<ThreadEvent>;
     /** Counts the operator as a viewer of the bot's conversation until the scope closes. */
@@ -279,6 +306,8 @@ export class BotSessions extends Context.Service<
           session: null,
           approvals: new Map(),
           finishHandoff: null,
+          finishLoginRequest: null,
+          loginHints: new Set(),
           stepImages: new Map(),
           lastPromptFrom: null,
           leftover: null,
@@ -303,9 +332,13 @@ export class BotSessions extends Context.Service<
         if (runtime.live.status !== previousStatus) PubSub.publishUnsafe(statusChanges, undefined);
       };
 
-      /** Derives the status after an approval or a handoff changes. */
-      const statusWhileRunning = (runtime: BotRuntime): BotStatus =>
-        runtime.live.approvals.length > 0 || runtime.live.handoff !== null ? "waiting" : "working";
+      /** Derives the status after an approval, a handoff or a login request changes. */
+      const statusWhileRunning = (runtime: BotRuntime): BotStatus => {
+        const loginState = runtime.live.loginRequest?.state;
+        const asksForLogin = loginState === "asking" || loginState === "failed";
+
+        return runtime.live.approvals.length > 0 || runtime.live.handoff !== null || asksForLogin ? "waiting" : "working";
+      };
 
       const record = (
         runtime: BotRuntime,
@@ -327,8 +360,8 @@ export class BotSessions extends Context.Service<
         (runtime: BotRuntime): CanUseTool =>
         (toolName, input, { signal, suggestions }) =>
           new Promise<PermissionResult>((resolve) => {
-            // The handoff is itself a request to the operator, so it needs no approval.
-            if (toolName === `mcp__clots__${HANDOFF_TOOL}`) {
+            // The handoff and the login request are themselves requests to the operator, so they need no approval.
+            if (toolName === `mcp__clots__${HANDOFF_TOOL}` || toolName === `mcp__clots__${LOGIN_TOOL}`) {
               resolve({ behavior: "allow", updatedInput: input });
 
               return;
@@ -386,6 +419,92 @@ export class BotSessions extends Context.Service<
       /** Lists the bots whose routines belong to `self`: itself and its clones, which run routines in their own threads. */
       const ownRoutineBots = (self: StoredBot) =>
         repository.list.pipe(Effect.map((bots) => bots.filter((bot) => bot.id === self.id || bot.clonedFrom === self.id)));
+
+      /** Lists the bots of the target's project that are logged in on the site of a page. Without its own Chrome, a bot cannot copy logins. */
+      const loginSourcesFor = (target: StoredBot, url: string) =>
+        repository.list.pipe(
+          Effect.flatMap((bots) => (botChrome(target) === undefined ? Effect.succeed([]) : Effect.promise(() => findLoginSources(target, bots, url)))),
+        );
+
+      const toLoginSource = ({ bot, updatedAt }: { readonly bot: StoredBot; readonly updatedAt: number }): LoginSource => ({
+        botId: bot.id,
+        name: bot.name,
+        color: bot.color,
+        shape: bot.shape,
+        updatedAt,
+      });
+
+      /** Copies a login between two bot browsers. A failure becomes a sentence for the operator. */
+      const copyLoginBetween = (source: StoredBot, target: StoredBot, url: string) => {
+        const from = botChrome(source);
+        const to = botChrome(target);
+        if (from === undefined || to === undefined) {
+          return Effect.fail(new LoginCopyFailed({ message: "clots runs no Chrome of its own for the bots here, so it cannot copy logins." }));
+        }
+
+        return Effect.tryPromise({
+          try: () => copyLogin(from, to, url),
+          catch: (error) => new LoginCopyFailed({ message: error instanceof Error ? error.message : String(error) }),
+        }).pipe(
+          Effect.timeoutOrElse({
+            duration: LOGIN_COPY_TIMEOUT,
+            orElse: () => Effect.fail(new LoginCopyFailed({ message: `${source.name}'s browser did not answer. Try again in a moment.` })),
+          }),
+        );
+      };
+
+      const updateLoginRequest = (runtime: BotRuntime, patch: Partial<LoginRequest>) => {
+        if (runtime.live.loginRequest === null) return;
+
+        setLive(runtime, { loginRequest: { ...runtime.live.loginRequest, ...patch } });
+        setLive(runtime, { status: statusWhileRunning(runtime) });
+      };
+
+      /** Names the running login request step by its outcome, so the trace says what happened. */
+      const titleLoginStep = (runtime: BotRuntime, title: string) => {
+        const step = runtime.live.steps.findLast((step) => step.status === "running" && step.title === `Using ${LOGIN_TOOL}`);
+        if (step === undefined) return;
+
+        setLive(runtime, { steps: runtime.live.steps.map((each) => (each === step ? { ...each, title } : each)) });
+      };
+
+      /**
+       * Tells the bot after a browser command when other bots of its project are logged in on the
+       * site of one of its pages, so it can ask for that login instead of the operator.
+       */
+      const loginHintFor =
+        (runtime: BotRuntime, bot: StoredBot): HookCallback =>
+        async (input) => {
+          if (input.hook_event_name !== "PostToolUse") return {};
+
+          const command = (input.tool_input as { command?: unknown }).command;
+          const chrome = botChrome(bot);
+          if (typeof command !== "string" || !command.includes("agent-browser") || chrome === undefined) return {};
+
+          const bots = await Effect.runPromise(repository.list);
+          const self = bots.find((each) => each.id === bot.id) ?? bot;
+          const hints: Array<string> = [];
+
+          for (const page of await readPages(chrome.port)) {
+            const site = siteOf(page.url);
+            if (site === undefined || runtime.loginHints.has(site)) continue;
+
+            const sources = await findLoginSources(self, bots, page.url);
+            if (sources.length === 0) continue;
+
+            runtime.loginHints.add(site);
+            const names = sources.map((source) => source.bot.name);
+            const verb = names.length === 1 ? "is" : "are";
+            const host = new URL(page.url).hostname;
+            hints.push(
+              `${joinNames(names)} ${verb} logged in on ${host}. When this site asks you to log in, call mcp__clots__${LOGIN_TOOL} with site "${host}" before you ask the operator.`,
+            );
+          }
+
+          if (hints.length === 0) return {};
+
+          return { hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: hints.join("\n") } };
+        };
 
       /**
        * The tools of the clots server that each bot gets: the handoff of the browser, and the tools
@@ -631,6 +750,70 @@ export class BotSessions extends Context.Service<
                 };
               },
             ),
+            tool(
+              LOGIN_TOOL,
+              "Use another clots bot's login on a site, so the operator does not have to log you in. Call it when a hint says that another bot is logged in, or when a site asks you to log in. The operator allows or skips the copy. It copies only that site's cookies and saved data, and you never see them. Returns copied, skipped, or why the copy failed.",
+              {
+                site: z.string().describe("The site's host, such as app.example.com, or the page's address."),
+                bot: z.string().optional().describe("The bot whose login to use, by id or name such as @Scout. The default is the bot that logged in last."),
+              },
+              async ({ site, bot: reference }) => {
+                const url = site.includes("://") ? site : `https://${site}`;
+                const host = URL.parse(url)?.hostname;
+                if (host === undefined) return toolText(`${site} is not a site. Give a host such as app.example.com.`);
+
+                const sources = await Effect.runPromise(loginSourcesFor(self, url));
+                const named = reference === undefined ? undefined : await Effect.runPromise(findBot(reference));
+                const source = reference === undefined ? sources[0] : sources.find((each) => each.bot.id === named?.id);
+                if (source === undefined) {
+                  return toolText(
+                    reference === undefined
+                      ? `No other bot in your project is logged in on ${host}. Use ${HANDOFF_TOOL} to ask the operator to log in.`
+                      : `${reference} is not a bot of your project that is logged in on ${host}.`,
+                  );
+                }
+
+                const request: LoginRequest = { id: crypto.randomUUID(), host, from: toLoginSource(source), state: "asking", error: null };
+                const name = source.bot.name;
+                setLive(runtime, { loginRequest: request, status: "waiting" });
+
+                // A failed copy stays on the card with Try again, so the loop waits for the operator again.
+                while (true) {
+                  const decision = await new Promise<LoginDecision>((resolve) => {
+                    runtime.finishLoginRequest = resolve;
+                  });
+                  runtime.finishLoginRequest = null;
+
+                  if (decision === "skip") {
+                    const failure = runtime.live.loginRequest?.error ?? null;
+                    titleLoginStep(runtime, `Skipped ${name}'s login`);
+                    setLive(runtime, { loginRequest: null });
+                    setLive(runtime, { status: statusWhileRunning(runtime) });
+
+                    return toolText(failure === null ? "skipped" : `skipped after a failed copy: ${failure}`);
+                  }
+
+                  updateLoginRequest(runtime, { state: "copying", error: null });
+                  const error = await Effect.runPromise(
+                    copyLoginBetween(source.bot, self, url).pipe(Effect.match({ onSuccess: () => null, onFailure: (failure) => failure.message })),
+                  );
+
+                  if (error !== null) {
+                    updateLoginRequest(runtime, { state: "failed", error });
+
+                    continue;
+                  }
+
+                  updateLoginRequest(runtime, { state: "done" });
+                  titleLoginStep(runtime, `Used ${name}'s login on ${host}`);
+                  setTimeout(() => {
+                    if (runtime.live.loginRequest?.id === request.id) setLive(runtime, { loginRequest: null });
+                  }, LOGIN_DONE_MS);
+
+                  return toolText("copied. The page reloaded with the login. Take a snapshot to see it.");
+                }
+              },
+            ),
           ],
         });
 
@@ -807,6 +990,8 @@ export class BotSessions extends Context.Service<
               PubSub.publishUnsafe(statusChanges, undefined);
             }
 
+            // A later turn can need the login that the bot did not use in this one, so the hints come again.
+            runtime.loginHints.clear();
             setLive(runtime, { status: "idle", steps: [] });
 
             return;
@@ -964,6 +1149,7 @@ export class BotSessions extends Context.Service<
               permissionMode: "auto",
               canUseTool: canUseToolFor(runtime),
               mcpServers: { clots: clotsServerFor(runtime, bot) },
+              hooks: { PostToolUse: [{ matcher: "Bash", hooks: [loginHintFor(runtime, bot)] }] },
               // The thread has no question dialog. The bot asks in plain text.
               disallowedTools: ["AskUserQuestion"],
               ...(bot.sdkSessionId === null ? {} : { resume: bot.sdkSessionId }),
@@ -996,6 +1182,7 @@ export class BotSessions extends Context.Service<
                 runtime.session = null;
                 runtime.approvals.clear();
                 runtime.finishHandoff = null;
+                runtime.finishLoginRequest = null;
                 setLive(runtime, IDLE);
               }),
             ),
@@ -1202,6 +1389,21 @@ export class BotSessions extends Context.Service<
             runtime.finishHandoff = null;
             setLive(runtime, { handoff: null });
             setLive(runtime, { status: statusWhileRunning(runtime) });
+          }),
+
+        findLogins: (bot, url) => loginSourcesFor(bot, url).pipe(Effect.map((sources) => sources.map(toLoginSource))),
+
+        copyLogin: (bot, source, url) => copyLoginBetween(source, bot, url),
+
+        resolveLoginRequest: (botId, requestId, decision) =>
+          Effect.sync(() => {
+            const runtime = runtimeFor(botId);
+            const request = runtime.live.loginRequest;
+
+            // A copy that runs or that already worked takes no new decision.
+            if (request?.id !== requestId || request.state === "copying" || request.state === "done") return;
+
+            runtime.finishLoginRequest?.(decision);
           }),
       });
     }),

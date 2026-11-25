@@ -133,6 +133,35 @@ export const Handoff = Schema.Struct({
 });
 export type Handoff = typeof Handoff.Type;
 
+/** Another bot of the same project that is logged in on the site of a page. */
+export const LoginSource = Schema.Struct({
+  botId: BotId,
+  name: Schema.String,
+  color: BotColor,
+  shape: BotShape,
+  /** The time of its latest cookie change on the site. */
+  updatedAt: Schema.Number,
+});
+export type LoginSource = typeof LoginSource.Type;
+
+/**
+ * A request from the bot to use another bot's login on a site. The operator allows or skips it.
+ * `done` stays shortly after the copy, so the card can say that it worked.
+ */
+export const LoginRequest = Schema.Struct({
+  id: Schema.String,
+  /** The host of the page, such as app.example.com. */
+  host: Schema.String,
+  from: LoginSource,
+  state: Schema.Literals(["asking", "copying", "done", "failed"]),
+  /** Why the copy failed, in the `failed` state. */
+  error: Schema.NullOr(Schema.String),
+});
+export type LoginRequest = typeof LoginRequest.Type;
+
+export const LoginDecision = Schema.Literals(["allow", "skip"]);
+export type LoginDecision = typeof LoginDecision.Type;
+
 /** A task that runs in the background of a bot's session, such as a subagent. */
 export const BackgroundTask = Schema.Struct({
   id: Schema.String,
@@ -147,6 +176,7 @@ export const ThreadLiveState = Schema.Struct({
   steps: Schema.Array(TraceStep),
   approvals: Schema.Array(PendingApproval),
   handoff: Schema.NullOr(Handoff),
+  loginRequest: Schema.NullOr(LoginRequest),
   /** The work that runs in the background. It can outlive the turn that started it. */
   tasks: Schema.Array(BackgroundTask),
 });

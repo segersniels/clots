@@ -7,6 +7,8 @@ import {
   type BotModel,
   type BotSummary,
   type BrowserAction,
+  type LoginDecision,
+  type LoginSource,
   type Project,
   type Upload,
   type Schedule,
@@ -53,6 +55,11 @@ export interface ClotsClient {
   interruptBot(botId: BotId): Promise<void>;
   resolveApproval(botId: BotId, approvalId: string, decision: ApprovalDecision): Promise<void>;
   resolveHandoff(botId: BotId, handoffId: string): Promise<void>;
+  /** Lists the other bots of the bot's project that are logged in on the site of a page, latest first. */
+  findLogins(botId: BotId, url: string): Promise<ReadonlyArray<LoginSource>>;
+  /** Copies another bot's login on the site of a page into the bot's browser. It fails with a `LoginCopyFailed` that says why. */
+  copyLogin(botId: BotId, fromBotId: BotId, url: string): Promise<void>;
+  resolveLoginRequest(botId: BotId, requestId: string, decision: LoginDecision): Promise<void>;
   createSchedule(botId: BotId, cron: string, prompt: string): Promise<Schedule>;
   updateSchedule(id: string, cron: string, prompt: string): Promise<void>;
   setSchedulePaused(id: string, paused: boolean): Promise<void>;
@@ -210,6 +217,10 @@ export const makeClotsClient = (origin: string): ClotsClient => {
     resolveApproval: (botId, approvalId, decision) =>
       call((rpc) => rpc.ResolveApproval({ botId, approvalId, decision })),
     resolveHandoff: (botId, handoffId) => call((rpc) => rpc.ResolveHandoff({ botId, handoffId })),
+    findLogins: (botId, url) => call((rpc) => rpc.FindLogins({ botId, url })),
+    copyLogin: (botId, fromBotId, url) => call((rpc) => rpc.CopyLogin({ botId, fromBotId, url })),
+    resolveLoginRequest: (botId, requestId, decision) =>
+      call((rpc) => rpc.ResolveLoginRequest({ botId, requestId, decision })),
     createSchedule: (botId, cron, prompt) => call((rpc) => rpc.CreateSchedule({ botId, cron, prompt })),
     updateSchedule: (id, cron, prompt) => call((rpc) => rpc.UpdateSchedule({ id, cron, prompt })),
     setSchedulePaused: (id, paused) => call((rpc) => rpc.SetSchedulePaused({ id, paused })),

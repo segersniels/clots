@@ -11,7 +11,7 @@ export interface ThreadState {
 
 export const emptyThread: ThreadState = {
   messages: [],
-  live: { status: "idle", steps: [], approvals: [], handoff: null, tasks: [] },
+  live: { status: "idle", steps: [], approvals: [], handoff: null, loginRequest: null, tasks: [] },
   lastSequence: 0,
   synced: false,
 };

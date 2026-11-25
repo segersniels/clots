@@ -9,6 +9,8 @@ import {
   BotShape,
   BotModel,
   BotSummary,
+  LoginDecision,
+  LoginSource,
   Project,
   Schedule,
   Skill,
@@ -31,6 +33,11 @@ export class BotNotFound extends Schema.TaggedError<BotNotFound>()("BotNotFound"
 
 export class InvalidCron extends Schema.TaggedError<InvalidCron>()("InvalidCron", {
   cron: Schema.String,
+}) {}
+
+/** A copy of a login between two bot browsers failed. The message says why, for the operator. */
+export class LoginCopyFailed extends Schema.TaggedError<LoginCopyFailed>()("LoginCopyFailed", {
+  message: Schema.String,
 }) {}
 
 export class UpdateFailed extends Schema.TaggedError<UpdateFailed>()("UpdateFailed", {
@@ -132,6 +139,19 @@ export class ClotsRpcs extends RpcGroup.make(
     error: BotNotFound,
   }),
 
+  /** Lists the other bots of the bot's project that are logged in on the site of a page, latest first. */
+  Rpc.make("FindLogins", {
+    payload: { botId: BotId, url: Schema.String },
+    success: Schema.Array(LoginSource),
+    error: BotNotFound,
+  }),
+
+  /** Copies the login of another bot on the site of a page into the bot's browser, and reloads that page. */
+  Rpc.make("CopyLogin", {
+    payload: { botId: BotId, fromBotId: BotId, url: Schema.String },
+    error: Schema.Union([BotNotFound, LoginCopyFailed]),
+  }),
+
   /** Puts the bots of one sidebar group in the given order. */
   Rpc.make("ReorderBots", { payload: { botIds: Schema.Array(BotId) } }),
 
@@ -195,6 +215,10 @@ export class ClotsRpcs extends RpcGroup.make(
   }),
   Rpc.make("ResolveHandoff", {
     payload: { botId: BotId, handoffId: Schema.String },
+    error: BotNotFound,
+  }),
+  Rpc.make("ResolveLoginRequest", {
+    payload: { botId: BotId, requestId: Schema.String, decision: LoginDecision },
     error: BotNotFound,
   }),
 
