@@ -24,7 +24,7 @@ export function ModelSelect({ bot }: { bot: BotSummary }) {
       >
         <SelectValue className="capitalize" />
       </SelectTrigger>
-      <SelectContent align="start" alignItemWithTrigger={false}>
+      <SelectContent align="start">
         <SelectGroup>
           {BotModel.literals.map((model) => (
             <SelectItem key={model} value={model} className="capitalize">
