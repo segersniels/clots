@@ -7,6 +7,7 @@ import {
   type PermissionResult,
   type Query,
   type SDKMessage,
+  type SDKResultError,
   type SDKUserMessage,
   type SlashCommand,
   type SpawnedProcess,
@@ -149,7 +150,17 @@ interface BotRuntime {
   restart: { readonly prompts: Array<SDKUserMessage> } | null;
   /** The open conversation views of the bot, on any device. A turn that ends while nobody views it marks the bot unread. */
   viewers: number;
+  /** Whether the operator pressed Stop during the running turn. The SDK ends that turn as a failure. */
+  stopping: boolean;
 }
+
+/** The sentences that tell the operator why a turn ended early, by the subtype of the SDK result. */
+const TURN_FAILURES: Record<SDKResultError["subtype"], string> = {
+  error_during_execution: "Something went wrong, so I stopped. Send your message again to retry.",
+  error_max_turns: "I stopped because this turn took too many steps.",
+  error_max_budget_usd: "I stopped because this turn reached its spending limit.",
+  error_max_structured_output_retries: "I stopped because I could not write the reply in the required format.",
+};
 
 /**
  * Tells a bot in its first prompt after a restart what the operator changed. Without the old name,
@@ -272,6 +283,7 @@ export class BotSessions extends Context.Service<
           leftover: null,
           restart: null,
           viewers: 0,
+          stopping: false,
         };
         runtimes.set(botId, runtime);
 
@@ -784,8 +796,9 @@ export class BotSessions extends Context.Service<
             yield* recordTrace(runtime, botId, true);
 
             if (message.subtype !== "success") {
-              yield* record(runtime, botId, "assistant", `The turn failed: ${message.subtype}.`);
+              yield* record(runtime, botId, "assistant", runtime.stopping ? "Stopped." : TURN_FAILURES[message.subtype]);
             }
+            runtime.stopping = false;
 
             // The operator did not see the turn end, so the sidebar marks the bot.
             if (runtime.viewers === 0) {
@@ -1163,6 +1176,8 @@ export class BotSessions extends Context.Service<
         interrupt: (botId) =>
           Effect.promise(async () => {
             const runtime = runtimeFor(botId);
+            if (runtime.live.status !== "idle") runtime.stopping = true;
+
             // The session from before a restart takes no commands, so Stop ends its process.
             if (runtime.leftover !== null) process.kill(runtime.leftover.pid, "SIGTERM");
 
