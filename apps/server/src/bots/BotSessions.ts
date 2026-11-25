@@ -41,6 +41,7 @@ import { BotRepository, type BotChanges, type StoredBot } from "./BotRepository.
 import { readPages } from "../browser/BotChrome.ts";
 import { botChrome, closeBrowser, makeBrowserEnvironment } from "../browser/BrowserEnvironment.ts";
 import { copyLogin, findLoginSources, siteOf } from "../browser/Logins.ts";
+import { botPlugins, botSkillsSignature, ensurePluginManifest, OWN_SKILLS_NOTE, showOwnSkills, toOwnSkills } from "./BotPlugin.ts";
 import { makeClaudeEnvironment, removeClaudeTranscripts, transcriptPath } from "./ClaudeEnvironment.ts";
 
 const HANDOFF_TOOL = "request_handoff";
@@ -157,6 +158,8 @@ interface BotRuntime {
     readonly systemPrompt: string;
     /** The bot's settings that the session started with, so the next session can tell the bot what changed. */
     readonly startedAs: StoredBot;
+    /** The bot's own skills that the session loaded. Claude Code does not load a skill file that changes later, so a change needs a new session. */
+    readonly skills: string;
     /** Completes when the session has stopped and wrote its last message. */
     readonly ended: Deferred.Deferred<void>;
   } | null;
@@ -222,6 +225,8 @@ const systemPromptFor = (bot: StoredBot) =>
     "You have a browser: use the `agent-browser` CLI through Bash. Run `agent-browser skills get core` before the first use.",
     "Your browser session and profile are already set in the environment. Do not pass `--session` or `--profile`, or the operator cannot see your browser.",
     `When a page needs the operator (a login, a captcha, a payment), call the ${HANDOFF_TOOL} tool and wait.`,
+    // Only a bot with its own skills gets the line, so the prompt of every other bot stays the same.
+    ...(botPlugins(bot).length === 0 ? [] : [OWN_SKILLS_NOTE]),
     bot.instructions.trim() === "" ? "" : `# Instructions\n\n${bot.instructions}`,
   ].join("\n\n");
 
@@ -276,6 +281,13 @@ export class BotSessions extends Context.Service<
     readonly statusChanges: PubSub.PubSub<void>;
     /** Fires when the skills of a bot change. */
     readonly skillChanges: PubSub.PubSub<void>;
+    /**
+     * Checks whether the files of the bot's own skills changed, such as after an edit in the details
+     * pane. A change fires `ownSkillChanges` and lists the bot's skills again.
+     */
+    checkOwnSkills(bot: StoredBot): Effect.Effect<void>;
+    /** Fires with the bot whose own skill files changed, by the operator or by the bot itself. */
+    readonly ownSkillChanges: PubSub.PubSub<BotId>;
   }
 >()("clots/bots/BotSessions") {
   static readonly layer = Layer.effect(
@@ -287,6 +299,7 @@ export class BotSessions extends Context.Service<
       const scope = yield* Effect.scope;
       const statusChanges = yield* PubSub.unbounded<void>();
       const skillChanges = yield* PubSub.unbounded<void>();
+      const ownSkillChanges = yield* PubSub.unbounded<BotId>();
       const runtimes = new Map<BotId, BotRuntime>();
 
       const claudeOptions = {
@@ -880,12 +893,12 @@ export class BotSessions extends Context.Service<
         });
       };
 
-      /** Stores what the operator can start with `/name`. Claude Code's own commands stay out. */
+      /** Stores what the operator can start with `/name`. Claude Code's own commands stay out, and the bot's own skills show by their bare names. */
       const saveSkills = (botId: BotId, commands: ReadonlyArray<SlashCommand>) =>
         repository
           .setSkills(
             botId,
-            commands.filter((command) => command.builtin !== true).map(({ name, description }) => ({ name, description })),
+            showOwnSkills(commands.filter((command) => command.builtin !== true).map(({ name, description }) => ({ name, description }))),
           )
           .pipe(Effect.andThen(PubSub.publish(skillChanges, undefined)));
 
@@ -897,6 +910,7 @@ export class BotSessions extends Context.Service<
           if (skillsListed.has(bot.id)) return;
 
           skillsListed.add(bot.id);
+          const skills = botSkillsSignature(bot);
 
           const lister = query({
             // The prompt never comes: the process only answers the request for its skills.
@@ -907,17 +921,50 @@ export class BotSessions extends Context.Service<
               ...(bot.projectDirectory === null ? {} : { additionalDirectories: [bot.workingDirectory] }),
               env: { ...claudeOptions.env, CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD: "1" },
               settingSources: ["user", "project", "local"],
+              plugins: botPlugins(bot),
               persistSession: false,
             },
           });
 
           yield* Effect.tryPromise(() => lister.supportedCommands()).pipe(
-            Effect.flatMap((commands) => saveSkills(bot.id, commands)),
+            // A skill file that changed while the process started gets its own, newer list.
+            Effect.flatMap((commands) => (botSkillsSignature(bot) === skills ? saveSkills(bot.id, commands) : Effect.void)),
             Effect.timeout("30 seconds"),
             Effect.ignore,
             Effect.ensuring(Effect.sync(() => lister.close())),
           );
         });
+
+      /** The last seen state of each bot's own skill files. */
+      const ownSkills = new Map<BotId, string>();
+
+      const checkOwnSkills = (bot: StoredBot) =>
+        Effect.gen(function* () {
+          const signature = botSkillsSignature(bot);
+          const previous = ownSkills.get(bot.id);
+
+          if (previous === signature) return;
+
+          ownSkills.set(bot.id, signature);
+
+          // The first look at a bot only learns its files.
+          if (previous === undefined) return;
+
+          if (signature !== "") ensurePluginManifest(bot);
+          yield* PubSub.publish(ownSkillChanges, bot.id);
+          skillsListed.delete(bot.id);
+          yield* loadSkills(bot).pipe(Effect.forkIn(scope));
+        });
+
+      // A bot can write its own skills, so the files are checked each second. The / list then follows without a restart.
+      yield* repository.list.pipe(
+        Effect.flatMap((bots) => Effect.forEach(bots, checkOwnSkills, { discard: true })),
+        Effect.andThen(Effect.sleep("1 second")),
+        Effect.forever,
+        Effect.forkIn(scope),
+      );
+
+      const hasOldSkills = (session: NonNullable<BotRuntime["session"]>) => botSkillsSignature(session.startedAs) !== session.skills;
 
       const handle = (runtime: BotRuntime, botId: BotId, message: SDKMessage) =>
         Effect.gen(function* () {
@@ -926,7 +973,7 @@ export class BotSessions extends Context.Service<
 
             // The list of skills is not part of the init message, so the session is asked for it.
             const session = runtime.session;
-            if (session !== null) {
+            if (session !== null && !hasOldSkills(session)) {
               yield* Effect.tryPromise(() => session.query.supportedCommands()).pipe(
                 Effect.flatMap((commands) => saveSkills(botId, commands)),
                 Effect.ignore,
@@ -958,8 +1005,9 @@ export class BotSessions extends Context.Service<
           }
 
           // The session found more skills, for example in a project directory.
+          // A session with old skill files lists old skills, so the newer list from `loadSkills` stays.
           if (message.type === "system" && message.subtype === "commands_changed") {
-            yield* saveSkills(botId, message.commands);
+            if (runtime.session === null || !hasOldSkills(runtime.session)) yield* saveSkills(botId, message.commands);
 
             return;
           }
@@ -1117,6 +1165,7 @@ export class BotSessions extends Context.Service<
           const prompts = yield* Queue.unbounded<SDKUserMessage, Cause.Done>();
           const ended = yield* Deferred.make<void>();
           const systemPrompt = systemPromptFor(bot);
+          const skills = botSkillsSignature(bot);
           const session = query({
             prompt: Stream.toAsyncIterable(Stream.fromQueue(prompts)),
             options: {
@@ -1132,6 +1181,8 @@ export class BotSessions extends Context.Service<
               },
               model: bot.model,
               settingSources: ["user", "project", "local"],
+              // The skills of the bot's template load for this bot only.
+              plugins: botPlugins(bot),
               // clots shows the bot's name, so Claude Code does not need a request to name the session.
               title: bot.name,
               settings: {
@@ -1163,7 +1214,7 @@ export class BotSessions extends Context.Service<
               },
             },
           });
-          runtime.session = { prompts, query: session, systemPrompt, startedAs: bot, ended };
+          runtime.session = { prompts, query: session, systemPrompt, startedAs: bot, skills, ended };
 
           // Iterate the Query itself: `return()` on the raw generator waits behind a pending read.
           const messages: AsyncIterable<SDKMessage> = { [Symbol.asyncIterator]: () => session };
@@ -1255,7 +1306,7 @@ export class BotSessions extends Context.Service<
 
             yield* deliver(bot, runtime, {
               type: "user",
-              message: { role: "user", content: [...images, { type: "text", text: `${text}${paths}${note}${origin}`.trim() }] },
+              message: { role: "user", content: [...images, { type: "text", text: `${toOwnSkills(bot, text)}${paths}${note}${origin}`.trim() }] },
               parent_tool_use_id: null,
             } as SDKUserMessage);
           });
@@ -1276,9 +1327,10 @@ export class BotSessions extends Context.Service<
             return;
           }
 
-          // Changed settings need a new session, but the running turn must finish first.
-          if (runtime.session !== null && runtime.session.systemPrompt !== systemPromptFor(bot)) {
-            runtime.restart = { prompts: [withSettingsNote(prompt, settingsNote(runtime.session.startedAs, bot))] };
+          // Changed settings or skills need a new session, but the running turn must finish first.
+          if (runtime.session !== null && (runtime.session.systemPrompt !== systemPromptFor(bot) || hasOldSkills(runtime.session))) {
+            const settingsChanged = runtime.session.systemPrompt !== systemPromptFor(bot);
+            runtime.restart = { prompts: [settingsChanged ? withSettingsNote(prompt, settingsNote(runtime.session.startedAs, bot)) : prompt] };
             yield* restartAfterTurn(bot.id, runtime, runtime.session).pipe(Effect.forkIn(scope));
 
             return;
@@ -1341,6 +1393,8 @@ export class BotSessions extends Context.Service<
       return BotSessions.of({
         statusChanges,
         skillChanges,
+        ownSkillChanges,
+        checkOwnSkills,
         live: (botId) => runtimeFor(botId).live,
         events: (botId) => runtimeFor(botId).events,
         view: (botId) =>

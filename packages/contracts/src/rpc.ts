@@ -31,6 +31,12 @@ export class BotNotFound extends Schema.TaggedError<BotNotFound>()("BotNotFound"
   botId: BotId,
 }) {}
 
+/** A skill save or delete failed: the name is not a valid folder name, is taken by another skill of the bot, or names no skill. */
+export class InvalidSkill extends Schema.TaggedError<InvalidSkill>()("InvalidSkill", {
+  name: Schema.String,
+  reason: Schema.Literals(["name", "taken", "missing"]),
+}) {}
+
 export class InvalidCron extends Schema.TaggedError<InvalidCron>()("InvalidCron", {
   cron: Schema.String,
 }) {}
@@ -89,6 +95,16 @@ export const MessageHit = Schema.Struct({
 });
 export type MessageHit = typeof MessageHit.Type;
 
+/** A Claude Code skill of one bot. Only that bot loads it. A template gives a new bot its first ones, and the bot and the operator edit them. */
+export const BotSkill = Schema.Struct({
+  /** The skill's folder name, such as `launch-posts`. */
+  name: Schema.String,
+  /** When Claude Code loads the skill, such as "When something ships." */
+  description: Schema.String,
+  body: Schema.String,
+});
+export type BotSkill = typeof BotSkill.Type;
+
 export class ProjectDirectoryNotFound extends Schema.TaggedError<ProjectDirectoryNotFound>()(
   "ProjectDirectoryNotFound",
   { directory: Schema.String },
@@ -104,7 +120,7 @@ export type BrowserAction = typeof BrowserAction.Type;
 
 export class ClotsRpcs extends RpcGroup.make(
   Rpc.make("WatchBots", { success: Schema.Array(BotSummary), stream: true }),
-  /** Creates a bot in a project, or in no project when `projectId` is left out or `null`. */
+  /** Creates a bot in a project, or in no project when `projectId` is left out or `null`. Its skills become a plugin that only it loads. */
   Rpc.make("CreateBot", {
     payload: {
       name: Schema.String,
@@ -112,6 +128,7 @@ export class ClotsRpcs extends RpcGroup.make(
       color: BotColor,
       shape: BotShape,
       projectId: Schema.optional(Schema.NullOr(Schema.String)),
+      skills: Schema.optional(Schema.Array(BotSkill)),
     },
     success: Bot,
   }),
@@ -227,6 +244,22 @@ export class ClotsRpcs extends RpcGroup.make(
     payload: { botId: BotId },
     success: Schema.Array(Skill),
     stream: true,
+  }),
+  /** The bot's own skills, with their text. The list follows the skill files, also when the bot changes them. */
+  Rpc.make("WatchBotSkills", {
+    payload: { botId: BotId },
+    success: Schema.Array(BotSkill),
+    error: BotNotFound,
+    stream: true,
+  }),
+  /** Adds or changes one of the bot's own skills. With `previousName`, the skill had that name before. */
+  Rpc.make("SaveBotSkill", {
+    payload: { botId: BotId, skill: BotSkill, previousName: Schema.optional(Schema.String) },
+    error: Schema.Union([BotNotFound, InvalidSkill]),
+  }),
+  Rpc.make("DeleteBotSkill", {
+    payload: { botId: BotId, name: Schema.String },
+    error: Schema.Union([BotNotFound, InvalidSkill]),
   }),
   Rpc.make("WatchSchedules", {
     payload: { botId: BotId },

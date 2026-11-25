@@ -192,6 +192,8 @@ export type ThreadEvent = typeof ThreadEvent.Type;
 export const Skill = Schema.Struct({
   name: Schema.String,
   description: Schema.String,
+  /** Marks a skill of the bot's own that hides one of the operator's skills with the same name. */
+  replaces: Schema.optional(Schema.Boolean),
 });
 export type Skill = typeof Skill.Type;
 

@@ -16,6 +16,7 @@ import {
   type UpdateInfo,
   type Account,
   type MessageHit,
+  type BotSkill,
 } from "@clots/contracts";
 import { Context, Effect, Fiber, Layer, ManagedRuntime, Schedule as RetrySchedule, Stream } from "effect";
 import { RpcClient, RpcClientError, RpcSerialization } from "effect/rpc";
@@ -33,7 +34,14 @@ export interface ClotsClient {
   thread(botId: BotId): Store<ThreadState>;
   schedules(botId: BotId): Store<ReadonlyArray<Schedule>>;
   skills(botId: BotId): Store<ReadonlyArray<Skill>>;
-  createBot(bot: Pick<Bot, "name" | "instructions" | "color" | "shape"> & Partial<Pick<Bot, "projectId">>): Promise<Bot>;
+  /** Follows the skills that only this bot has, from its files. It holds `null` until the first list arrives. */
+  botSkills(botId: BotId): Store<ReadonlyArray<BotSkill> | null>;
+  /** Adds one of the bot's own skills, or changes the skill that had `previousName`. It fails with an `InvalidSkill` that says why. */
+  saveBotSkill(botId: BotId, skill: BotSkill, previousName?: string): Promise<void>;
+  deleteBotSkill(botId: BotId, name: string): Promise<void>;
+  createBot(
+    bot: Pick<Bot, "name" | "instructions" | "color" | "shape"> & Partial<Pick<Bot, "projectId">> & { readonly skills?: ReadonlyArray<BotSkill> },
+  ): Promise<Bot>;
   updateBot(botId: BotId, changes: Partial<Pick<Bot, "name" | "instructions" | "color" | "shape">>): Promise<void>;
   setBotModel(botId: BotId, model: BotModel): Promise<void>;
   setBotUnread(botId: BotId, unread: boolean): Promise<void>;
@@ -150,6 +158,7 @@ export const makeClotsClient = (origin: string): ClotsClient => {
   const threads = new Map<BotId, Store<ThreadState>>();
   const schedules = new Map<BotId, Store<ReadonlyArray<Schedule>>>();
   const skills = new Map<BotId, Store<ReadonlyArray<Skill>>>();
+  const botSkills = new Map<BotId, Store<ReadonlyArray<BotSkill> | null>>();
 
   return {
     connection,
@@ -197,6 +206,24 @@ export const makeClotsClient = (origin: string): ClotsClient => {
 
       return store;
     },
+
+    botSkills: (botId) => {
+      const existing = botSkills.get(botId);
+      if (existing !== undefined) return existing;
+
+      const store = makeStreamStore<ReadonlyArray<BotSkill> | null, ReadonlyArray<BotSkill>>(
+        null,
+        (rpc) => rpc.WatchBotSkills({ botId }),
+        (_, list) => list,
+      );
+      botSkills.set(botId, store);
+
+      return store;
+    },
+
+    saveBotSkill: (botId, skill, previousName) =>
+      call((rpc) => rpc.SaveBotSkill({ botId, skill, ...(previousName === undefined ? {} : { previousName }) })),
+    deleteBotSkill: (botId, name) => call((rpc) => rpc.DeleteBotSkill({ botId, name })),
 
     createBot: (bot) => call((rpc) => rpc.CreateBot(bot)),
     updateBot: (botId, changes) => call((rpc) => rpc.UpdateBot({ botId, ...changes })),

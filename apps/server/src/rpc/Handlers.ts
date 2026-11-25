@@ -2,6 +2,7 @@ import {
   BotNotFound,
   ClotsRpcs,
   InvalidCron,
+  InvalidSkill,
   ProjectDirectoryNotFound,
   UpdateFailed,
   type BotId,
@@ -13,6 +14,7 @@ import { homedir } from "node:os";
 import { resolve } from "node:path";
 
 import { readAccount } from "../account/Account.ts";
+import { deleteBotSkill, readBotSkills, saveBotSkill, writeBotSkills } from "../bots/BotPlugin.ts";
 import { BotRepository, type StoredBot } from "../bots/BotRepository.ts";
 import { BotSessions } from "../bots/BotSessions.ts";
 import { ClotsConfig } from "../config.ts";
@@ -86,8 +88,11 @@ export const HandlersLayer = ClotsRpcs.toLayer(
           Stream.fromPubSub(sessions.statusChanges),
         ),
 
-      CreateBot: ({ projectId, ...newBot }) =>
-        bots.create({ ...newBot, projectId: projectId ?? null }).pipe(Effect.tap(() => PubSub.publish(sessions.statusChanges, undefined))),
+      CreateBot: ({ projectId, skills = [], ...newBot }) =>
+        bots.create({ ...newBot, projectId: projectId ?? null }).pipe(
+          Effect.tap((bot) => Effect.sync(() => writeBotSkills(bot, skills))),
+          Effect.tap(() => PubSub.publish(sessions.statusChanges, undefined)),
+        ),
 
       WatchProjects: () => watch(projects.list, Stream.fromPubSub(projects.changes)),
 
@@ -227,6 +232,41 @@ export const HandlersLayer = ClotsRpcs.toLayer(
                 ),
           ),
         ),
+
+      WatchBotSkills: ({ botId }) =>
+        Stream.unwrap(
+          requireBot(botId).pipe(
+            Effect.map((bot) =>
+              watch(
+                Effect.sync(() => readBotSkills(bot)),
+                Stream.fromPubSub(sessions.ownSkillChanges).pipe(
+                  Stream.filter((changed) => changed === botId),
+                  Stream.as(undefined),
+                ),
+              ),
+            ),
+          ),
+        ),
+
+      SaveBotSkill: ({ botId, skill, previousName }) =>
+        Effect.gen(function* () {
+          const bot = yield* requireBot(botId);
+          const reason = saveBotSkill(bot, skill, previousName);
+
+          if (reason !== undefined) return yield* new InvalidSkill({ name: skill.name, reason });
+
+          yield* sessions.checkOwnSkills(bot);
+        }),
+
+      DeleteBotSkill: ({ botId, name }) =>
+        Effect.gen(function* () {
+          const bot = yield* requireBot(botId);
+          const reason = deleteBotSkill(bot, name);
+
+          if (reason !== undefined) return yield* new InvalidSkill({ name, reason });
+
+          yield* sessions.checkOwnSkills(bot);
+        }),
 
       WatchSchedules: ({ botId }) => watch(schedules.list(botId), Stream.fromPubSub(schedules.changes)),
 
