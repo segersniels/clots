@@ -19,6 +19,7 @@
     "@effect/sql-sqlite-bun": "catalog:",
     "agent-browser": "^0.43.0",
     "effect": "catalog:",
+    "tldts": "^7.0.27",
     "uqr": "^0.1.3",
     "zod": "^4"
   },
