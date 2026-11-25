@@ -1,6 +1,6 @@
 import type { Project } from "@clots/contracts";
-import { FolderXIcon, PencilIcon } from "lucide-react";
-import { useState, type ReactNode, type RefObject } from "react";
+import { FolderXIcon, PencilIcon, UserRoundPlusIcon } from "lucide-react";
+import { useRef, useState, type ReactNode, type RefObject } from "react";
 
 import {
   AlertDialog,
@@ -15,6 +15,7 @@ import {
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from "@/components/ui/context-menu";
 
 import { client } from "../client.ts";
+import { NewBotDialog } from "./CreateDialog.tsx";
 
 /** Keeps the item icons quieter than the labels, as in the other menus. */
 const ICON = "text-muted-foreground";
@@ -48,6 +49,25 @@ export function ProjectMenu({
   children: ReactNode;
 }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [creatingBot, setCreatingBot] = useState(false);
+  // The menu closes after the dialog opens, so it must leave the focus in the dialog's name field.
+  const openingDialog = useRef(false);
+
+  const createBot = () => {
+    openingDialog.current = true;
+    setCreatingBot(true);
+  };
+
+  /** Chooses where the focus goes when the menu closes: the rename field, the dialog, or back to the header. */
+  const focusAfterMenu = () => {
+    if (openingDialog.current) {
+      openingDialog.current = false;
+
+      return false;
+    }
+
+    return renameField.current ?? true;
+  };
 
   const remove = () => {
     setConfirmingDelete(false);
@@ -61,7 +81,12 @@ export function ProjectMenu({
           {children}
         </ContextMenuTrigger>
 
-        <ContextMenuContent className="w-44" finalFocus={() => renameField.current ?? true}>
+        <ContextMenuContent className="w-44" finalFocus={focusAfterMenu}>
+          <ContextMenuItem onClick={createBot}>
+            <UserRoundPlusIcon className={ICON} />
+            New bot
+          </ContextMenuItem>
+
           <ContextMenuItem onClick={onRename}>
             <PencilIcon className={ICON} />
             Rename
@@ -75,6 +100,8 @@ export function ProjectMenu({
           </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
+
+      <NewBotDialog open={creatingBot} onOpenChange={setCreatingBot} projectId={project.id} />
 
       <AlertDialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
         <AlertDialogContent size="sm">
