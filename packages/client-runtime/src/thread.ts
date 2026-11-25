@@ -7,18 +7,34 @@ export interface ThreadState {
   readonly lastSequence: number;
   /** Is `false` until the server sent the live state, which follows the replay. */
   readonly synced: boolean;
+  /**
+   * The last message of the replay of the current subscription. Later messages arrived live. It is
+   * infinite while a replay runs, because every message then is a missed one.
+   */
+  readonly replayedThrough: number;
 }
+
+/** Tells the thread that a new subscription starts, so the messages before its live state are a replay. */
+export type ThreadUpdate = ThreadEvent | { readonly _tag: "Subscribed" };
 
 export const emptyThread: ThreadState = {
   messages: [],
   live: { status: "idle", steps: [], approvals: [], handoff: null, loginRequest: null, tasks: [] },
   lastSequence: 0,
   synced: false,
+  replayedThrough: Number.POSITIVE_INFINITY,
 };
 
-/** Applies one server event to the thread state. */
-export const applyThreadEvent = (state: ThreadState, event: ThreadEvent): ThreadState => {
-  if (event._tag === "Live") return { ...state, live: event.state, synced: true };
+/** Applies one server event, or the start of a subscription, to the thread state. */
+export const applyThreadEvent = (state: ThreadState, event: ThreadUpdate): ThreadState => {
+  if (event._tag === "Subscribed") return { ...state, replayedThrough: Number.POSITIVE_INFINITY };
+
+  // The first live state of a subscription ends its replay. Later live states do not move the end.
+  if (event._tag === "Live") {
+    const replayedThrough = state.replayedThrough === Number.POSITIVE_INFINITY ? state.lastSequence : state.replayedThrough;
+
+    return { ...state, live: event.state, synced: true, replayedThrough };
+  }
 
   // A resumed subscription can replay a message that this client already has.
   if (event.message.sequence <= state.lastSequence) return state;

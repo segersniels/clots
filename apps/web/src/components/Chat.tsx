@@ -52,9 +52,6 @@ export const BUBBLE = "rounded-[1.1rem] px-3.5 py-2 text-sm leading-normal";
 const ENTER =
   "transition-[opacity,translate] duration-200 ease-out starting:translate-y-2 starting:opacity-0 motion-reduce:starting:translate-y-0";
 
-/** Spaces out the entrances of messages that arrive together, such as the update of a thread from the cache. */
-const STAGGER_MS = 50;
-
 /** The label above a message on the operator's side that the operator did not type. */
 const SENDER_LABELS: Partial<Record<MessageRole, string>> = { routine: "Routine", bot: "Bot message" };
 
@@ -268,14 +265,9 @@ export function Chat({
   // After the app starts again, the thread shows its last messages from before, until the server sends the history.
   const [cached] = useState(() => (thread.synced ? null : readCachedThread(botId)));
   const messages = thread.synced || cached === null ? thread.messages : cached;
-  // The messages that the thread shows first stay still. Later ones, live or from the update of a cached thread, ease in.
+  // The messages that the thread shows first stay still. Only later ones that arrive live ease in.
   const shownThrough = useRef(thread.synced ? thread.lastSequence : (cached?.at(-1)?.sequence ?? null));
   if (shownThrough.current === null && thread.synced) shownThrough.current = thread.lastSequence;
-  // The newest message of the previous render. The messages after it arrived together.
-  const renderedThrough = useRef(messages.at(-1)?.sequence ?? 0);
-  useEffect(() => {
-    renderedThrough.current = messages.at(-1)?.sequence ?? 0;
-  });
   // Only a thread with nothing to show yet fades in. A thread in memory or in the cache is there at once.
   const [loadsLate] = useState(!thread.synced && cached === null);
   const { live } = thread;
@@ -333,13 +325,14 @@ export function Chat({
 
   const loginLeaving = live.loginRequest === null;
 
-  /** Gives a message that arrived after the thread showed its entrance, a bit later than the one before it in the same batch. */
+  /**
+   * Eases in a message that arrived live while the thread was on screen. The messages that a new
+   * subscription replays, such as the ones a hidden window missed, appear at once with the rest.
+   */
   const entrance = (sequence: number) => {
-    if (shownThrough.current === null || sequence <= shownThrough.current) return undefined;
+    if (shownThrough.current === null || sequence <= shownThrough.current || sequence <= thread.replayedThrough) return "";
 
-    const place = Math.max(0, sequence - Math.max(renderedThrough.current, shownThrough.current) - 1);
-
-    return { className: ENTER, style: { transitionDelay: `${Math.min(place, 4) * STAGGER_MS}ms` } };
+    return ENTER;
   };
 
   const backgroundTitle =
@@ -381,7 +374,7 @@ export function Chat({
                 // A compaction or a settings change is no message but a divider: the bot works differently after it.
                 if (message.role === "compact" || message.role === "settings") {
                   return (
-                    <MessageScrollerItem key={message.id} messageId={message.id} className={`py-3 ${enter?.className ?? ""}`} style={enter?.style}>
+                    <MessageScrollerItem key={message.id} messageId={message.id} className={`py-3 ${enter}`}>
                       <p className="flex items-center gap-3 text-[0.6875rem] text-muted-foreground before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">
                         {message.text}
                       </p>
@@ -391,14 +384,13 @@ export function Chat({
 
                 // A trace that takes the place of the live steps sits where they sat, so only a trace without them eases in.
                 if (message.role === "trace") {
-                  const traceEnter = live.steps.length === 0 ? enter : undefined;
+                  const traceEnter = live.steps.length === 0 ? enter : "";
 
                   return (
                     <MessageScrollerItem
                       key={message.id}
                       messageId={message.id}
-                      className={`px-1 pt-2 ${traceEnter?.className ?? ""}`}
-                      style={traceEnter?.style}
+                      className={`px-1 pt-2 ${traceEnter}`}
                     >
                       <Steps
                         steps={message.steps}
@@ -416,8 +408,7 @@ export function Chat({
                     key={message.id}
                     messageId={message.id}
                     data-jumped={highlightedId === message.id || undefined}
-                    className={`${changesSide && !showsTime ? "pt-3" : ""} ${enter?.className ?? ""}`}
-                    style={enter?.style}
+                    className={`${changesSide && !showsTime ? "pt-3" : ""} ${enter}`}
                   >
                     {showsTime && (
                       <p className="py-3 text-center text-[0.6875rem] text-muted-foreground">{formatClock(message.createdAt)}</p>

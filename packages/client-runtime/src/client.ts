@@ -173,7 +173,11 @@ export const makeClotsClient = (origin: string): ClotsClient => {
 
       const store = makeStreamStore(
         emptyThread,
-        (rpc, current) => rpc.SubscribeThread({ botId, afterSequence: current.lastSequence }),
+        (rpc, current) =>
+          Stream.concat(
+            Stream.succeed({ _tag: "Subscribed" } as const),
+            rpc.SubscribeThread({ botId, afterSequence: current.lastSequence }),
+          ),
         applyThreadEvent,
       );
       threads.set(botId, store);
