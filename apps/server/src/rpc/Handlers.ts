@@ -161,7 +161,6 @@ export const HandlersLayer = ClotsRpcs.toLayer(
 
       DeleteBot: ({ botId }) => requireBot(botId).pipe(Effect.flatMap((bot) => sessions.deleteBot(bot))),
 
-      CompactBot: ({ botId }) => requireBot(botId).pipe(Effect.flatMap((bot) => sessions.compact(bot))),
 
       SetBotModel: ({ botId, model }) =>
         requireBot(botId).pipe(

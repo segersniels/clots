@@ -232,8 +232,6 @@ export class BotSessions extends Context.Service<
      * Claude transcripts. The session and the browser stop first, so neither writes to the files while they go.
      */
     deleteBot(bot: StoredBot): Effect.Effect<void>;
-    /** Asks the bot's session to compact its conversation, as `/compact` does in Claude Code. */
-    compact(bot: StoredBot): Effect.Effect<void>;
     /** Marks in the thread that the operator renamed the bot or changed its instructions. Other changes add nothing. */
     noteSettingsChange(bot: StoredBot, changes: BotChanges): Effect.Effect<void>;
     /** Switches the model of a running session. A bot without a session reads its model at the next start. */
@@ -1121,19 +1119,6 @@ export class BotSessions extends Context.Service<
 
       const removeRuntime = (botId: BotId) => stop(botId).pipe(Effect.andThen(Effect.sync(() => runtimes.delete(botId))));
 
-      const compact = (bot: StoredBot) =>
-        Effect.gen(function* () {
-          const runtime = runtimeFor(bot.id);
-          setLive(runtime, { status: statusWhileRunning(runtime) });
-
-          // Claude Code runs its own command. The thread gets a note when it is done, not a message from the operator.
-          yield* deliver(bot, runtime, {
-            type: "user",
-            message: { role: "user", content: "/compact" },
-            parent_tool_use_id: null,
-          } as SDKUserMessage);
-        });
-
       const noteSettingsChange = (bot: StoredBot, changes: BotChanges) => {
         const notes = [
           changes.name !== undefined && changes.name !== bot.name ? `Renamed to ${changes.name}` : "",
@@ -1196,8 +1181,6 @@ export class BotSessions extends Context.Service<
         remove: removeRuntime,
 
         deleteBot,
-
-        compact,
 
         noteSettingsChange,
 

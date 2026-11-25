@@ -153,12 +153,6 @@ export class ClotsRpcs extends RpcGroup.make(
     error: BotNotFound,
   }),
 
-  /** Compacts the bot's conversation, as `/compact` does in Claude Code. */
-  Rpc.make("CompactBot", {
-    payload: { botId: BotId },
-    error: BotNotFound,
-  }),
-
   /** Changes the model of a bot. A running session switches at once. */
   Rpc.make("SetBotModel", {
     payload: { botId: BotId, model: BotModel },

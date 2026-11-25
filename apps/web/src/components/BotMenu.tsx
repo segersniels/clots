@@ -1,6 +1,6 @@
 import type { BotSummary } from "@clots/contracts";
 import { useNavigate, useParams } from "@tanstack/react-router";
-import { BellDotIcon, BellIcon, FoldVerticalIcon, FolderInputIcon, PencilIcon, UserRoundPlusIcon, UserRoundXIcon } from "lucide-react";
+import { BellDotIcon, BellIcon, FolderInputIcon, PencilIcon, UserRoundPlusIcon, UserRoundXIcon } from "lucide-react";
 import { useState, type ReactNode, type RefObject } from "react";
 
 import {
@@ -55,7 +55,6 @@ export function BotMenu({
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   // A bot without messages has nothing to compact.
-  const canCompact = bot.lastMessageAt !== null;
 
   const duplicate = async () => {
     const copy = await client.duplicateBot(bot.id);
@@ -117,12 +116,6 @@ export function BotMenu({
 
           <ContextMenuSeparator />
 
-          {canCompact && (
-            <ContextMenuItem onClick={() => void client.compactBot(bot.id)}>
-              <FoldVerticalIcon className={ICON} />
-              Compact
-            </ContextMenuItem>
-          )}
           <ContextMenuItem variant="destructive" onClick={() => setConfirmingDelete(true)}>
             <UserRoundXIcon />
             Delete
