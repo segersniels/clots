@@ -189,7 +189,7 @@ function BotPage() {
             </div>
             <BotInstructions key={`instructions-${botId}`} bot={bot} />
             <BotSkills key={`skills-${botId}`} bot={bot} />
-            <Routines botId={botId} />
+            <Routines bot={bot} />
           </div>
         </ScrollArea>
       )}
