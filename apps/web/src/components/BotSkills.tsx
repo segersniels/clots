@@ -20,7 +20,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { client, useStore } from "../client.ts";
 import { PANE_EMPTY, PANE_LABEL } from "./BotSettings.tsx";
 import { Collapse } from "./Collapse.tsx";
-import { CreateDialog, CreateDialogFooter, FILLED_FIELD } from "./CreateDialog.tsx";
+import { CreateDialog, CreateDialogFooter, DIALOG_FIELD, THIN_SCROLLBAR } from "./CreateDialog.tsx";
 import { SkillPreview } from "./SkillPreview.tsx";
 
 /** How long a removed skill takes to close. It matches the Collapse transition. */
@@ -108,8 +108,6 @@ function SkillForm({
     form.current?.requestSubmit();
   };
 
-  const field = `${FILLED_FIELD} bg-muted/45 dark:bg-muted/45 dark:focus-visible:bg-muted text-[14px] md:text-[14px]`;
-
   return (
     <form ref={form} onSubmit={save} onKeyDownCapture={saveOnShortcut} className="mt-4 flex flex-col gap-4">
       <SkillPreview bot={bot} name={finished.name} when={finished.description} />
@@ -132,7 +130,7 @@ function SkillForm({
             spellCheck={false}
             placeholder="pricing-page"
             aria-invalid={taken}
-            className={`h-10 pr-3 pl-9 font-medium ${field}`}
+            className={`h-10 pr-3 pl-9 font-medium ${DIALOG_FIELD}`}
           />
         </div>
       </div>
@@ -146,7 +144,7 @@ function SkillForm({
           value={description}
           onChange={(event) => setDescription(event.target.value)}
           placeholder="You change prices, plans or the pricing page."
-          className={`h-10 px-3 ${field}`}
+          className={`h-10 px-3 ${DIALOG_FIELD}`}
         />
       </div>
 
@@ -168,7 +166,7 @@ function SkillForm({
           autoFocus={skill !== undefined}
           spellCheck={false}
           placeholder={"1. Read the current pricing page.\n2. List what changes, and why.\n3. Show me the new copy before you publish."}
-          className={`max-h-[300px] min-h-[148px] resize-none overflow-y-auto [&::-webkit-scrollbar]:w-2.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:border-[3px] [&::-webkit-scrollbar-thumb]:border-solid [&::-webkit-scrollbar-thumb]:border-transparent [&::-webkit-scrollbar-thumb]:bg-foreground/25 [&::-webkit-scrollbar-thumb]:bg-clip-padding [&::-webkit-scrollbar-track]:my-2 px-3 py-2.5 text-[13.5px] leading-[1.55] md:text-[13.5px] ${field}`}
+          className={`max-h-[300px] min-h-[148px] resize-none overflow-y-auto ${THIN_SCROLLBAR} px-3 py-2.5 text-[13.5px] leading-[1.55] md:text-[13.5px] ${DIALOG_FIELD}`}
         />
       </div>
 

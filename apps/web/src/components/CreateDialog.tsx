@@ -18,6 +18,17 @@ import { TemplateList, TemplatePage } from "./Templates.tsx";
 export const FILLED_FIELD =
   "rounded-xl border-transparent bg-muted/60 transition-[background-color,box-shadow] duration-150 focus-visible:border-transparent focus-visible:bg-muted focus-visible:ring-1 focus-visible:ring-ring/40 dark:bg-muted/60 dark:focus-visible:bg-muted";
 
+/** The filled look of a field in a dialog that edits an item of the details pane, such as a skill or a routine. */
+export const DIALOG_FIELD = `${FILLED_FIELD} bg-muted/45 dark:bg-muted/45 dark:focus-visible:bg-muted text-[14px] md:text-[14px]`;
+
+/** The look of DIALOG_FIELD for a field with chips. The focus sits in the editor inside it, so the field reacts to focus within. */
+export const DIALOG_CHIP_FIELD =
+  "rounded-xl bg-muted/45 text-[14px] transition-[background-color,box-shadow] duration-150 focus-within:bg-muted focus-within:ring-1 focus-within:ring-ring/40";
+
+/** A thin scrollbar thumb that stays inside the rounded corners of a dialog field, with no arrows and no track. */
+export const THIN_SCROLLBAR =
+  "[&::-webkit-scrollbar]:w-2.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:border-[3px] [&::-webkit-scrollbar-thumb]:border-solid [&::-webkit-scrollbar-thumb]:border-transparent [&::-webkit-scrollbar-thumb]:bg-foreground/25 [&::-webkit-scrollbar-thumb]:bg-clip-padding [&::-webkit-scrollbar-track]:my-2";
+
 /** The motion of the views of the New bot dialog: they slide 16 px and fade. Reduced motion keeps the fade. */
 const VIEW = "transition-[opacity,translate] duration-200 ease-out motion-reduce:transition-opacity";
 

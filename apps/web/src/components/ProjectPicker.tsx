@@ -14,6 +14,10 @@ function useProjectOptions() {
   return [{ label: "Personal", value: PERSONAL }, ...projects.map((project) => ({ label: project.name, value: project.id }))];
 }
 
+/** The look of a small select in a dialog footer: a filled button with an icon, the value and a chevron. */
+export const FOOTER_SELECT_TRIGGER =
+  "justify-center gap-[5px] rounded-[10px] border-transparent bg-muted/45 px-2.5 font-medium data-[size=default]:h-[34px] dark:bg-muted/45 [&_svg]:size-3.5";
+
 /** Chooses the project of a bot with a small button, for a dialog footer. It shows only the name, without the path. */
 export function ProjectSelect({
   projectId,
@@ -31,7 +35,7 @@ export function ProjectSelect({
       <SelectTrigger
         aria-label="Works in"
         title="Works in"
-        className={`justify-center gap-[5px] rounded-[10px] border-transparent bg-muted/45 px-2.5 font-medium data-[size=default]:h-[34px] dark:bg-muted/45 [&_svg]:size-3.5 ${className}`}
+        className={`${FOOTER_SELECT_TRIGGER} ${className}`}
       >
         <FolderIcon className="text-muted-foreground" />
         <SelectValue />
