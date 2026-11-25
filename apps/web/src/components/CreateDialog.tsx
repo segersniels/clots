@@ -16,7 +16,7 @@ import { TemplateList, TemplatePage } from "./Templates.tsx";
 
 /** The filled look of a dialog field. It matches the instructions field in the details pane. */
 export const FILLED_FIELD =
-  "rounded-xl border-transparent bg-muted/60 transition-[background-color,box-shadow] duration-150 focus-visible:border-transparent focus-visible:bg-muted focus-visible:ring-1 focus-visible:ring-ring/40 dark:bg-muted/60";
+  "rounded-xl border-transparent bg-muted/60 transition-[background-color,box-shadow] duration-150 focus-visible:border-transparent focus-visible:bg-muted focus-visible:ring-1 focus-visible:ring-ring/40 dark:bg-muted/60 dark:focus-visible:bg-muted";
 
 /** The motion of the views of the New bot dialog: they slide 16 px and fade. Reduced motion keeps the fade. */
 const VIEW = "transition-[opacity,translate] duration-200 ease-out motion-reduce:transition-opacity";
