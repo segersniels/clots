@@ -1,9 +1,11 @@
-import type { ApprovalDecision, BotId, MessageRole, PendingApproval, TraceStep } from "@clots/contracts";
-import { CircleCheckIcon, LoaderCircleIcon } from "lucide-react";
+import { Character } from "@clots/character";
+import type { ApprovalDecision, BotId, BotSummary, LoginRequest, MessageRole, PendingApproval, TraceStep } from "@clots/contracts";
+import { ArrowRightIcon, CheckIcon, CircleAlertIcon, CircleCheckIcon, LoaderCircleIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { Message, MessageContent, MessageHeader } from "@/components/ui/message";
 import {
   MessageScroller,
@@ -28,11 +30,12 @@ import { usePageVisible } from "@/hooks/use-page-visible";
 
 import { client, useStore } from "../client.ts";
 import { readCachedThread, saveCachedThread } from "../thread-cache.ts";
-import { formatClock, formatDuration } from "../time.ts";
+import { formatAgo, formatClock, formatDuration } from "../time.ts";
 import { Collapse } from "./Collapse.tsx";
 import { Composer } from "./Composer.tsx";
 import { Markdown } from "./Markdown.tsx";
 import { EmptyThread } from "./EmptyThread.tsx";
+import { LOGIN_RISK } from "./LoginBar.tsx";
 import { MessageAttachments } from "./MessageAttachments.tsx";
 import { knownNames } from "../references.ts";
 
@@ -131,6 +134,66 @@ function Approval({ botId, approval }: { botId: BotId; approval: PendingApproval
           </Button>
         )}
         <Button variant="outline" onClick={() => resolve("deny")}>
+          Skip
+        </Button>
+      </div>
+    </FromBot>
+  );
+}
+
+/** Asks the operator to copy another bot's login into this bot's browser, and shows how the copy goes. */
+function LoginRequestCard({ botId, target, request }: { botId: BotId; target: BotSummary; request: LoginRequest }) {
+  const { from } = request;
+  const resolve = (decision: "allow" | "skip") => client.resolveLoginRequest(botId, request.id, decision);
+
+  if (request.state === "done") {
+    return (
+      <FromBot>
+        <p className="flex items-center gap-2">
+          <CheckIcon className="size-4 text-attention" />
+          Copied. {target.name} reloads the page.
+        </p>
+      </FromBot>
+    );
+  }
+
+  const copying = request.state === "copying";
+  const allowLabel = { asking: "Allow", copying: "Copying…", failed: "Try again" }[request.state];
+
+  return (
+    <FromBot>
+      <p className="font-medium">
+        Use {from.name}'s login on {request.host}?
+      </p>
+      <div className="mt-3 rounded-[10px] bg-background px-3 py-2.5">
+        <p className="flex items-center gap-2 text-[13.5px] font-medium">
+          <span className="flex items-center gap-1.5">
+            <Character shape={from.shape} color={from.color} size={22} />
+            {from.name}
+          </span>
+          <ArrowRightIcon className="size-[15px] text-muted-foreground" />
+          <span className="flex items-center gap-1.5">
+            <Character shape={target.shape} color={target.color} size={22} />
+            {target.name}
+          </span>
+        </p>
+        <p className="mt-1.5 text-[12.5px] leading-normal text-muted-foreground">
+          Copies this site's cookies and saved data. {target.name} never sees them. {from.name} logged in{" "}
+          {formatAgo(from.updatedAt)}. {LOGIN_RISK}
+        </p>
+      </div>
+      {request.state === "failed" && (
+        <p className="mt-3 flex items-center gap-2 text-[13px] text-destructive">
+          <CircleAlertIcon className="size-4 shrink-0" />
+          {request.error}
+        </p>
+      )}
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Button disabled={copying} onClick={() => resolve("allow")}>
+          {copying && <Spinner className="motion-reduce:animate-none" />}
+          {allowLabel}
+        </Button>
+        <Button variant="outline" disabled={copying} onClick={() => resolve("skip")}>
           Skip
         </Button>
       </div>
@@ -262,6 +325,12 @@ export function Chat({
   // The line keeps the last tasks while it closes, so it does not go blank before it is gone.
   const shownTasks = useRef(live.tasks);
   if (live.tasks.length > 0) shownTasks.current = live.tasks;
+
+  // The login card keeps the last request while it leaves, so it does not vanish at once.
+  const [shownLogin, setShownLogin] = useState(live.loginRequest);
+  if (live.loginRequest !== null && live.loginRequest !== shownLogin) setShownLogin(live.loginRequest);
+
+  const loginLeaving = live.loginRequest === null;
 
   /** Gives a message that arrived after the thread showed its entrance, a bit later than the one before it in the same batch. */
   const entrance = (sequence: number) => {
@@ -406,6 +475,18 @@ export function Chat({
                       I am done
                     </Button>
                   </FromBot>
+                </MessageScrollerItem>
+              )}
+
+              {shownLogin !== null && bot !== undefined && (
+                <MessageScrollerItem messageId={shownLogin.id} className={`pt-3 ${ENTER}`}>
+                  <div
+                    inert={loginLeaving}
+                    onTransitionEnd={(event) => event.target === event.currentTarget && loginLeaving && setShownLogin(null)}
+                    className={`transition-[opacity,translate] duration-200 ease-out ${loginLeaving ? "translate-y-2 opacity-0 motion-reduce:translate-y-0" : ""}`}
+                  >
+                    <LoginRequestCard botId={botId} target={bot} request={shownLogin} />
+                  </div>
                 </MessageScrollerItem>
               )}
 

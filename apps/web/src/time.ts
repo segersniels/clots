@@ -52,3 +52,24 @@ export const formatReset = (time: number, now = Date.now()) => {
 
   return `Resets ${day === "Today" || day === "Tomorrow" ? day.toLowerCase() : day} at ${clock.format(time)}`;
 };
+
+const ago = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+
+/** The units of `formatAgo`, from the largest, with their length in milliseconds. */
+const AGO_UNITS: ReadonlyArray<[Intl.RelativeTimeFormatUnit, number]> = [
+  ["year", 365 * DAY_MS],
+  ["month", 30 * DAY_MS],
+  ["week", 7 * DAY_MS],
+  ["day", DAY_MS],
+  ["hour", 60 * 60 * 1000],
+  ["minute", 60 * 1000],
+];
+
+/** Formats how long ago something happened, for example "2 days ago", "yesterday" or "just now". */
+export const formatAgo = (time: number, now = Date.now()) => {
+  const elapsed = now - time;
+  const unit = AGO_UNITS.find(([, length]) => elapsed >= length);
+  if (unit === undefined) return "just now";
+
+  return ago.format(-Math.floor(elapsed / unit[1]), unit[0]);
+};

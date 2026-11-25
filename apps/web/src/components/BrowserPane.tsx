@@ -18,6 +18,7 @@ import {
   type BrowserTab,
 } from "./BrowserWindow.tsx";
 import { Collapse } from "./Collapse.tsx";
+import { LoginBar } from "./LoginBar.tsx";
 
 /** Is `true` when the operator uses a Mac, where the Command key does what Control does on Linux. */
 const OPERATOR_ON_MAC = navigator.userAgent.includes("Mac");
@@ -301,23 +302,26 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
             </BrowserToolbar>
             <BrowserViewport botName={botName} frameRatio={frameRatio} live={frame !== null}>
               {frame === null ? null : (
-                <img
-                  {...OWN_ESCAPE}
-                  ref={screen}
-                  src={frame}
-                  alt={`${botName}'s screen`}
-                  tabIndex={0}
-                  draggable={false}
-                  onMouseDown={sendMouse("mousePressed")}
-                  onMouseUp={sendMouse("mouseReleased")}
-                  onMouseMove={sendMouse("mouseMoved")}
-                  onWheel={sendWheel}
-                  onKeyDown={sendKey("keyDown")}
-                  onKeyUp={sendKey("keyUp")}
-                  onPaste={pasteText}
-                  // The page fits the window by its width, or by its height when it is tall.
-                  className="block max-h-(--page-max-height) max-w-full cursor-default outline-none"
-                />
+                <>
+                  <img
+                    {...OWN_ESCAPE}
+                    ref={screen}
+                    src={frame}
+                    alt={`${botName}'s screen`}
+                    tabIndex={0}
+                    draggable={false}
+                    onMouseDown={sendMouse("mousePressed")}
+                    onMouseUp={sendMouse("mouseReleased")}
+                    onMouseMove={sendMouse("mouseMoved")}
+                    onWheel={sendWheel}
+                    onKeyDown={sendKey("keyDown")}
+                    onKeyUp={sendKey("keyUp")}
+                    onPaste={pasteText}
+                    // The page fits the window by its width, or by its height when it is tall.
+                    className="block max-h-(--page-max-height) max-w-full cursor-default outline-none"
+                  />
+                  <LoginBar botId={botId} botName={botName} address={address} />
+                </>
               )}
             </BrowserViewport>
           </BrowserWindow>

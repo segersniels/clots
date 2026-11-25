@@ -362,7 +362,7 @@ export function BrowserViewport({
     // The frame hugs the page, so a tall page sits in the middle of the window with the ring around it.
     <div className="mx-2.5 mb-2.5 flex justify-center">
       <div
-        className={`max-w-full overflow-hidden rounded-[10px] transition-[box-shadow] duration-200 ease-out ${live ? "ring-2 ring-attention" : "w-full ring-1 ring-border"}`}
+        className={`relative max-w-full overflow-hidden rounded-[10px] transition-[box-shadow] duration-200 ease-out ${live ? "ring-2 ring-attention" : "w-full ring-1 ring-border"}`}
       >
         {/* Before the first frame, the window shows that it connects instead of an empty box. */}
         {children ?? (

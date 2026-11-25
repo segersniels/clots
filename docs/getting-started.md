@@ -93,6 +93,15 @@ The details pane on the right shows the bot's browser live, when the bot has one
 
 Each bot has its own browser profile, so its logins stay.
 
+### Use another bot's login
+
+When another bot of the same project is logged in on a site, a bot can use that login. You do not have to log in again.
+
+- In the take-over window, a bar over the page shows which bots are logged in on the site. Click **Use login**. With several bots, click **Use a login** and pick one. Click **×** to hide the bar for that site until you close the window.
+- A bot that opens the site hears about the login and can ask for it. The thread then shows a card. Click **Allow** to copy the login, or **Skip**.
+
+clots copies only the cookies and the saved data of that one site, and then reloads the page. The bot never sees them. Both bots then share one session. Some sites sign one of them out.
+
 ## Model
 
 The details pane has a model menu with four choices: **Haiku**, **Sonnet**, **Opus** and **Fable**. A choice changes the model at once, also in the middle of a thread. clots stores only the class. Claude Code picks the newest model of that class that your account can use.
