@@ -23,12 +23,14 @@ import type {
   LoginRequest,
   LoginSource,
   MessageRole,
+  RoutinePlace,
+  Schedule,
   ThreadEvent,
   ThreadLiveState,
   TraceStep,
   Upload,
 } from "@clots/contracts";
-import { LoginCopyFailed, MAX_UPLOAD_BYTES } from "@clots/contracts";
+import { InvalidCron, LoginCopyFailed, MAX_UPLOAD_BYTES, TooManyClones } from "@clots/contracts";
 import { Cause, Context, Deferred, Effect, Layer, PubSub, Queue, Scope, Stream } from "effect";
 import { spawn } from "node:child_process";
 import { copyFileSync, mkdirSync, statSync, writeFileSync } from "node:fs";
@@ -294,6 +296,14 @@ export class BotSessions extends Context.Service<
      * Claude transcripts. The session and the browser stop first, so neither writes to the files while they go.
      */
     deleteBot(bot: StoredBot): Effect.Effect<void>;
+    /**
+     * Makes a routine of a bot. With "clone", a clone of the bot runs it in its own thread, under the
+     * bot. A clone cannot make clones, so its routines run in its own conversation.
+     */
+    createRoutine(
+      bot: StoredBot,
+      routine: { cron: string; prompt: string; place: RoutinePlace; title?: string },
+    ): Effect.Effect<{ routine: Schedule; thread: StoredBot }, InvalidCron | TooManyClones>;
     /** Marks in the thread that the operator renamed the bot or changed its instructions. Other changes add nothing. */
     noteSettingsChange(bot: StoredBot, changes: BotChanges): Effect.Effect<void>;
     /** Switches the model of a running session. A bot without a session reads its model at the next start. */
@@ -491,6 +501,54 @@ export class BotSessions extends Context.Service<
             bots.filter((bot) => bot.id === self.id || bot.clonedFrom === self.id),
           ),
         );
+
+      const createRoutine = (
+        self: StoredBot,
+        {
+          cron,
+          prompt,
+          place,
+          title = `${self.name} routine`,
+        }: { cron: string; prompt: string; place: RoutinePlace; title?: string },
+      ) =>
+        Effect.gen(function* () {
+          const next = nextRunAt(cron, Date.now());
+          if (next === undefined) {
+            return yield* new InvalidCron({ cron });
+          }
+
+          if (place === "here" || self.clonedFrom !== null) {
+            const routine = yield* schedules.create(self.id, cron, prompt, next);
+
+            return { routine, thread: self };
+          }
+
+          const bots = yield* repository.list;
+          if (bots.filter((bot) => bot.clonedFrom === self.id).length >= MAX_CLONES) {
+            return yield* new TooManyClones({ max: MAX_CLONES });
+          }
+
+          const thread = yield* repository.create({
+            name: uniqueName(title, bots),
+            instructions: [
+              self.instructions,
+              `You run the clots routine "${title}" for @${self.name}. Each run arrives as a message in this thread, and the operator reads your result here.`,
+              `When a run needs to know what @${self.name} did, read its notes directory ${self.workingDirectory} and its thread with read_bot_thread.`,
+            ]
+              .filter((part) => part.trim() !== "")
+              .join("\n\n"),
+            color: self.color,
+            shape: self.shape,
+            model: self.model,
+            projectId: self.projectId,
+            clonedFrom: self.id,
+          });
+          const routine = yield* schedules.create(thread.id, cron, prompt, next);
+          // The bot list shows the routine's thread.
+          yield* PubSub.publish(statusChanges, undefined);
+
+          return { routine, thread };
+        });
 
       /** Lists the bots of the target's project that are logged in on the site of a page. Without its own Chrome, a bot cannot copy logins. */
       const loginSourcesFor = (target: StoredBot, url: string) =>
@@ -745,13 +803,8 @@ export class BotSessions extends Context.Service<
             ),
             tool(
               "create_routine",
-              `Make a clots routine: a prompt that clots sends on a schedule, such as a morning brief every day at 9:00. Use it for recurring work that must keep running across restarts. For a short check within this session, such as every 5 minutes for the next hour, use CronCreate or Monitor instead. By default the routine gets its own thread: a bot under you that runs it, so its runs do not fill this conversation, and that can read your notes and thread. Use where "here" only for reminders or tasks that belong in this conversation. The operator can pause or delete a routine in the details pane of the bot that runs it.`,
+              `Make a clots routine: a prompt that clots sends on a schedule, such as a morning brief every day at 9:00. Use it for recurring work that must keep running across restarts. For a short check within this session, such as every 5 minutes for the next hour, use CronCreate or Monitor instead. A routine runs "here", in this conversation (the default), or in a "clone": a bot under you with your instructions, so its runs do not fill this conversation, and that can read your notes and thread. Unless the operator already said where, ask them before you make it. The operator can pause or delete a routine in the details pane of the bot that runs it.`,
               {
-                title: z
-                  .string()
-                  .describe(
-                    "A short name, such as Morning brief. It names the routine's own thread.",
-                  ),
                 cron: z
                   .string()
                   .describe(
@@ -763,60 +816,43 @@ export class BotSessions extends Context.Service<
                     "The message that each run gets. Say what to do and what to report, so it works without this conversation.",
                   ),
                 where: z
-                  .enum(["own thread", "here"])
+                  .enum(["here", "clone"])
                   .optional()
-                  .describe('"own thread" (the default) or "here", this conversation.'),
+                  .describe('"here", this conversation (the default), or "clone".'),
+                title: z
+                  .string()
+                  .optional()
+                  .describe(
+                    "A short name for the clone, such as Morning brief. Only a clone uses it.",
+                  ),
               },
-              async ({ title, cron, prompt, where = "own thread" }) => {
-                const next = nextRunAt(cron, Date.now());
-                if (next === undefined) {
-                  return toolText(`"${cron}" is not a valid cron expression.`);
-                }
+              async ({ cron, prompt, where = "here", title }) => {
+                const result = await Effect.runPromise(
+                  createRoutine(self, {
+                    cron,
+                    prompt,
+                    place: where,
+                    ...(title === undefined ? {} : { title }),
+                  }).pipe(
+                    Effect.map(({ routine, thread }) => {
+                      const firstRun = `The first run is ${new Date(routine.nextRunAt).toLocaleString()} (${HOST_TIME_ZONE}).`;
 
-                // A clone cannot make clones, so its routines run in its own thread.
-                if (where === "here" || self.clonedFrom !== null) {
-                  const routine = await Effect.runPromise(
-                    schedules.create(self.id, cron, prompt, next),
-                  );
-
-                  return toolText(
-                    `Made routine ${routine.id} in this thread. The first run is ${new Date(next).toLocaleString()} (${HOST_TIME_ZONE}).`,
-                  );
-                }
-
-                const bots = await Effect.runPromise(repository.list);
-                if (bots.filter((bot) => bot.clonedFrom === self.id).length >= MAX_CLONES) {
-                  return toolText(
-                    `You have ${MAX_CLONES} clones and routine threads already. Delete one first, or use where "here".`,
-                  );
-                }
-
-                const runner = await Effect.runPromise(
-                  repository.create({
-                    name: uniqueName(title, bots),
-                    instructions: [
-                      self.instructions,
-                      `You run the clots routine "${title}" for @${self.name}. Each run arrives as a message in this thread, and the operator reads your result here.`,
-                      `When a run needs to know what @${self.name} did, read its notes directory ${self.workingDirectory} and its thread with read_bot_thread.`,
-                    ]
-                      .filter((part) => part.trim() !== "")
-                      .join("\n\n"),
-                    color: self.color,
-                    shape: self.shape,
-                    model: self.model,
-                    projectId: self.projectId,
-                    clonedFrom: self.id,
-                  }),
+                      return thread.id === self.id
+                        ? `Made routine ${routine.id} in this thread. ${firstRun}`
+                        : `Made routine ${routine.id}. It runs in its own thread, @${thread.name}, under you. ${firstRun}`;
+                    }),
+                    Effect.catchTags({
+                      InvalidCron: () =>
+                        Effect.succeed(`"${cron}" is not a valid cron expression.`),
+                      TooManyClones: ({ max }) =>
+                        Effect.succeed(
+                          `You have ${max} clones and routine threads already. Delete one first, or use where "here".`,
+                        ),
+                    }),
+                  ),
                 );
-                const routine = await Effect.runPromise(
-                  schedules.create(runner.id, cron, prompt, next),
-                );
-                // The bot list shows the routine's thread.
-                PubSub.publishUnsafe(statusChanges, undefined);
 
-                return toolText(
-                  `Made routine ${routine.id}. It runs in its own thread, @${runner.name}, under you. The first run is ${new Date(next).toLocaleString()} (${HOST_TIME_ZONE}).`,
-                );
+                return toolText(result);
               },
             ),
             tool(
@@ -1879,6 +1915,7 @@ export class BotSessions extends Context.Service<
         remove: removeRuntime,
 
         deleteBot,
+        createRoutine,
 
         noteSettingsChange,
 

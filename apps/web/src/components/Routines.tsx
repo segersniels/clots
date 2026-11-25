@@ -1,7 +1,9 @@
-import type { BotSummary, Schedule } from "@clots/contracts";
+import type { BotSummary, RoutinePlace, Schedule } from "@clots/contracts";
 import {
   CirclePauseIcon,
   ClockIcon,
+  CopyIcon,
+  MessageSquareIcon,
   MoreHorizontalIcon,
   PencilIcon,
   PlayIcon,
@@ -20,6 +22,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -55,6 +58,16 @@ import {
 import { FOOTER_SELECT_TRIGGER } from "./ProjectPicker.tsx";
 import { ReferenceText } from "./ReferenceText.tsx";
 
+/**
+ * Styles a select in the routine's when-and-where row. The selects share the full row width, and a
+ * long value truncates. The value is a block, because the shared trigger makes it a flex line clamp,
+ * which cuts the text without an ellipsis.
+ */
+const ROW_SELECT_TRIGGER = cn(
+  FOOTER_SELECT_TRIGGER,
+  "min-w-0 flex-1 basis-0 justify-between *:data-[slot=select-value]:block",
+);
+
 const CUSTOM = "custom";
 
 /** The schedules that the form offers. `rule` is how often a preset runs, without its time, for the row. */
@@ -71,6 +84,10 @@ const DEFAULT_PRESET = PRESETS[1]!.value;
 
 /** The labels of the select. The menu says "Custom…", because it opens a field, and the button says "Custom". */
 const OPTIONS = [...PRESETS, { label: "Custom", value: CUSTOM }];
+
+/** Checks whether the server refused a clone, because the bot has the most clones already. */
+const isTooManyClones = (error: unknown) =>
+  typeof error === "object" && error !== null && "_tag" in error && error._tag === "TooManyClones";
 
 /** How long a removed routine takes to close. It matches the Collapse transition. */
 const CLOSE_MS = 200;
@@ -105,13 +122,23 @@ function RoutineForm({
   const [customCron, setCustomCron] = useState(
     schedule !== undefined && !isPreset ? schedule.cron : "",
   );
+  const [place, setPlace] = useState<RoutinePlace>("here");
   const [invalidCron, setInvalidCron] = useState(false);
+  const [tooManyClones, setTooManyClones] = useState(false);
   const [saving, setSaving] = useState(false);
   const cron = preset === CUSTOM ? customCron.trim() : preset;
   // An edit that changes nothing would only restart the schedule, so Save waits for a change.
   const changed =
     schedule === undefined || prompt.trim() !== schedule.prompt || cron !== schedule.cron;
-  const canSave = prompt.trim() !== "" && cron !== "" && changed && !invalidCron && !saving;
+  const canSave =
+    prompt.trim() !== "" && cron !== "" && changed && !invalidCron && !tooManyClones && !saving;
+  // A routine keeps its thread, and a clone cannot make clones, so only a new routine of an operator's bot can choose.
+  const canChoosePlace = schedule === undefined && bot.clonedFrom === null;
+  const places = [
+    { value: "here", label: "This conversation", icon: MessageSquareIcon },
+    { value: "clone", label: `A clone of ${bot.name}`, icon: CopyIcon },
+  ] as const;
+  const PlaceIcon = place === "here" ? MessageSquareIcon : CopyIcon;
 
   const save = async (event: FormEvent) => {
     event.preventDefault();
@@ -124,15 +151,20 @@ function RoutineForm({
 
     try {
       if (schedule === undefined) {
-        await client.createSchedule(bot.id, cron, prompt.trim());
+        await client.createSchedule(bot.id, cron, prompt.trim(), place);
       } else {
         await client.updateSchedule(schedule.id, cron, prompt.trim());
       }
 
       onDone();
-    } catch {
-      // The server rejects a cron expression that it cannot parse.
-      setInvalidCron(true);
+    } catch (error) {
+      // The server rejects a cron expression that it cannot parse, and a clone past the limit.
+      if (isTooManyClones(error)) {
+        setTooManyClones(true);
+      } else {
+        setInvalidCron(true);
+      }
+
       setSaving(false);
     }
   };
@@ -184,23 +216,15 @@ function RoutineForm({
         />
       </Collapse>
 
-      <CreateDialogFooter
-        submitLabel={schedule === undefined ? "Add routine" : "Save"}
-        disabled={!canSave}
-        className="mt-5"
-      >
+      <div className="mt-3 flex items-center gap-1.5">
         <Select
           items={OPTIONS}
           value={preset}
           onValueChange={(value) => choosePreset(value as string)}
         >
-          <SelectTrigger
-            aria-label="Schedule"
-            title="Schedule"
-            className={`${FOOTER_SELECT_TRIGGER} mb-2 w-full sm:mr-auto sm:mb-0 sm:w-fit`}
-          >
+          <SelectTrigger aria-label="Schedule" title="Schedule" className={ROW_SELECT_TRIGGER}>
             <ClockIcon className="text-muted-foreground" />
-            <SelectValue />
+            <SelectValue className="min-w-0 truncate" />
           </SelectTrigger>
           <SelectContent align="start">
             <SelectGroup>
@@ -216,7 +240,43 @@ function RoutineForm({
             </SelectGroup>
           </SelectContent>
         </Select>
-      </CreateDialogFooter>
+        {canChoosePlace && (
+          <Select
+            items={places}
+            value={place}
+            onValueChange={(value) => {
+              setPlace(value as RoutinePlace);
+              setTooManyClones(false);
+            }}
+          >
+            <SelectTrigger aria-label="Runs in" title="Runs in" className={ROW_SELECT_TRIGGER}>
+              <PlaceIcon className="text-muted-foreground" />
+              <SelectValue className="min-w-0 truncate" />
+            </SelectTrigger>
+            <SelectContent align="start">
+              <SelectGroup>
+                {places.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        )}
+      </div>
+
+      {tooManyClones && (
+        <p className="mt-2 text-[0.8125rem] text-destructive">
+          {bot.name} has the most clones already. Delete one, or run the routine here.
+        </p>
+      )}
+
+      <CreateDialogFooter
+        submitLabel={schedule === undefined ? "Add routine" : "Save"}
+        disabled={!canSave}
+        className="mt-5"
+      />
     </form>
   );
 }

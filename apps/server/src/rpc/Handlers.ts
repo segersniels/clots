@@ -310,16 +310,11 @@ export const HandlersLayer = ClotsRpcs.toLayer(
       WatchSchedules: ({ botId }) =>
         watch(schedules.list(botId), Stream.fromPubSub(schedules.changes)),
 
-      CreateSchedule: ({ botId, cron, prompt }) =>
-        Effect.gen(function* () {
-          yield* requireBot(botId);
-          const next = nextRunAt(cron, Date.now());
-          if (next === undefined) {
-            return yield* new InvalidCron({ cron });
-          }
-
-          return yield* schedules.create(botId, cron, prompt, next);
-        }),
+      CreateSchedule: ({ botId, cron, prompt, place }) =>
+        requireBot(botId).pipe(
+          Effect.flatMap((bot) => sessions.createRoutine(bot, { cron, prompt, place })),
+          Effect.map(({ routine }) => routine),
+        ),
 
       UpdateSchedule: ({ id, cron, prompt }) =>
         Effect.gen(function* () {

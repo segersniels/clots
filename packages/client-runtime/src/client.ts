@@ -11,6 +11,7 @@ import {
   type LoginSource,
   type Project,
   type Upload,
+  type RoutinePlace,
   type Schedule,
   type Skill,
   type UpdateInfo,
@@ -82,7 +83,13 @@ export interface ClotsClient {
   /** Copies another bot's login on the site of a page into the bot's browser. It fails with a `LoginCopyFailed` that says why. */
   copyLogin(botId: BotId, fromBotId: BotId, url: string): Promise<void>;
   resolveLoginRequest(botId: BotId, requestId: string, decision: LoginDecision): Promise<void>;
-  createSchedule(botId: BotId, cron: string, prompt: string): Promise<Schedule>;
+  /** Adds a routine. With "clone", a clone of the bot runs it in its own thread. */
+  createSchedule(
+    botId: BotId,
+    cron: string,
+    prompt: string,
+    place: RoutinePlace,
+  ): Promise<Schedule>;
   updateSchedule(id: string, cron: string, prompt: string): Promise<void>;
   setSchedulePaused(id: string, paused: boolean): Promise<void>;
   deleteSchedule(id: string): Promise<void>;
@@ -295,8 +302,8 @@ export const makeClotsClient = (origin: string): ClotsClient => {
     copyLogin: (botId, fromBotId, url) => call((rpc) => rpc.CopyLogin({ botId, fromBotId, url })),
     resolveLoginRequest: (botId, requestId, decision) =>
       call((rpc) => rpc.ResolveLoginRequest({ botId, requestId, decision })),
-    createSchedule: (botId, cron, prompt) =>
-      call((rpc) => rpc.CreateSchedule({ botId, cron, prompt })),
+    createSchedule: (botId, cron, prompt, place) =>
+      call((rpc) => rpc.CreateSchedule({ botId, cron, prompt, place })),
     updateSchedule: (id, cron, prompt) => call((rpc) => rpc.UpdateSchedule({ id, cron, prompt })),
     setSchedulePaused: (id, paused) => call((rpc) => rpc.SetSchedulePaused({ id, paused })),
     deleteSchedule: (id) => call((rpc) => rpc.DeleteSchedule({ id })),

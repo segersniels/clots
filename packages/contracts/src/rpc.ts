@@ -41,6 +41,15 @@ export class InvalidCron extends Schema.TaggedError<InvalidCron>()("InvalidCron"
   cron: Schema.String,
 }) {}
 
+/** A bot has the most clones that it can have, so it cannot make another one. */
+export class TooManyClones extends Schema.TaggedError<TooManyClones>()("TooManyClones", {
+  max: Schema.Number,
+}) {}
+
+/** Where a routine runs: in the bot's own conversation, or in a clone of the bot that shows under it. */
+export const RoutinePlace = Schema.Literals(["here", "clone"]);
+export type RoutinePlace = typeof RoutinePlace.Type;
+
 /** A copy of a login between two bot browsers failed. The message says why, for the operator. */
 export class LoginCopyFailed extends Schema.TaggedError<LoginCopyFailed>()("LoginCopyFailed", {
   message: Schema.String,
@@ -279,9 +288,9 @@ export class ClotsRpcs extends RpcGroup.make(
     stream: true,
   }),
   Rpc.make("CreateSchedule", {
-    payload: { botId: BotId, cron: Schema.String, prompt: Schema.String },
+    payload: { botId: BotId, cron: Schema.String, prompt: Schema.String, place: RoutinePlace },
     success: Schedule,
-    error: Schema.Union([BotNotFound, InvalidCron]),
+    error: Schema.Union([BotNotFound, InvalidCron, TooManyClones]),
   }),
   /** Changes the schedule and the prompt of a routine. The next run follows from the new schedule. */
   Rpc.make("UpdateSchedule", {
