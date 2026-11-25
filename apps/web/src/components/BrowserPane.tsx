@@ -35,7 +35,7 @@ const RECONNECT_DELAY_MS = 3000;
 /** The storage key prefix of the last shape of each bot's page, so the take-over window opens at the right size. */
 const SCREEN_RATIO_KEY = "clots.screenRatio.";
 
-/** The shape of the page before the first frame of a bot that never showed one. */
+/** The shape of the normal screen (1280 × 800). A take-over opens at it, and a bot that never showed a frame starts at it. */
 const DEFAULT_SCREEN_RATIO = 16 / 10;
 
 /** Reads the last shape of the bot's page. A missing value or a blocked storage gives the default shape. */
@@ -68,6 +68,8 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
   // The browser takes a moment to close. The button stays disabled until the stream ends.
   const [stopping, setStopping] = useState(false);
   const socket = useRef<WebSocket | null>(null);
+  // Frames in the bot's own page size can arrive while the take-over resets it, and must not change the window.
+  const resettingViewport = useRef(false);
   // The socket opens again after a drop, and the new one must ask for the same frame rate.
   const takeOverNow = useRef(takeOver);
   takeOverNow.current = takeOver;
@@ -155,15 +157,22 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
     void client.navigateBrowser(botId, action, target);
 
   /** Opens the take-over window at the normal screen size, also when the bot made its page tall or narrow. */
-  const openTakeOver = () => {
+  const openTakeOver = async () => {
     setTakeOver(true);
-    navigate("resetViewport");
+    setFrameRatio(DEFAULT_SCREEN_RATIO);
+    resettingViewport.current = true;
+
+    try {
+      await client.navigateBrowser(botId, "resetViewport");
+    } finally {
+      resettingViewport.current = false;
+    }
   };
 
   /** Follows the shape of the page, and keeps it, so the next take-over of this bot opens at that size. */
   const followFrameShape = (image: HTMLImageElement) => {
     const ratio = image.naturalWidth / image.naturalHeight;
-    if (Math.abs(ratio - frameRatio) < 0.001) return;
+    if (resettingViewport.current || Math.abs(ratio - frameRatio) < 0.001) return;
 
     setFrameRatio(ratio);
     try {
@@ -269,8 +278,8 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
                 tabIndex={0}
                 draggable={false}
                 onLoad={(event) => followFrameShape(event.currentTarget)}
-                onClick={openTakeOver}
-                onKeyDown={(event) => event.key === "Enter" && openTakeOver()}
+                onClick={() => void openTakeOver()}
+                onKeyDown={(event) => event.key === "Enter" && void openTakeOver()}
                 className="w-full cursor-pointer rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
               />
             </div>
