@@ -43,7 +43,7 @@ import { knownNames } from "../references.ts";
 const TIME_LABEL_GAP_MS = 30 * 60 * 1000;
 
 /** The bubble shape of the thread: larger text and rounder corners than the shadcn default. */
-const BUBBLE = "rounded-[1.1rem] px-3.5 py-2 text-sm leading-normal";
+export const BUBBLE = "rounded-[1.1rem] px-3.5 py-2 text-sm leading-normal";
 
 /**
  * Eases a new thread item in, so that the thread does not jump when it arrives. The transition

@@ -258,3 +258,10 @@ button:not(:disabled),
     box-shadow: 0 0 0 2px var(--attention);
   }
 }
+
+/* The caret of the composer in the skill preview. */
+@keyframes caret-blink {
+  50% {
+    opacity: 0;
+  }
+}

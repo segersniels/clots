@@ -21,6 +21,7 @@ import { client, useStore } from "../client.ts";
 import { PANE_EMPTY, PANE_LABEL } from "./BotSettings.tsx";
 import { Collapse } from "./Collapse.tsx";
 import { CreateDialog, CreateDialogFooter, FILLED_FIELD } from "./CreateDialog.tsx";
+import { SkillPreview } from "./SkillPreview.tsx";
 
 /** How long a removed skill takes to close. It matches the Collapse transition. */
 const CLOSE_MS = 200;
@@ -107,39 +108,44 @@ function SkillForm({
     form.current?.requestSubmit();
   };
 
-  const field = `${FILLED_FIELD} bg-muted/45 dark:bg-muted/45 text-[14px] md:text-[14px]`;
+  const field = `${FILLED_FIELD} bg-muted/45 dark:bg-muted/45 dark:focus-visible:bg-muted text-[14px] md:text-[14px]`;
 
   return (
     <form ref={form} onSubmit={save} onKeyDownCapture={saveOnShortcut} className="mt-4 flex flex-col gap-4">
+      <SkillPreview bot={bot} name={finished.name} when={finished.description} />
+
       <div className="flex flex-col gap-1.5">
         <label htmlFor="skill-name" className="px-1 text-[0.8125rem] text-muted-foreground">
           Name
         </label>
-        <Input
-          id="skill-name"
-          value={name}
-          onChange={(event) => {
-            setName(slugWhileTyping(event.target.value));
-            setFailure(null);
-          }}
-          autoFocus={skill === undefined}
-          autoComplete="off"
-          spellCheck={false}
-          placeholder="pricing-page"
-          aria-invalid={taken}
-          className={`h-10 px-3 ${field}`}
-        />
+        <div className="relative">
+          <BoxIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-skill" />
+          <Input
+            id="skill-name"
+            value={name}
+            onChange={(event) => {
+              setName(slugWhileTyping(event.target.value));
+              setFailure(null);
+            }}
+            autoFocus={skill === undefined}
+            autoComplete="off"
+            spellCheck={false}
+            placeholder="pricing-page"
+            aria-invalid={taken}
+            className={`h-10 pr-3 pl-9 font-medium ${field}`}
+          />
+        </div>
       </div>
 
       <div className="flex flex-col gap-1.5">
         <label htmlFor="skill-description" className="px-1 text-[0.8125rem] text-muted-foreground">
-          Description
+          Use it when
         </label>
         <Input
           id="skill-description"
           value={description}
           onChange={(event) => setDescription(event.target.value)}
-          placeholder="Use before you change prices, plans or the pricing page."
+          placeholder="You change prices, plans or the pricing page."
           className={`h-10 px-3 ${field}`}
         />
       </div>
@@ -161,8 +167,8 @@ function SkillForm({
           onChange={(event) => setBody(event.target.value)}
           autoFocus={skill !== undefined}
           spellCheck={false}
-          placeholder={"## Before you start\n- …\n\n## Steps\n- …"}
-          className={`h-[280px] resize-none px-3 py-2.5 text-[13px] leading-[1.55] [field-sizing:fixed] md:text-[13px] ${field}`}
+          placeholder={"1. Read the current pricing page.\n2. List what changes, and why.\n3. Show me the new copy before you publish."}
+          className={`max-h-[300px] min-h-[148px] resize-none overflow-y-auto [&::-webkit-scrollbar]:w-2.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:border-[3px] [&::-webkit-scrollbar-thumb]:border-solid [&::-webkit-scrollbar-thumb]:border-transparent [&::-webkit-scrollbar-thumb]:bg-foreground/25 [&::-webkit-scrollbar-thumb]:bg-clip-padding [&::-webkit-scrollbar-track]:my-2 px-3 py-2.5 text-[13.5px] leading-[1.55] md:text-[13.5px] ${field}`}
         />
       </div>
 
