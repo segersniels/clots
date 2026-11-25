@@ -7,7 +7,7 @@
   "scripts": {
     "build": "bun run --cwd ../web build:setup && bun build src/main.ts src/preload.ts --target=node --format=cjs --external electron --outdir dist --entry-naming '[name].cjs'",
     "start": "bun run build && electron .",
-    "package:mac": "bun run --cwd ../.. build:cli && bun run build && electron-builder --mac -c.extraMetadata.version=$(bun -p \"require('../../package.json').version\") && open release/Clots.dmg",
+    "package:mac": "bun run --cwd ../.. build:cli && bun run build && electron-builder --mac -c.mac.identity=- -c.mac.hardenedRuntime=false -c.extraMetadata.version=$(bun -p \"require('../../package.json').version\") && open release/Clots.dmg",
     "lint": "oxlint src",
     "typecheck": "tsc --noEmit"
   },
@@ -28,10 +28,12 @@
     "mac": {
       "category": "public.app-category.productivity",
       "icon": "resources/icon.png",
-      "target": ["dmg"],
-      "identity": "-",
-      "hardenedRuntime": false
+      "target": ["dmg", "zip"],
+      "hardenedRuntime": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
     },
-    "dmg": { "artifactName": "Clots.${ext}" }
+    "dmg": { "artifactName": "Clots.${ext}" },
+    "publish": { "provider": "github", "owner": "segersniels", "repo": "clots" }
   }
 }

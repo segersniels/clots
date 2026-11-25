@@ -124,10 +124,24 @@ See [Architecture](./architecture.md) for how the parts fit.
 Run the **Release** workflow from the Actions tab on `main`, and enter the version, such as `0.2.0`. The workflow:
 
 1. commits the version to the root `package.json` and tags `v0.2.0`,
-2. builds the `clots` archives for macOS (Apple Silicon) and Linux (x64 and arm64), and `Clots.dmg`,
-3. publishes a GitHub release with them and generated notes.
+2. builds the `clots` archives for macOS (Apple Silicon) and Linux (x64 and arm64), `Clots.dmg`, and the zip and `latest-mac.yml` that the app updates itself from,
+3. publishes a GitHub release with them, `checksums.txt` and generated notes.
 
-Servers and apps see the new release within an hour. Each server can then update itself from its sidebar.
+Servers and apps see the new release within an hour. Each server can then update itself from its sidebar, and so can the app.
+
+### Signing the app
+
+The workflow signs the app with a Developer ID and notarizes it when the repository has these Actions secrets:
+
+| Secret | Value |
+| --- | --- |
+| `CSC_LINK` | The Developer ID Application certificate and its private key, exported as a `.p12` file and encoded with `base64 -i Certificate.p12`. |
+| `CSC_KEY_PASSWORD` | The password of the `.p12` file. |
+| `APPLE_API_KEY` | The contents of the App Store Connect API key file, `AuthKey_<id>.p8`. |
+| `APPLE_API_KEY_ID` | The ID of that key. |
+| `APPLE_API_ISSUER` | The issuer ID of the App Store Connect team. |
+
+Without all five, such as in a fork, the app gets an ad-hoc signature and no notarization, as `package:mac` does. Such an app works, but it cannot update itself.
 
 ## Copied code
 

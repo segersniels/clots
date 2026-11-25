@@ -76,19 +76,43 @@ jobs:
         run: |
           bundle=$(ls dist)
           tar -czf "$bundle.tar.gz" -C dist "$bundle"
+      # The app updates itself from the zip and latest-mac.yml. macOS installs an update only into an app
+      # with a Developer ID signature, so a build without the Apple secrets, such as in a fork, does not update itself.
       - name: Build the Clots app
         if: matrix.app
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
         run: |
           bun run --cwd apps/desktop build
           cd apps/desktop
-          bunx electron-builder --mac --publish never -c.extraMetadata.version="$VERSION"
-          mv release/Clots.dmg ../../Clots.dmg
+
+          if [[ -n "$CSC_LINK" && -n "$CSC_KEY_PASSWORD" && -n "$APPLE_API_KEY" && -n "$APPLE_API_KEY_ID" && -n "$APPLE_API_ISSUER" ]]; then
+            # notarytool reads the App Store Connect API key from a file.
+            key="$RUNNER_TEMP/AuthKey_$APPLE_API_KEY_ID.p8"
+            (umask 077 && printf '%s' "$APPLE_API_KEY" > "$key")
+            export APPLE_API_KEY="$key"
+            unsigned=()
+          else
+            echo "::warning::The Apple secrets are missing, so the app gets an ad-hoc signature and no notarization."
+            unset CSC_LINK CSC_KEY_PASSWORD APPLE_API_KEY APPLE_API_KEY_ID APPLE_API_ISSUER
+            unsigned=(-c.mac.identity=- -c.mac.hardenedRuntime=false)
+          fi
+
+          bunx electron-builder --mac --publish never -c.extraMetadata.version="$VERSION" "${unsigned[@]}"
+          mv release/Clots.dmg release/*.zip release/*.blockmap release/latest-mac.yml ../..
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.runner }}
           path: |
             *.tar.gz
             *.dmg
+            *.zip
+            *.blockmap
+            latest-mac.yml
           if-no-files-found: error
 
   publish:
