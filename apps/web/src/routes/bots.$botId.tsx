@@ -21,6 +21,7 @@ import { ModelPicker } from "../components/ModelPicker.tsx";
 import { takeCreatedBot } from "../components/CreateDialog.tsx";
 import { ProjectPicker } from "../components/ProjectPicker.tsx";
 import { Routines } from "../components/Routines.tsx";
+import { BotSkills } from "../components/BotSkills.tsx";
 
 export const Route = createFileRoute("/bots/$botId")({
   component: BotPage,
@@ -190,6 +191,7 @@ function BotPage() {
             <ModelPicker bot={bot} />
             <Routines botId={botId} />
             <BotInstructions key={`instructions-${botId}`} bot={bot} />
+            <BotSkills key={`skills-${botId}`} bot={bot} />
           </div>
         </ScrollArea>
       )}
