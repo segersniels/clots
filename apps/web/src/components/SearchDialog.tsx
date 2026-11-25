@@ -47,7 +47,7 @@ const POPUP =
   "fixed top-[92px] left-1/2 z-50 flex w-[600px] max-w-[calc(100%-2rem)] -translate-x-1/2 origin-top flex-col overflow-hidden rounded-[20px] bg-popover text-sm text-popover-foreground shadow-2xl ring-1 ring-foreground/9 outline-none transition-[opacity,scale] duration-160 ease-out data-ending-style:scale-[0.97] data-ending-style:opacity-0 data-ending-style:duration-120 data-starting-style:scale-[0.97] data-starting-style:opacity-0 data-instant:transition-none motion-reduce:data-ending-style:scale-100 motion-reduce:data-starting-style:scale-100";
 
 /** One row of a result list. The keys and the pointer both highlight it. */
-const ROW =
+export const ROW =
   "group flex min-h-11 cursor-default items-center gap-3 rounded-[14px] px-3 py-2 outline-none select-none data-highlighted:bg-[#ececed] dark:data-highlighted:bg-[#2a2a2d]";
 
 /** What the search can do besides opening a bot. The sidebar owns the dialogs and menus that these open. */
