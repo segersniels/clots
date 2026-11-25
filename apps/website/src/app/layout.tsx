@@ -14,10 +14,10 @@ const allo = localFont({
   adjustFontFallback: "Arial",
 });
 
-const TITLE = "clots · Always-on Claude Code bots on your Mac";
+const TITLE = "clots · Always-on Claude Code bots";
 
 const DESCRIPTION =
-  "Run always-on Claude Code bots on your own Mac with your Claude subscription. Each bot has its own instructions, memory, browser and routines, and keeps working while you are away. Free and open source.";
+  "Run always-on Claude Code bots on your own machine with your Claude subscription. Each bot has its own instructions, memory, browser and routines, and keeps working while you are away. Free and open source.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
