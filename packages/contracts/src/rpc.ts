@@ -249,6 +249,8 @@ export class ClotsRpcs extends RpcGroup.make(
     error: BotNotFound,
   }),
   Rpc.make("InterruptBot", { payload: { botId: BotId }, error: BotNotFound }),
+  /** Stops one background task of a bot. The live state drops it when the session reports the change. */
+  Rpc.make("StopTask", { payload: { botId: BotId, taskId: Schema.String }, error: BotNotFound }),
   Rpc.make("ResolveApproval", {
     payload: { botId: BotId, approvalId: Schema.String, decision: ApprovalDecision },
     error: BotNotFound,

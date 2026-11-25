@@ -294,6 +294,8 @@ export class BotSessions extends Context.Service<
       uploads?: ReadonlyArray<Upload>,
     ): Effect.Effect<void>;
     interrupt(botId: BotId): Effect.Effect<void>;
+    /** Stops one background task. The session then reports the shorter task list. */
+    stopTask(botId: BotId, taskId: string): Effect.Effect<void>;
     /** Stops the session of a bot. The next message starts a new one with the bot's current settings. */
     stop(botId: BotId): Effect.Effect<void>;
     /**
@@ -1551,7 +1553,16 @@ export class BotSessions extends Context.Service<
           // Work in the background, such as a subagent, can outlive the turn that started it. Housekeeping tasks stay out.
           if (message.type === "system" && message.subtype === "background_tasks_changed") {
             const tasks = message.tasks.flatMap((task) =>
-              task.ambient === true ? [] : [{ id: task.task_id, description: task.description }],
+              task.ambient === true
+                ? []
+                : [
+                    {
+                      id: task.task_id,
+                      kind:
+                        task.task_type === "local_agent" ? ("agent" as const) : ("shell" as const),
+                      description: task.description,
+                    },
+                  ],
             );
             setLive(runtime, { tasks });
             // The bot list shows the running tasks.
@@ -2101,6 +2112,11 @@ export class BotSessions extends Context.Service<
             }
 
             await runtime.session?.query.interrupt();
+          }),
+
+        stopTask: (botId, taskId) =>
+          Effect.promise(async () => {
+            await runtimeFor(botId).session?.query.stopTask(taskId);
           }),
 
         setModel: (botId, model) =>

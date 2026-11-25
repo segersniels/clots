@@ -179,6 +179,8 @@ export type LoginDecision = typeof LoginDecision.Type;
 /** A task that runs in the background of a bot's session, such as a subagent. */
 export const BackgroundTask = Schema.Struct({
   id: Schema.String,
+  /** What runs the task: a subagent, or a shell command. Other kinds of task count as shell. */
+  kind: Schema.Literals(["shell", "agent"]),
   description: Schema.String,
 });
 export type BackgroundTask = typeof BackgroundTask.Type;

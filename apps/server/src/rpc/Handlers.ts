@@ -244,6 +244,9 @@ export const HandlersLayer = ClotsRpcs.toLayer(
       InterruptBot: ({ botId }) =>
         requireBot(botId).pipe(Effect.andThen(sessions.interrupt(botId))),
 
+      StopTask: ({ botId, taskId }) =>
+        requireBot(botId).pipe(Effect.andThen(sessions.stopTask(botId, taskId))),
+
       ResolveApproval: ({ botId, approvalId, decision }) =>
         requireBot(botId).pipe(
           Effect.andThen(sessions.resolveApproval(botId, approvalId, decision)),

@@ -14,6 +14,7 @@ import { saveLastBot } from "@/lib/last-bot";
 import { readPaneOpen, readPaneWidth, savePaneOpen, savePaneWidth } from "@/lib/pane-width";
 
 import { client, useStore } from "../client.ts";
+import { BackgroundTasks } from "../components/BackgroundTasks.tsx";
 import { BotIdentity, BotInstructions } from "../components/BotSettings.tsx";
 import { BrowserPane } from "../components/BrowserPane.tsx";
 import { Chat } from "../components/Chat.tsx";
@@ -178,7 +179,7 @@ function BotPage() {
   const chat = (
     <section className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col">
       {/* The header floats over the thread, which fades out below it. A scroll over the header still reaches the thread. */}
-      <header className="window-drag pointer-events-none absolute inset-x-0 top-0 z-10 grid h-13 grid-cols-[1fr_auto_1fr] items-center px-3 *:pointer-events-auto">
+      <header className="window-drag pointer-events-none absolute inset-x-0 top-0 z-10 grid h-13 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center px-3 *:pointer-events-auto">
         <Button
           variant="ghost"
           size="icon"
@@ -200,6 +201,10 @@ function BotPage() {
           <Character shape={bot.shape} color={bot.color} mood={bot.status} size={20} />
           <span className="max-w-[40vw] truncate">{bot.name}</span>
         </Button>
+
+        <div className="@container col-start-3 flex min-w-0 justify-end">
+          <BackgroundTasks botId={botId} />
+        </div>
       </header>
 
       {/* The key gives each bot its own chat state, such as the draft. */}

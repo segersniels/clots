@@ -45,7 +45,6 @@ import { usePageVisible } from "@/hooks/use-page-visible";
 import { client, useStore } from "../client.ts";
 import { readCachedThread, saveCachedThread } from "../thread-cache.ts";
 import { formatAgo, formatClock, formatDuration } from "../time.ts";
-import { Collapse } from "./Collapse.tsx";
 import { Composer } from "./Composer.tsx";
 import { Markdown } from "./Markdown.tsx";
 import { EmptyThread } from "./EmptyThread.tsx";
@@ -377,12 +376,6 @@ export function Chat({
   );
   const runningStep = live.steps.findLast((step) => step.status === "running");
   const thinking = live.status === "working" && runningStep === undefined;
-  // The line keeps the last tasks while it closes, so it does not go blank before it is gone.
-  const shownTasks = useRef(live.tasks);
-  if (live.tasks.length > 0) {
-    shownTasks.current = live.tasks;
-  }
-
   // The login card keeps the last request while it leaves, so it does not vanish at once.
   const [shownLogin, setShownLogin] = useState(live.loginRequest);
   if (live.loginRequest !== null && live.loginRequest !== shownLogin) {
@@ -406,11 +399,6 @@ export function Chat({
 
     return ENTER;
   };
-
-  const backgroundTitle =
-    shownTasks.current.length === 1
-      ? `In the background: ${shownTasks.current[0]!.description}`
-      : `${shownTasks.current.length} tasks in the background`;
 
   return (
     <>
@@ -603,26 +591,6 @@ export function Chat({
             </div>
           )}
         </MessageScroller>
-
-        {/**
-          Work in the background, such as a subagent, can outlive the turn. The line stays until the work ends.
-          The side padding sits outside the Collapse, because its focus ring margin would otherwise widen the panel.
-        */}
-        <div className="px-5">
-          <Collapse open={live.tasks.length > 0}>
-            <div className="pb-2">
-              <Steps
-                steps={shownTasks.current.map((task) => ({
-                  id: task.id,
-                  title: task.description,
-                  status: "running" as const,
-                }))}
-                title={backgroundTitle}
-                running
-              />
-            </div>
-          </Collapse>
-        </div>
 
         {/* The composer sits inside the provider, so that sending can make the thread follow its end again. */}
         <Composer

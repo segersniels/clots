@@ -76,6 +76,7 @@ export interface ClotsClient {
   setBotProject(botId: BotId, projectId: string | null): Promise<void>;
   sendMessage(botId: BotId, text: string, attachments?: ReadonlyArray<Upload>): Promise<void>;
   interruptBot(botId: BotId): Promise<void>;
+  stopTask(botId: BotId, taskId: string): Promise<void>;
   resolveApproval(botId: BotId, approvalId: string, decision: ApprovalDecision): Promise<void>;
   resolveHandoff(botId: BotId, handoffId: string): Promise<void>;
   /** Lists the other bots of the bot's project that are logged in on the site of a page, latest first. */
@@ -295,6 +296,7 @@ export const makeClotsClient = (origin: string): ClotsClient => {
     sendMessage: (botId, text, attachments = []) =>
       call((rpc) => rpc.SendMessage({ botId, text, attachments })),
     interruptBot: (botId) => call((rpc) => rpc.InterruptBot({ botId })),
+    stopTask: (botId, taskId) => call((rpc) => rpc.StopTask({ botId, taskId })),
     resolveApproval: (botId, approvalId, decision) =>
       call((rpc) => rpc.ResolveApproval({ botId, approvalId, decision })),
     resolveHandoff: (botId, handoffId) => call((rpc) => rpc.ResolveHandoff({ botId, handoffId })),
