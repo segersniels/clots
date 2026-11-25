@@ -39,6 +39,13 @@ const appBridge: DesktopAppBridge = {
 
     return () => ipcRenderer.removeListener("app:update-changed", listener);
   },
+  checkForUpdates: () => ipcRenderer.invoke("app:check-for-updates"),
+  onCheckForUpdates: (onCheck) => {
+    const listener = () => onCheck();
+    ipcRenderer.on("app:check-for-updates-requested", listener);
+
+    return () => ipcRenderer.removeListener("app:check-for-updates-requested", listener);
+  },
   downloadUpdate: () => ipcRenderer.invoke("app:download-update"),
   installUpdate: () => ipcRenderer.invoke("app:install-update"),
   setBadgeCount: (count) => ipcRenderer.invoke("app:set-badge-count", count),

@@ -13,8 +13,11 @@ const LATEST_RELEASE_URL =
   process.env.CLOTS_RELEASES_URL ??
   "https://api.github.com/repos/segersniels/clots/releases/latest";
 
-/** How long a release check stays valid. GitHub allows 60 unauthenticated API calls per hour. */
-const CHECK_INTERVAL_MS = 60 * 60_000;
+/**
+ * How long a release check answers again, so that clients which ask at once share one call. GitHub
+ * allows 60 unauthenticated API calls per hour.
+ */
+const CHECK_INTERVAL_MS = 60_000;
 
 /** The bundle of this platform in a release, as the release workflow names it. */
 const BUNDLE_NAME = `clots-${process.platform}-${process.arch}`;
@@ -57,7 +60,10 @@ export const latestRelease = async (): Promise<Release | undefined> => {
     )
     .catch(() => undefined);
 
-  lastCheck = { at: Date.now(), release };
+  // A failed check is not kept, so the next ask tries GitHub again.
+  if (release !== undefined) {
+    lastCheck = { at: Date.now(), release };
+  }
 
   return release;
 };

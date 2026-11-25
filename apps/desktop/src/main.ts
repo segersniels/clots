@@ -221,6 +221,7 @@ ipcMain.handle("app:reveal-window", () => {
 ipcMain.handle("app:set-badge-count", (_event, count: number) => void app.setBadgeCount(count));
 
 ipcMain.handle("app:update-state", () => updateState());
+ipcMain.handle("app:check-for-updates", () => checkForUpdates());
 ipcMain.handle("app:download-update", () => downloadUpdate());
 
 ipcMain.handle("app:install-update", () => {
@@ -250,9 +251,12 @@ void app.whenReady().then(() => {
 
   const defaultMenu = Menu.getApplicationMenu();
 
-  // On macOS the first menu is the app menu. The update check goes under About, and the sidebar shows what it finds.
+  // On macOS the first menu is the app menu. The update check goes under About. The page checks the app and the server, and the sidebar shows what it finds.
   if (process.platform === "darwin") {
-    const checkItem = new MenuItem({ label: "Check for Updates…", click: () => checkForUpdates() });
+    const checkItem = new MenuItem({
+      label: "Check for Updates…",
+      click: () => window?.webContents.send("app:check-for-updates-requested"),
+    });
     defaultMenu?.items[0]?.submenu?.insert(1, checkItem);
   }
 

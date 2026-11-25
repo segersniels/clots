@@ -6,7 +6,7 @@ import { resolve } from "node:path";
 import { promisify } from "node:util";
 
 /** How often the app asks GitHub for a new release. The web client asks the server for one as often. */
-const CHECK_INTERVAL_MS = 60 * 60_000;
+const CHECK_INTERVAL_MS = 15 * 60_000;
 
 let state: AppUpdateState = { status: "off" };
 let report: (state: AppUpdateState) => void = () => undefined;
@@ -36,7 +36,7 @@ const hasDeveloperIdSignature = async () => {
 export const updateState = () => state;
 
 /**
- * Starts the updater of a signed app. It asks GitHub for a new release now and every hour, and
+ * Starts the updater of a signed app. It asks GitHub for a new release now and every 15 minutes, and
  * reports each state change. The download waits for the operator's click.
  */
 export const startUpdates = async (onChange: (state: AppUpdateState) => void) => {
@@ -63,25 +63,27 @@ export const startUpdates = async (onChange: (state: AppUpdateState) => void) =>
   });
 
   setState({ status: "current" });
-  check();
-  setInterval(check, CHECK_INTERVAL_MS);
+  void check();
+  setInterval(() => void check(), CHECK_INTERVAL_MS);
 };
 
 /** Asks GitHub for a new release. A failed check, for example without a network, keeps the last state. */
-const check = () => {
+const check = async () => {
   // A check during a download or before the restart would forget the downloaded version.
   if (state.status === "downloading" || state.status === "ready") {
     return;
   }
 
-  void autoUpdater.checkForUpdates().catch(() => undefined);
+  await autoUpdater.checkForUpdates().catch(() => undefined);
 };
 
-/** Checks for a new release now, for the menu. The sidebar shows what the check finds. */
-export const checkForUpdates = () => {
+/** Checks for a new release now, for the operator's check, and returns the state that it leaves. */
+export const checkForUpdates = async () => {
   if (state.status !== "off") {
-    check();
+    await check();
   }
+
+  return state;
 };
 
 /** Downloads the version that the last check found. The error event reports a failed download. */

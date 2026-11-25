@@ -15,7 +15,14 @@ import {
   ServerIcon,
   XIcon,
 } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useEffectEvent,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 
 import { client, useStore } from "@/client.ts";
 import { Button } from "@/components/ui/button";
@@ -30,8 +37,8 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
 
-/** How often a client asks the server again for the latest release. The server asks GitHub at most hourly. */
-const CHECK_INTERVAL_MS = 60 * 60_000;
+/** How often a client asks the server again for the latest release. The desktop app checks itself as often. */
+const CHECK_INTERVAL_MS = 15 * 60_000;
 
 /** How long the done pill stays before it goes. */
 const DONE_MS = 4000;
@@ -158,13 +165,13 @@ export function useUpdates() {
   const latest = info?.latest;
 
   /** Checks whether the app has something to show. An app that updates itself knows better than the server. */
-  const appHasUpdate = (found: UpdateInfo | undefined) =>
-    app.status === "off" ? hasAppUpdate(found) : app.status !== "current";
+  const appHasUpdate = (found: UpdateInfo | undefined, appState = app) =>
+    appState.status === "off" ? hasAppUpdate(found) : appState.status !== "current";
   const appUpdate = appHasUpdate(info);
 
   /**
-   * Asks for the latest release because the operator asked, so the pill shows the check. Without
-   * anything new, it says so for a moment. An update in progress keeps its own pill.
+   * Asks for the latest server and app releases because the operator asked, so the pill shows the
+   * check. Without anything new, it says so for a moment. An update in progress keeps its own pill.
    */
   const checkNow = async () => {
     if (phase.name !== "idle") {
@@ -172,18 +179,26 @@ export function useUpdates() {
     }
 
     setPhase({ name: "checking" });
-    const found = await client.getUpdateInfo().catch(() => undefined);
+    const [found, appState] = await Promise.all([
+      client.getUpdateInfo().catch(() => undefined),
+      window.clotsApp?.checkForUpdates?.().catch(() => undefined),
+    ]);
 
     if (found !== undefined) {
       setInfo(found);
     }
 
     setPhase(
-      found !== undefined && (found.serverUpdate || appHasUpdate(found))
+      found !== undefined && (found.serverUpdate || appHasUpdate(found, appState ?? app))
         ? { name: "idle" }
         : { name: "current" },
     );
   };
+
+  // Check for Updates in the app menu runs the same check as the search command.
+  const onMenuCheck = useEffectEvent(() => void checkNow());
+
+  useEffect(() => window.clotsApp?.onCheckForUpdates?.(onMenuCheck), []);
 
   const updateServer = async () => {
     if (latest === undefined) {

@@ -58,6 +58,10 @@ export interface DesktopAppBridge {
   updateState?(): Promise<AppUpdateState>;
   /** Calls `onState` on each change of the update state. Returns the call that stops it. */
   onUpdateState?(onState: (state: AppUpdateState) => void): () => void;
+  /** Asks GitHub for a new version now and returns the state that the check leaves. */
+  checkForUpdates?(): Promise<AppUpdateState>;
+  /** Calls `onCheck` when the operator picks Check for Updates in the app menu. Returns the call that stops it. */
+  onCheckForUpdates?(onCheck: () => void): () => void;
   /** Downloads the new version in the background. */
   downloadUpdate?(): Promise<void>;
   /** Quits the app, replaces it with the downloaded version, and opens it again. */
