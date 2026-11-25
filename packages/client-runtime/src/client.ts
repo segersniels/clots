@@ -32,6 +32,8 @@ export interface ClotsClient {
   readonly bots: Store<ReadonlyArray<BotSummary>>;
   readonly projects: Store<ReadonlyArray<Project>>;
   thread(botId: BotId): Store<ThreadState>;
+  /** Counts the operator as a viewer of the bot's conversation until the returned function runs. A viewed bot does not turn unread. */
+  viewBot(botId: BotId): () => void;
   schedules(botId: BotId): Store<ReadonlyArray<Schedule>>;
   skills(botId: BotId): Store<ReadonlyArray<Skill>>;
   /** Follows the skills that only this bot has, from its files. It holds `null` until the first list arrives. */
@@ -177,6 +179,19 @@ export const makeClotsClient = (origin: string): ClotsClient => {
       threads.set(botId, store);
 
       return store;
+    },
+
+    viewBot: (botId) => {
+      // A dropped connection ends the view, so the client views the bot again.
+      const fiber = runtime.runFork(
+        Effect.service(Rpc).pipe(
+          Effect.flatMap((rpc) => Stream.runDrain(rpc.ViewBot({ botId }))),
+          Effect.ignore,
+          Effect.repeat(RetrySchedule.spaced("1 second")),
+        ),
+      );
+
+      return () => void runtime.runFork(Fiber.interrupt(fiber));
     },
 
     schedules: (botId) => {

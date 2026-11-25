@@ -221,6 +221,8 @@ export class ClotsRpcs extends RpcGroup.make(
     error: BotNotFound,
     stream: true,
   }),
+  /** Counts the operator as a viewer of the bot's conversation while the stream is open. A bot turns unread only while nobody views it. */
+  Rpc.make("ViewBot", { payload: { botId: BotId }, error: BotNotFound, stream: true }),
   Rpc.make("SendMessage", {
     payload: { botId: BotId, text: Schema.String, attachments: Schema.Array(Upload) },
     error: BotNotFound,

@@ -261,9 +261,10 @@ export function Chat({
   /** Reports that the thread scrolled to `jumpTo`, so the page can forget it. */
   onJumped?: () => void;
 }) {
-  // The operator reads a bot only while its conversation is on screen. A hidden window lets go of the thread, so the bot can turn unread.
+  // The operator reads a bot only while its conversation is on screen. A hidden window stops the view, so the bot can turn unread.
   const visible = usePageVisible();
-  const thread = useStore(client.thread(botId), visible);
+  useEffect(() => (visible ? client.viewBot(botId) : undefined), [botId, visible]);
+  const thread = useStore(client.thread(botId));
   // After the app starts again, the thread shows its last messages from before, until the server sends the history.
   const [cached] = useState(() => (thread.synced ? null : readCachedThread(botId)));
   const messages = thread.synced || cached === null ? thread.messages : cached;

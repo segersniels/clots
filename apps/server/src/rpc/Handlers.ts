@@ -179,8 +179,6 @@ export const HandlersLayer = ClotsRpcs.toLayer(
         Stream.unwrap(
           Effect.gen(function* () {
             yield* requireBot(botId);
-            // The stream lives as long as the conversation is open, so the operator views the bot until it ends.
-            yield* sessions.view(botId);
 
             // Subscribe before the replay, so that no event falls between the replay and the live part.
             const subscription = yield* PubSub.subscribe(sessions.events(botId));
@@ -195,6 +193,17 @@ export const HandlersLayer = ClotsRpcs.toLayer(
                 ),
               ),
             );
+          }),
+        ),
+
+      // The stream sends nothing. It lives as long as the conversation is on screen, so the operator views the bot until it ends.
+      ViewBot: ({ botId }) =>
+        Stream.unwrap(
+          Effect.gen(function* () {
+            yield* requireBot(botId);
+            yield* sessions.view(botId);
+
+            return Stream.never;
           }),
         ),
 
