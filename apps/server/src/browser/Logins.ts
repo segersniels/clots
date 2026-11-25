@@ -257,7 +257,7 @@ export const copyLogin = async (source: BotChrome, target: BotChrome, url: strin
   } finally {
     from.close();
     to.close();
-    if (!sourceRan) await closeChrome(source.port);
+    if (!sourceRan) await closeChrome(source.port, source.profile);
   }
 };
 

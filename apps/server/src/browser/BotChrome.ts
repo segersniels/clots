@@ -32,12 +32,37 @@ export const isRunning = async (port: number) => {
 };
 
 /**
+ * Checks whether the Chrome on a DevTools port runs the given profile. Another clots server, such as
+ * a test server, can give the same port to one of its own bots.
+ */
+const runsProfile = async (port: number, profile: string) => {
+  const version = (await (await fetch(`http://127.0.0.1:${port}/json/version`)).json()) as { webSocketDebuggerUrl: string };
+  const socket = new WebSocket(version.webSocketDebuggerUrl);
+  const reply = await new Promise<{ result?: { processInfo: ReadonlyArray<{ type: string; id: number }> } }>((resolve, reject) => {
+    socket.onopen = () => socket.send(JSON.stringify({ id: 1, method: "SystemInfo.getProcessInfo" }));
+    socket.onmessage = ({ data }) => resolve(JSON.parse(String(data)));
+    socket.onerror = () => reject(new Error(`No DevTools connection on port ${port}.`));
+  }).finally(() => socket.close());
+  const browser = reply.result?.processInfo.find((process) => process.type === "browser");
+
+  if (browser === undefined) return false;
+
+  const commandLine = Bun.spawnSync(["ps", "-ww", "-o", "args=", "-p", String(browser.id)]).stdout.toString();
+
+  return commandLine.includes(`--user-data-dir=${profile}`);
+};
+
+/**
  * Starts the bot's Chrome when it does not run yet. It runs headless, because the server has no
  * screen, and clots starts it without the automation switch that agent-browser sets, so sites see a
  * normal browser. It runs apart from the server, so a server restart keeps the bot's open pages.
  */
 export const ensureChrome = async ({ executable, port, profile, userAgent }: BotChrome) => {
-  if (await isRunning(port)) return;
+  if (await isRunning(port)) {
+    if (await runsProfile(port, profile)) return;
+
+    throw new Error(`Port ${port} has the Chrome of another profile, so the bot does not use it.`);
+  }
 
   const chrome = spawn(
     executable,
@@ -74,13 +99,13 @@ export const ensureChrome = async ({ executable, port, profile, userAgent }: Bot
   throw new Error(`The bot's Chrome did not start on port ${port}.`);
 };
 
-/** Closes the bot's Chrome, if it runs. */
-export const closeChrome = async (port: number) => {
+/** Closes the bot's Chrome, if it runs. A Chrome of another profile on the port stays open. */
+export const closeChrome = async (port: number, profile: string) => {
   const version = await fetch(`http://127.0.0.1:${port}/json/version`)
     .then((response) => response.json() as Promise<{ webSocketDebuggerUrl: string }>)
     .catch(() => undefined);
 
-  if (version === undefined) return;
+  if (version === undefined || !(await runsProfile(port, profile))) return;
 
   await new Promise<void>((resolve) => {
     const socket = new WebSocket(version.webSocketDebuggerUrl);

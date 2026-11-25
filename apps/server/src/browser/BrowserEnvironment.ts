@@ -129,7 +129,7 @@ export const closeBrowser = (bot: StoredBot) =>
       stderr: "ignore",
     });
     await detaching.exited;
-    await closeChrome(devToolsPort(bot));
+    await closeChrome(devToolsPort(bot), browserProfile(bot));
   }).pipe(Effect.timeout("15 seconds"), Effect.ignore);
 
 /** Builds the agent-browser arguments of a take-over action. The tab actions are operations of its `tab` command. */
