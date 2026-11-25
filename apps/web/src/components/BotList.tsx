@@ -25,7 +25,13 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Link, useParams } from "@tanstack/react-router";
-import { ChevronDownIcon, PencilLineIcon, PlusIcon, SearchIcon } from "lucide-react";
+import {
+  ChevronDownIcon,
+  LoaderCircleIcon,
+  PencilLineIcon,
+  PlusIcon,
+  SearchIcon,
+} from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -234,6 +240,8 @@ function BotRow({ bot }: { bot: BotSummary }) {
   // A bot that needs the operator keeps its status line. The open bot already shows its draft in the composer.
   const showDraft = hasContent(draft) && bot.id !== openBotId && bot.status !== "waiting";
   const dotShown = bot.status === "waiting" || bot.unread;
+  // A bot that waits or is unread needs the operator more than a working bot, so the dot wins.
+  const spinnerShown = bot.status === "working" && !dotShown;
   // An idle bot with an unread reply calls the operator, as a bot that waits for an answer does.
   const mood = bot.status === "idle" && bot.unread ? "waiting" : bot.status;
 
@@ -318,14 +326,19 @@ function BotRow({ bot }: { bot: BotSummary }) {
                 </span>
               </span>
             </span>
-            {/* The dot marks a bot that waits for the operator, or that is unread. Its place opens and closes, so the status line does not jump. */}
+            {/* The dot marks a bot that waits for the operator or is unread, the spinner a working bot. Their place opens and closes, so the status line does not jump. */}
             <span
               aria-hidden
-              className={`flex shrink-0 justify-end overflow-hidden transition-[width] duration-200 ease-out ${dotShown ? "w-4" : "w-0"}`}
+              className={`grid shrink-0 items-center justify-items-end overflow-hidden transition-[width] duration-200 ease-out ${dotShown || spinnerShown ? "w-4" : "w-0"}`}
             >
               <span
-                className={`size-2 shrink-0 rounded-full bg-attention transition-[scale,opacity] duration-200 ease-out motion-reduce:scale-100 ${
+                className={`col-start-1 row-start-1 size-2 shrink-0 rounded-full bg-attention transition-[scale,opacity] duration-200 ease-out motion-reduce:scale-100 ${
                   dotShown ? "scale-100 opacity-100" : "scale-50 opacity-0"
+                }`}
+              />
+              <LoaderCircleIcon
+                className={`col-start-1 row-start-1 size-3 shrink-0 animate-spin text-foreground transition-[scale,opacity] duration-200 ease-out motion-reduce:animate-none motion-reduce:scale-100 ${
+                  spinnerShown ? "scale-100 opacity-100" : "scale-50 opacity-0"
                 }`}
               />
             </span>
