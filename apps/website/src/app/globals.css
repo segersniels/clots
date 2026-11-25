@@ -1,0 +1,78 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* The site follows the system theme. The app switches with a class instead. */
+@custom-variant dark (@media (prefers-color-scheme: dark));
+
+/* The tokens of the app in apps/web/src/styles.css, limited to what the page uses. */
+:root {
+  --background: #fbfbfb;
+  --foreground: #111111;
+  --primary: #111111;
+  --primary-foreground: #fbfbfb;
+  --muted: #ebebeb;
+  --muted-foreground: #7c7c80;
+  --border: #e4e4e4;
+  --ring: #a3a3a8;
+  --radius: 0.625rem;
+  --attention: #2f7cf6;
+  --grid: rgb(0 0 0 / 0.035);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #111112;
+    --foreground: #f4f4f5;
+    --primary: #f4f4f5;
+    --primary-foreground: #111112;
+    --muted: #262628;
+    --muted-foreground: #8e8e94;
+    --border: #232325;
+    --ring: #6b6b70;
+    --attention: #5b9bff;
+    --grid: rgb(255 255 255 / 0.035);
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --font-sans: var(--font-allo), ui-sans-serif, system-ui, sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+  --color-attention: var(--attention);
+  --radius-lg: var(--radius);
+  --animate-float: float 7s ease-in-out infinite;
+}
+
+/* A clot drifts up and tilts a little, then back. Each one starts at another point of the loop. */
+@keyframes float {
+  50% {
+    transform: translateY(-10px) rotate(var(--tilt));
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+    /* Allo's roundness axis runs from 0 (sharp) to 100 (round). Its default of 50 looks square at text sizes. */
+    font-variation-settings: "ROND" 100;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 64px 64px;
+    background-position: center;
+  }
+}
