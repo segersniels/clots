@@ -85,9 +85,10 @@ A bot that waits for you shows "Needs you" and a blue dot in the sidebar.
 
 The details pane on the right shows the bot's browser live, when the bot has one open. Use the monitor icon in the chat header to open or close the pane.
 
-- Click the screen to **take over**. Your mouse and keyboard then go to the page. The paste shortcut types your own clipboard into the page.
+- Click the screen to **take over**. The bot's browser opens in a window, and your mouse and keyboard go to the page. The paste shortcut types your own clipboard into the page.
+- The window has the bot's tabs, with **+** to open a tab and **×** to close one. The address bar opens what you type, and the buttons next to it go back, go forward, stop or reload the page. You can also copy the link, or open the page in your own browser.
 - Click **Give back** to return control.
-- Click **Stop** to close the bot's browser.
+- Click **Stop** on the card to close the bot's browser.
 - When a page needs you (a login, a captcha, a payment), the bot asks for a handoff in the thread. Take over, do the step, and click **I am done**.
 
 Each bot has its own browser profile, so its logins stay.
