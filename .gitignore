@@ -18,3 +18,4 @@ apps/desktop/resources/setup
 
 # Git worktrees for parallel work. Each one is a full checkout.
 .worktrees/
+.vercel
