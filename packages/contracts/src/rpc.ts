@@ -12,6 +12,7 @@ import {
   LoginDecision,
   LoginSource,
   Project,
+  RoutinePlace,
   Schedule,
   Skill,
   ThreadEvent,
@@ -46,9 +47,10 @@ export class TooManyClones extends Schema.TaggedError<TooManyClones>()("TooManyC
   max: Schema.Number,
 }) {}
 
-/** Where a routine runs: in the bot's own conversation, or in a clone of the bot that shows under it. */
-export const RoutinePlace = Schema.Literals(["here", "clone"]);
-export type RoutinePlace = typeof RoutinePlace.Type;
+/** A clone mirrors its parent, so its instructions, skills and routines cannot change. */
+export class CloneIsReadOnly extends Schema.TaggedError<CloneIsReadOnly>()("CloneIsReadOnly", {
+  botId: BotId,
+}) {}
 
 /** A copy of a login between two bot browsers failed. The message says why, for the operator. */
 export class LoginCopyFailed extends Schema.TaggedError<LoginCopyFailed>()("LoginCopyFailed", {
@@ -163,7 +165,7 @@ export class ClotsRpcs extends RpcGroup.make(
       color: Schema.optional(BotColor),
       shape: Schema.optional(BotShape),
     },
-    error: BotNotFound,
+    error: Schema.Union([BotNotFound, CloneIsReadOnly]),
   }),
 
   /** Closes the bot's browser. Its logins stay in the profile, and the bot opens the browser again when it needs it. */
@@ -212,7 +214,7 @@ export class ClotsRpcs extends RpcGroup.make(
   /** Changes the model of a bot. A running session switches at once. */
   Rpc.make("SetBotModel", {
     payload: { botId: BotId, model: BotModel },
-    error: BotNotFound,
+    error: Schema.Union([BotNotFound, CloneIsReadOnly]),
   }),
 
   Rpc.make("WatchProjects", { success: Schema.Array(Project), stream: true }),
@@ -276,11 +278,11 @@ export class ClotsRpcs extends RpcGroup.make(
   /** Adds or changes one of the bot's own skills. With `previousName`, the skill had that name before. */
   Rpc.make("SaveBotSkill", {
     payload: { botId: BotId, skill: BotSkill, previousName: Schema.optional(Schema.String) },
-    error: Schema.Union([BotNotFound, InvalidSkill]),
+    error: Schema.Union([BotNotFound, InvalidSkill, CloneIsReadOnly]),
   }),
   Rpc.make("DeleteBotSkill", {
     payload: { botId: BotId, name: Schema.String },
-    error: Schema.Union([BotNotFound, InvalidSkill]),
+    error: Schema.Union([BotNotFound, InvalidSkill, CloneIsReadOnly]),
   }),
   Rpc.make("WatchSchedules", {
     payload: { botId: BotId },
@@ -290,7 +292,7 @@ export class ClotsRpcs extends RpcGroup.make(
   Rpc.make("CreateSchedule", {
     payload: { botId: BotId, cron: Schema.String, prompt: Schema.String, place: RoutinePlace },
     success: Schedule,
-    error: Schema.Union([BotNotFound, InvalidCron, TooManyClones]),
+    error: Schema.Union([BotNotFound, InvalidCron, TooManyClones, CloneIsReadOnly]),
   }),
   /** Changes the schedule and the prompt of a routine. The next run follows from the new schedule. */
   Rpc.make("UpdateSchedule", {

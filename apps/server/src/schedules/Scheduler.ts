@@ -4,7 +4,7 @@ import { BotRepository } from "../bots/BotRepository.ts";
 import { BotSessions } from "../bots/BotSessions.ts";
 import { nextRunAt, ScheduleRepository } from "./ScheduleRepository.ts";
 
-/** Sends the prompt of each due schedule to its bot, then moves the schedule to its next run. */
+/** Sends the prompt of each due schedule to the bot that runs it, then moves the schedule to its next run. */
 const runDueSchedules = Effect.gen(function* () {
   const schedules = yield* ScheduleRepository;
   const bots = yield* BotRepository;
@@ -30,7 +30,7 @@ const runDueSchedules = Effect.gen(function* () {
       continue;
     }
 
-    yield* sessions.send(bot, "routine", schedule.prompt);
+    yield* sessions.runRoutine(bot, schedule);
   }
 });
 

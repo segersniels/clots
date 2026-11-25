@@ -132,8 +132,8 @@ function RoutineForm({
     schedule === undefined || prompt.trim() !== schedule.prompt || cron !== schedule.cron;
   const canSave =
     prompt.trim() !== "" && cron !== "" && changed && !invalidCron && !tooManyClones && !saving;
-  // A routine keeps its thread, and a clone cannot make clones, so only a new routine of an operator's bot can choose.
-  const canChoosePlace = schedule === undefined && bot.clonedFrom === null;
+  // A routine keeps its thread, so only a new routine can choose.
+  const canChoosePlace = schedule === undefined;
   const places = [
     { value: "here", label: "This conversation", icon: MessageSquareIcon },
     { value: "clone", label: `A clone of ${bot.name}`, icon: CopyIcon },
@@ -283,18 +283,21 @@ function RoutineForm({
 
 /**
  * One routine as a filled row. It opens on mount, so a new routine eases in, and it closes before
- * the server deletes it. A click opens the editor.
+ * the server deletes it. A click opens the editor. In a clone, the row only shows the routine, because
+ * the bot that the clone mirrors owns it.
  */
 function RoutineRow({
   schedule,
   known,
   removing,
+  readOnly,
   onEdit,
   onRemove,
 }: {
   schedule: Schedule;
   known: KnownNames;
   removing: boolean;
+  readOnly: boolean;
   onEdit: () => void;
   onRemove: () => void;
 }) {
@@ -313,7 +316,37 @@ function RoutineRow({
   const when = schedule.paused
     ? `Paused · ${rule.charAt(0).toUpperCase()}${rule.slice(1)}`
     : `${formatNextDay(schedule.nextRunAt)}, ${formatClock(schedule.nextRunAt)} · ${rule}`;
-  const Icon = schedule.paused ? CirclePauseIcon : ClockIcon;
+  // The clone's own pane shows only this routine, so it needs no sign of where the routine runs.
+  const PlaceIcon = schedule.place === "clone" && !readOnly ? CopyIcon : ClockIcon;
+  const Icon = schedule.paused ? CirclePauseIcon : PlaceIcon;
+  const content = (
+    <>
+      <Icon
+        className={`row-span-2 size-[17px] text-muted-foreground transition-opacity ${schedule.paused ? "opacity-50" : ""}`}
+      />
+      <span
+        title={schedule.prompt}
+        className={`col-start-2 truncate transition-opacity ${schedule.paused ? "opacity-50" : ""}`}
+      >
+        <ReferenceText text={schedule.prompt} known={known} bots={bots} />
+      </span>
+      <span className="col-start-2 row-start-2 truncate text-[0.8125rem] text-muted-foreground tabular-nums">
+        {when}
+      </span>
+    </>
+  );
+
+  if (readOnly) {
+    return (
+      <Collapse open={shown && !removing}>
+        <div className="pb-1">
+          <div className="grid grid-cols-[18px_minmax(0,1fr)] items-center gap-x-2.5 gap-y-px rounded-xl bg-muted/60 py-2 pr-2.5 pl-2.5">
+            {content}
+          </div>
+        </div>
+      </Collapse>
+    );
+  }
 
   return (
     <Collapse open={shown && !removing}>
@@ -324,18 +357,7 @@ function RoutineRow({
             onClick={onEdit}
             className="grid grid-cols-[18px_minmax(0,1fr)] items-center gap-x-2.5 gap-y-px rounded-xl py-2 pl-2.5 text-left outline-none focus-visible:ring-1 focus-visible:ring-ring/40"
           >
-            <Icon
-              className={`row-span-2 size-[17px] text-muted-foreground transition-opacity ${schedule.paused ? "opacity-50" : ""}`}
-            />
-            <span
-              title={schedule.prompt}
-              className={`col-start-2 truncate transition-opacity ${schedule.paused ? "opacity-50" : ""}`}
-            >
-              <ReferenceText text={schedule.prompt} known={known} bots={bots} />
-            </span>
-            <span className="col-start-2 row-start-2 truncate text-[0.8125rem] text-muted-foreground tabular-nums">
-              {when}
-            </span>
+            {content}
           </button>
           <DropdownMenu>
             <DropdownMenuTrigger
@@ -374,7 +396,10 @@ function RoutineRow({
   );
 }
 
-/** Lists the routines of a bot. The editor opens in a dialog, as the editor of a skill does. */
+/**
+ * Lists the routines of a bot. The editor opens in a dialog, as the editor of a skill does. A clone
+ * only shows the routine that it runs, and hides the section when it runs none.
+ */
 export function Routines({ bot }: { bot: BotSummary }) {
   const schedules = useStore(client.schedules(bot.id));
   const skills = useStore(client.skills(bot.id));
@@ -389,6 +414,9 @@ export function Routines({ bot }: { bot: BotSummary }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [removing, setRemoving] = useState<ReadonlySet<string>>(new Set());
   const [confirmingDelete, setConfirmingDelete] = useState<Schedule | null>(null);
+  const isClone = bot.clonedFrom !== null;
+  // The clone that runs the routine goes with it, so the confirmation names it.
+  const runnerName = bots.find((other) => other.id === confirmingDelete?.runnerId)?.name;
 
   const openEditor = (schedule: Schedule | undefined) => {
     setEditing({ schedule, round: (editing?.round ?? 0) + 1 });
@@ -409,19 +437,25 @@ export function Routines({ bot }: { bot: BotSummary }) {
     }, CLOSE_MS);
   };
 
+  if (isClone && schedules.length === 0) {
+    return null;
+  }
+
   return (
     <section className="flex flex-col gap-1">
       <div className="flex h-7 items-center justify-between">
         <h2 className={PANE_LABEL}>Routines</h2>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label="New routine"
-          className="text-muted-foreground"
-          onClick={() => openEditor(undefined)}
-        >
-          <PlusIcon />
-        </Button>
+        {!isClone && (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="New routine"
+            className="text-muted-foreground"
+            onClick={() => openEditor(undefined)}
+          >
+            <PlusIcon />
+          </Button>
+        )}
       </div>
 
       {schedules.length === 0 && <p className={PANE_EMPTY}>No routines yet.</p>}
@@ -434,6 +468,7 @@ export function Routines({ bot }: { bot: BotSummary }) {
               schedule={schedule}
               known={known}
               removing={removing.has(schedule.id)}
+              readOnly={isClone}
               onEdit={() => openEditor(schedule)}
               onRemove={() => setConfirmingDelete(schedule)}
             />
@@ -466,7 +501,9 @@ export function Routines({ bot }: { bot: BotSummary }) {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this routine?</AlertDialogTitle>
             <AlertDialogDescription>
-              {bot.name} stops running it. You cannot undo this.
+              {runnerName === undefined
+                ? `${bot.name} stops running it. You cannot undo this.`
+                : `${bot.name} stops running it, and ${runnerName} is deleted with it. You cannot undo this.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

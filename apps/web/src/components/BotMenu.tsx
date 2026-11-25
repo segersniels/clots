@@ -59,6 +59,9 @@ export function BotMenu({
   const navigate = useNavigate();
   const openBotId = useParams({ strict: false }).botId;
   const projects = useStore(client.projects);
+  const bots = useStore(client.bots);
+  // A clone mirrors its bot, so the server deletes the clones with it.
+  const cloneCount = bots.filter((other) => other.clonedFrom === bot.id).length;
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   // A bot without messages has nothing to compact.
@@ -137,7 +140,11 @@ export function BotMenu({
       <AlertDialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
         <AlertDialogContent size="sm">
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete {bot.name}?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {cloneCount === 0
+                ? `Delete ${bot.name}?`
+                : `Delete ${bot.name} and its ${cloneCount === 1 ? "clone" : `${cloneCount} clones`}?`}
+            </AlertDialogTitle>
             <AlertDialogDescription>
               This deletes the thread, the routines and the notes of the bot. You cannot undo this.
             </AlertDialogDescription>

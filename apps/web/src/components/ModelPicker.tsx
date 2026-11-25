@@ -11,8 +11,20 @@ import {
 
 import { client } from "../client.ts";
 
-/** Lets the operator change the model of a bot, for example a faster one for simple tasks. Every model is a Claude model, so the pill in the pane header names only the model. */
+/**
+ * Lets the operator change the model of a bot, for example a faster one for simple tasks. Every model
+ * is a Claude model, so the pill in the pane header names only the model. A clone has the model of the
+ * bot that it mirrors, so its pill only shows it.
+ */
 export function ModelSelect({ bot }: { bot: BotSummary }) {
+  if (bot.clonedFrom !== null) {
+    return (
+      <span className="inline-flex h-[30px] items-center rounded-[10px] bg-secondary px-2.5 text-sm font-medium text-secondary-foreground capitalize">
+        {bot.model}
+      </span>
+    );
+  }
+
   return (
     <Select
       value={bot.model}

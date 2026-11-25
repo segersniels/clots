@@ -27,11 +27,15 @@ const OWN_DESCRIPTION_PREFIX = `(${PLUGIN_NAME}) `;
 /** Matches the source that Claude Code puts after a skill's description, such as " (user)". The picker shows the description only. */
 const SOURCE_SUFFIX = / \((?:user|project|claude\.ai sync)\)$/;
 
-/** Finds the plugin folder in a bot's notes directory. It holds the skills that only this bot loads. */
-const pluginFolder = (workingDirectory: string) => join(workingDirectory, "plugin");
+/**
+ * Finds the plugin folder in a bot's notes directory. It holds the skills that only this bot loads. A
+ * clone uses the folder of the bot that it mirrors, so it always has the same skills.
+ */
+const pluginFolder = (bot: StoredBot) =>
+  join(bot.parentDirectory ?? bot.workingDirectory, "plugin");
 
 /** Finds the folder that holds one folder per skill of the bot. */
-const skillsFolder = (bot: StoredBot) => join(pluginFolder(bot.workingDirectory), "skills");
+const skillsFolder = (bot: StoredBot) => join(pluginFolder(bot), "skills");
 
 /** Matches a skill name that is also a safe folder name, such as `launch-posts`: no path parts, no spaces, no capitals. */
 const SKILL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -72,7 +76,7 @@ const otherFields = (frontmatter: string) => {
 
 /** Writes the plugin manifest when the bot has none yet, such as when the bot wrote its first skill itself. Claude Code names the skills after it. */
 export const ensurePluginManifest = (bot: StoredBot) => {
-  const folder = join(pluginFolder(bot.workingDirectory), ".claude-plugin");
+  const folder = join(pluginFolder(bot), ".claude-plugin");
 
   if (existsSync(join(folder, "plugin.json"))) {
     return;
@@ -215,7 +219,7 @@ export const botSkillsSignature = (bot: StoredBot) =>
 
 /** Lists the plugin of a bot for Claude Code, or none when the bot has no skills of its own. Other bots never get it. */
 export const botPlugins = (bot: StoredBot) => {
-  const folder = pluginFolder(bot.workingDirectory);
+  const folder = pluginFolder(bot);
 
   return existsSync(folder) ? [{ type: "local" as const, path: folder }] : [];
 };
@@ -264,13 +268,13 @@ const SKILL_REFERENCE = /(^|\s)\/([a-zA-Z0-9](?:[\w:.-]*\w)?)/g;
  * keeps the bare name that the operator sees, and only the prompt gets the full one.
  */
 export const toOwnSkills = (bot: StoredBot, text: string) => {
-  const skillsFolder = join(pluginFolder(bot.workingDirectory), "skills");
+  const folder = skillsFolder(bot);
 
-  if (!existsSync(skillsFolder)) {
+  if (!existsSync(folder)) {
     return text;
   }
 
-  const own = new Set(readdirSync(skillsFolder));
+  const own = new Set(readdirSync(folder));
 
   return text.replace(SKILL_REFERENCE, (reference, before: string, name: string) =>
     own.has(name) ? `${before}/${OWN_PREFIX}${name}` : reference,

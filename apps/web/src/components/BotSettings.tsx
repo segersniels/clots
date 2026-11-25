@@ -22,7 +22,10 @@ export const PANE_EMPTY = "px-1 text-sm text-muted-foreground";
 /** Caps the picker of a pane field at about six rows, so it covers at most the row above and never its label. */
 export const CHIP_PICKER_CLASSES = "max-h-[13.5rem]";
 
-/** Shows the character and the name of a bot. A click on either one edits it. */
+/**
+ * Shows the character and the name of a bot. A click on either one edits it. A clone has the look of
+ * the bot that it mirrors, so only its name is editable.
+ */
 export function BotIdentity({ bot }: { bot: BotSummary }) {
   const [name, setName] = useState(bot.name);
 
@@ -39,24 +42,29 @@ export function BotIdentity({ bot }: { bot: BotSummary }) {
     }
   };
 
+  const character = <Character shape={bot.shape} color={bot.color} mood={bot.status} size={64} />;
+
   return (
     <section className="flex flex-col items-center gap-1.5">
-      <Popover>
-        <PopoverTrigger
-          aria-label="Edit character"
-          className="rounded-2xl p-2 outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
-        >
-          <Character shape={bot.shape} color={bot.color} mood={bot.status} size={64} />
-        </PopoverTrigger>
-        <PopoverContent className="w-80 p-4">
-          <CharacterPicker
-            color={bot.color}
-            shape={bot.shape}
-            onColorChange={(color) => client.updateBot(bot.id, { color })}
-            onShapeChange={(shape) => client.updateBot(bot.id, { shape })}
-          />
-        </PopoverContent>
-      </Popover>
+      {bot.clonedFrom !== null && <div className="p-2">{character}</div>}
+      {bot.clonedFrom === null && (
+        <Popover>
+          <PopoverTrigger
+            aria-label="Edit character"
+            className="rounded-2xl p-2 outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            {character}
+          </PopoverTrigger>
+          <PopoverContent className="w-80 p-4">
+            <CharacterPicker
+              color={bot.color}
+              shape={bot.shape}
+              onColorChange={(color) => client.updateBot(bot.id, { color })}
+              onShapeChange={(shape) => client.updateBot(bot.id, { shape })}
+            />
+          </PopoverContent>
+        </Popover>
+      )}
 
       <Input
         value={name}
@@ -79,7 +87,11 @@ const instructionFlashes = new Map<BotId, () => void>();
 /** Makes the instructions field of the bot, if the details pane shows it, light up once. */
 export const flashInstructions = (botId: BotId) => instructionFlashes.get(botId)?.();
 
-/** Lets the operator edit the instructions of a bot. The bot reads them when its next session starts. */
+/**
+ * Lets the operator edit the instructions of a bot. The bot reads them when its next session starts.
+ * A clone shows the instructions of the bot that it mirrors as text, and hides the section when
+ * there are none.
+ */
 export function BotInstructions({ bot }: { bot: BotSummary }) {
   const [instructions, setInstructions] = useState(bot.instructions);
   const [flashing, setFlashing] = useState(false);
@@ -115,6 +127,22 @@ export function BotInstructions({ bot }: { bot: BotSummary }) {
 
     return () => clearTimeout(timer);
   }, [flashing]);
+
+  if (bot.clonedFrom !== null) {
+    if (bot.instructions.trim() === "") {
+      return null;
+    }
+
+    return (
+      <section className="flex flex-col gap-1">
+        <h2 className={PANE_LABEL}>Instructions</h2>
+        {/* The block matches the field of a bot that is no clone, so the text lines up when the operator switches between them. */}
+        <p className="rounded-xl bg-muted/60 px-2.5 py-1.5 text-sm wrap-break-word whitespace-pre-wrap">
+          {bot.instructions}
+        </p>
+      </section>
+    );
+  }
 
   return (
     <section className="flex flex-col gap-1">

@@ -58,8 +58,10 @@ export function EmptyThread({
   focusOnOpen: boolean;
   onDone: () => void;
 }) {
+  // A clone has the instructions of the bot that it mirrors, so it never asks for its own.
+  const isClone = bot.clonedFrom !== null;
   const [step, setStep] = useState<Step>(() => {
-    if (bot.instructions.trim() !== "") {
+    if (isClone || bot.instructions.trim() !== "") {
       return "saved";
     }
 
@@ -213,7 +215,7 @@ export function EmptyThread({
           Send {bot.name} its first message.
         </p>
 
-        <Collapse open={step === "saved"}>
+        <Collapse open={step === "saved" && !isClone}>
           <div className="mt-[18px] flex w-full gap-3 rounded-2xl bg-muted px-3.5 py-3 text-left">
             <div className="min-w-0 flex-1">
               <p className="mb-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">

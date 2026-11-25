@@ -30,7 +30,13 @@ import type {
   TraceStep,
   Upload,
 } from "@clots/contracts";
-import { InvalidCron, LoginCopyFailed, MAX_UPLOAD_BYTES, TooManyClones } from "@clots/contracts";
+import {
+  CloneIsReadOnly,
+  InvalidCron,
+  LoginCopyFailed,
+  MAX_UPLOAD_BYTES,
+  TooManyClones,
+} from "@clots/contracts";
 import { Cause, Context, Deferred, Effect, Layer, PubSub, Queue, Scope, Stream } from "effect";
 import { spawn } from "node:child_process";
 import { copyFileSync, mkdirSync, statSync, writeFileSync } from "node:fs";
@@ -260,10 +266,15 @@ const systemPromptFor = (bot: StoredBot) =>
     "You have a browser: use the `agent-browser` CLI through Bash. Run `agent-browser skills get core` before the first use.",
     "Your browser session and profile are already set in the environment. Do not pass `--session` or `--profile`, or the operator cannot see your browser.",
     `When a page needs the operator (a login, a captcha, a payment), call the ${HANDOFF_TOOL} tool and wait.`,
+    bot.parentName === null
+      ? ""
+      : `You are a clone of @${bot.parentName}: you have its instructions and its skills, and they stay the same as its own. You cannot change them or make routines. When a task needs to know what @${bot.parentName} did, read its notes directory ${bot.parentDirectory} and its thread with read_bot_thread.`,
     // Only a bot with its own skills gets the line, so the prompt of every other bot stays the same.
     ...(botPlugins(bot).length === 0 ? [] : [OWN_SKILLS_NOTE]),
     bot.instructions.trim() === "" ? "" : `# Instructions\n\n${bot.instructions}`,
-  ].join("\n\n");
+  ]
+    .filter((part) => part !== "")
+    .join("\n\n");
 
 const textOf = (blocks: ReadonlyArray<{ type: string; text?: string }>) =>
   blocks
@@ -299,12 +310,19 @@ export class BotSessions extends Context.Service<
     deleteBot(bot: StoredBot): Effect.Effect<void>;
     /**
      * Makes a routine of a bot. With "clone", a clone of the bot runs it in its own thread, under the
-     * bot. A clone cannot make clones, so its routines run in its own conversation.
+     * bot. A clone has no routines of its own.
      */
     createRoutine(
       bot: StoredBot,
       routine: { cron: string; prompt: string; place: RoutinePlace; title?: string },
-    ): Effect.Effect<{ routine: Schedule; thread: StoredBot }, InvalidCron | TooManyClones>;
+    ): Effect.Effect<
+      { routine: Schedule; thread: StoredBot },
+      InvalidCron | TooManyClones | CloneIsReadOnly
+    >;
+    /** Sends a routine's prompt to the bot that runs it. A routine whose clone is gone gets a new clone. */
+    runRoutine(owner: StoredBot, routine: Schedule): Effect.Effect<void>;
+    /** Deletes a routine, and the clone that runs it. */
+    deleteRoutine(routine: Schedule): Effect.Effect<void>;
     /** Marks in the thread that the operator renamed the bot or changed its instructions. Other changes add nothing. */
     noteSettingsChange(bot: StoredBot, changes: BotChanges): Effect.Effect<void>;
     /** Switches the model of a running session. A bot without a session reads its model at the next start. */
@@ -495,13 +513,28 @@ export class BotSessions extends Context.Service<
           ),
         );
 
-      /** Lists the bots whose routines belong to `self`: itself and its clones, which run routines in their own threads. */
-      const ownRoutineBots = (self: StoredBot) =>
-        repository.list.pipe(
-          Effect.map((bots) =>
-            bots.filter((bot) => bot.id === self.id || bot.clonedFrom === self.id),
-          ),
-        );
+      /** Counts the clones that a bot made, which it reports to and deletes. */
+      const clonesMadeBy = (bots: ReadonlyArray<StoredBot>, self: StoredBot) =>
+        bots.filter((bot) => bot.orchestratedBy === self.id).length;
+
+      /** Makes a clone of a bot that runs one of its routines. It mirrors the bot and shows under it. */
+      const makeRunner = (owner: StoredBot, title: string) =>
+        Effect.gen(function* () {
+          const runner = yield* repository.create({
+            name: uniqueName(title, yield* repository.list),
+            instructions: "",
+            color: owner.color,
+            shape: owner.shape,
+            model: owner.model,
+            projectId: owner.projectId,
+            clonedFrom: owner.id,
+            orchestratedBy: owner.id,
+          });
+          // The bot list shows the routine's thread.
+          yield* PubSub.publish(statusChanges, undefined);
+
+          return runner;
+        });
 
       const createRoutine = (
         self: StoredBot,
@@ -518,37 +551,57 @@ export class BotSessions extends Context.Service<
             return yield* new InvalidCron({ cron });
           }
 
-          if (place === "here" || self.clonedFrom !== null) {
+          // The bot that a clone mirrors owns all routines.
+          if (self.clonedFrom !== null) {
+            return yield* new CloneIsReadOnly({ botId: self.id });
+          }
+
+          if (place === "here") {
             const routine = yield* schedules.create(self.id, cron, prompt, next);
 
             return { routine, thread: self };
           }
 
-          const bots = yield* repository.list;
-          if (bots.filter((bot) => bot.clonedFrom === self.id).length >= MAX_CLONES) {
+          if (clonesMadeBy(yield* repository.list, self) >= MAX_CLONES) {
             return yield* new TooManyClones({ max: MAX_CLONES });
           }
 
-          const thread = yield* repository.create({
-            name: uniqueName(title, bots),
-            instructions: [
-              self.instructions,
-              `You run the clots routine "${title}" for @${self.name}. Each run arrives as a message in this thread, and the operator reads your result here.`,
-              `When a run needs to know what @${self.name} did, read its notes directory ${self.workingDirectory} and its thread with read_bot_thread.`,
-            ]
-              .filter((part) => part.trim() !== "")
-              .join("\n\n"),
-            color: self.color,
-            shape: self.shape,
-            model: self.model,
-            projectId: self.projectId,
-            clonedFrom: self.id,
-          });
-          const routine = yield* schedules.create(thread.id, cron, prompt, next);
-          // The bot list shows the routine's thread.
-          yield* PubSub.publish(statusChanges, undefined);
+          const thread = yield* makeRunner(self, title);
+          const routine = yield* schedules.create(self.id, cron, prompt, next, thread.id);
 
           return { routine, thread };
+        });
+
+      const runRoutine = (owner: StoredBot, routine: Schedule) =>
+        Effect.gen(function* () {
+          if (routine.place === "here") {
+            return yield* send(owner, "routine", routine.prompt);
+          }
+
+          const current =
+            routine.runnerId === null ? undefined : yield* repository.find(routine.runnerId);
+
+          // The operator may have deleted the clone. The routine still belongs to its owner, so a new clone runs it.
+          let runner = current;
+          if (runner?.clonedFrom !== owner.id) {
+            runner = yield* makeRunner(owner, `${owner.name} routine`);
+            yield* schedules.setRunner(routine.id, runner.id);
+          }
+
+          yield* send(runner, "routine", routine.prompt);
+        });
+
+      const deleteRoutine = (routine: Schedule) =>
+        Effect.gen(function* () {
+          yield* schedules.remove(routine.id);
+
+          // The clone exists only for the routine's runs, so it goes with the routine.
+          const runner =
+            routine.runnerId === null ? undefined : yield* repository.find(routine.runnerId);
+
+          if (runner !== undefined) {
+            yield* deleteBot(runner);
+          }
         });
 
       /** Lists the bots of the target's project that are logged in on the site of a page. Without its own Chrome, a bot cannot copy logins. */
@@ -722,7 +775,7 @@ export class BotSessions extends Context.Service<
                 }
 
                 const bots = await Effect.runPromise(repository.list);
-                if (bots.filter((bot) => bot.clonedFrom === self.id).length >= MAX_CLONES) {
+                if (clonesMadeBy(bots, self) >= MAX_CLONES) {
                   return toolText(
                     `You have ${MAX_CLONES} clones already. Delete finished ones with delete_bot first.`,
                   );
@@ -735,15 +788,23 @@ export class BotSessions extends Context.Service<
                   return toolText(`No bot is called ${reference}. list_bots shows the bots.`);
                 }
 
+                if (source.clonedFrom !== null) {
+                  return toolText(
+                    `@${source.name} is a clone. Clone the bot that it mirrors instead.`,
+                  );
+                }
+
+                // The clone mirrors the source and shows under it, but reports to the bot that made it.
                 const clone = await Effect.runPromise(
                   repository.create({
                     name: uniqueName(name ?? `${source.name} clone`, bots),
-                    instructions: source.instructions,
+                    instructions: "",
                     color: source.color,
                     shape: source.shape,
                     model: source.model,
                     projectId: source.projectId,
-                    clonedFrom: self.id,
+                    clonedFrom: source.id,
+                    orchestratedBy: self.id,
                   }),
                 );
                 // The bot list shows the new clone.
@@ -775,7 +836,7 @@ export class BotSessions extends Context.Service<
                 // Only clones can go this way: the clone itself, or its orchestrator. The operator's own bots stay.
                 const mayDelete =
                   target.clonedFrom !== null &&
-                  (target.id === self.id || target.clonedFrom === self.id);
+                  (target.id === self.id || target.orchestratedBy === self.id);
 
                 if (!mayDelete) {
                   return toolText(
@@ -849,6 +910,10 @@ export class BotSessions extends Context.Service<
                         Effect.succeed(
                           `You have ${max} clones and routine threads already. Delete one first, or use where "here".`,
                         ),
+                      CloneIsReadOnly: () =>
+                        Effect.succeed(
+                          `A clone has no routines of its own. Ask @${self.parentName} to make the routine.`,
+                        ),
                     }),
                   ),
                 );
@@ -861,24 +926,27 @@ export class BotSessions extends Context.Service<
               "List your clots routines, also those in their own threads, with id, thread, schedule, next run and prompt.",
               {},
               async () => {
-                const runners = await Effect.runPromise(ownRoutineBots(self));
-                const lines = await Promise.all(
-                  runners.map(async (runner) =>
-                    (await Effect.runPromise(schedules.list(runner.id))).map((routine) =>
-                      [
-                        routine.id,
-                        runner.id === self.id ? "here" : `@${runner.name}`,
-                        routine.cron,
-                        routine.paused
-                          ? "paused"
-                          : `next ${new Date(routine.nextRunAt).toLocaleString()}`,
-                        routine.prompt,
-                      ].join(" | "),
-                    ),
-                  ),
-                );
+                const routines = await Effect.runPromise(schedules.list(self.id));
+                const bots = await Effect.runPromise(repository.list);
+                const lines = routines.map((routine) => {
+                  const runner = bots.find((bot) => bot.id === routine.runnerId);
+                  const thread =
+                    routine.place === "here" || runner?.id === self.id
+                      ? "here"
+                      : `clone ${runner === undefined ? "(made at the next run)" : `@${runner.name}`}`;
 
-                return toolText(lines.flat().join("\n") || "You have no routines.");
+                  return [
+                    routine.id,
+                    thread,
+                    routine.cron,
+                    routine.paused
+                      ? "paused"
+                      : `next ${new Date(routine.nextRunAt).toLocaleString()}`,
+                    routine.prompt,
+                  ].join(" | ");
+                });
+
+                return toolText(lines.join("\n") || "You have no routines.");
               },
             ),
             tool(
@@ -886,23 +954,17 @@ export class BotSessions extends Context.Service<
               "Delete one of your clots routines, for example when the operator no longer wants it. A routine with its own thread also deletes that thread.",
               { id: z.string().describe("The routine's id from list_routines.") },
               async ({ id }) => {
-                for (const runner of await Effect.runPromise(ownRoutineBots(self))) {
-                  const routines = await Effect.runPromise(schedules.list(runner.id));
-                  if (!routines.some((routine) => routine.id === id)) {
-                    continue;
-                  }
+                const routine = (await Effect.runPromise(schedules.list(self.id))).find(
+                  (each) => each.id === id && each.botId === self.id,
+                );
 
-                  // The routine's own thread exists only for its runs, so it goes with its last routine.
-                  if (runner.id !== self.id && routines.length === 1) {
-                    await Effect.runPromise(deleteBot(runner));
-                  } else {
-                    await Effect.runPromise(schedules.remove(id));
-                  }
-
-                  return toolText(`Deleted routine ${id}.`);
+                if (routine === undefined) {
+                  return toolText(`You have no routine ${id}. list_routines shows yours.`);
                 }
 
-                return toolText(`You have no routine ${id}. list_routines shows yours.`);
+                await Effect.runPromise(deleteRoutine(routine));
+
+                return toolText(`Deleted routine ${id}.`);
               },
             ),
             tool(
@@ -1023,6 +1085,12 @@ export class BotSessions extends Context.Service<
                   );
                 }
 
+                if (instructions !== undefined && target.clonedFrom !== null) {
+                  return toolText(
+                    `@${target.name} is a clone with the instructions of @${target.parentName}. Change those instead.`,
+                  );
+                }
+
                 // Bots find each other by name, so two bots must not share one.
                 const bots = await Effect.runPromise(repository.list);
                 const nameTaken =
@@ -1087,6 +1155,12 @@ export class BotSessions extends Context.Service<
                 if (target.projectId !== self.projectId) {
                   return toolText(
                     `@${target.name} is not in your project, so only the operator can change it.`,
+                  );
+                }
+
+                if (target.clonedFrom !== null) {
+                  return toolText(
+                    `@${target.name} is a clone with the skills of @${target.parentName}. Save the skill there instead.`,
                   );
                 }
 
@@ -1977,14 +2051,18 @@ export class BotSessions extends Context.Service<
         return record(runtimeFor(bot.id), bot.id, "settings", notes.join(" · "));
       };
 
-      const deleteBot = (bot: StoredBot) =>
-        removeRuntime(bot.id).pipe(
-          Effect.andThen(closeBrowser(bot)),
-          Effect.andThen(repository.remove(bot)),
-          Effect.andThen(Effect.sync(() => removeClaudeTranscripts(bot))),
-          Effect.andThen(PubSub.publish(statusChanges, undefined)),
-          Effect.asVoid,
-        );
+      const deleteBot = (bot: StoredBot): Effect.Effect<void> =>
+        Effect.gen(function* () {
+          // A clone mirrors its bot, so it cannot outlive it.
+          const clones = (yield* repository.list).filter((each) => each.clonedFrom === bot.id);
+          yield* Effect.forEach(clones, deleteBot);
+
+          yield* removeRuntime(bot.id);
+          yield* closeBrowser(bot);
+          yield* repository.remove(bot);
+          removeClaudeTranscripts(bot);
+          yield* PubSub.publish(statusChanges, undefined);
+        });
 
       // A session that was running when the server stopped may still run its turn.
       for (const bot of yield* repository.list) {
@@ -2007,6 +2085,8 @@ export class BotSessions extends Context.Service<
           ),
 
         send,
+        runRoutine,
+        deleteRoutine,
 
         interrupt: (botId) =>
           Effect.promise(async () => {

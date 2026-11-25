@@ -48,6 +48,12 @@ export interface StoredBot extends Bot {
   readonly lastMessageText: string | null;
   readonly lastMessageAt: number | null;
   readonly unread: boolean;
+  /** The bot that made this clone. It gets the clone's reports and can delete it. */
+  readonly orchestratedBy: BotId | null;
+  /** The name of the bot that this clone mirrors. */
+  readonly parentName: string | null;
+  /** The notes directory of the bot that this clone mirrors. The clone loads its skills from there. */
+  readonly parentDirectory: string | null;
 }
 
 /** A bot as SQLite returns it: the unread flag is an integer. */
@@ -69,15 +75,17 @@ const toMessage = (row: MessageRow): Message => ({
   steps: JSON.parse(row.steps),
 });
 
+/** A new bot, plus the fields that a copy or a clone brings of its own. */
+type NewBotCopy = NewBot &
+  Partial<Pick<Bot, "model" | "projectId" | "clonedFrom"> & Pick<StoredBot, "orchestratedBy">>;
+
 export class BotRepository extends Context.Service<
   BotRepository,
   {
     readonly list: Effect.Effect<ReadonlyArray<StoredBot>>;
     find(botId: BotId): Effect.Effect<StoredBot | undefined>;
     /** Creates a bot with the default model and no project, unless a copy brings its own. */
-    create(
-      bot: NewBot & Partial<Pick<Bot, "model" | "projectId" | "clonedFrom">>,
-    ): Effect.Effect<StoredBot>;
+    create(bot: NewBotCopy): Effect.Effect<StoredBot>;
     /** Deletes the bot, its thread, its routines and its notes directory. */
     remove(bot: StoredBot): Effect.Effect<void>;
     setUnread(botId: BotId, unread: boolean): Effect.Effect<void>;
@@ -120,12 +128,16 @@ export class BotRepository extends Context.Service<
         SELECT
           bots.id,
           bots.name,
-          bots.instructions,
-          bots.color,
-          bots.shape,
-          bots.model,
+          -- A clone has the settings of the bot that it mirrors. Only its name is its own.
+          COALESCE(parent.instructions, bots.instructions) AS instructions,
+          COALESCE(parent.color, bots.color) AS color,
+          COALESCE(parent.shape, bots.shape) AS shape,
+          COALESCE(parent.model, bots.model) AS model,
           bots.project_id AS projectId,
           bots.cloned_from AS clonedFrom,
+          bots.orchestrated_by AS orchestratedBy,
+          parent.name AS parentName,
+          parent.working_directory AS parentDirectory,
           projects.name AS projectName,
           projects.directory AS projectDirectory,
           bots.created_at AS createdAt,
@@ -145,6 +157,7 @@ export class BotRepository extends Context.Service<
         FROM bots
         JOIN threads ON threads.bot_id = bots.id
         LEFT JOIN projects ON projects.id = bots.project_id
+        LEFT JOIN bots AS parent ON parent.id = bots.cloned_from
         ${where}
         ORDER BY bots.sort_order, bots.created_at
       `.pipe(Effect.map((rows) => rows.map(toStoredBot)));
@@ -165,7 +178,8 @@ export class BotRepository extends Context.Service<
         model = DEFAULT_MODEL,
         projectId = null,
         clonedFrom = null,
-      }: NewBot & Partial<Pick<Bot, "model" | "projectId" | "clonedFrom">>) =>
+        orchestratedBy = null,
+      }: NewBotCopy) =>
         Effect.gen(function* () {
           const id = crypto.randomUUID() as BotId;
           const workingDirectory = join(config.home, "bots", id);
@@ -173,9 +187,9 @@ export class BotRepository extends Context.Service<
           mkdirSync(workingDirectory, { recursive: true });
 
           yield* sql`
-            INSERT INTO bots (id, name, instructions, color, shape, model, project_id, cloned_from, working_directory, browser_stream_port, sort_order, created_at)
+            INSERT INTO bots (id, name, instructions, color, shape, model, project_id, cloned_from, orchestrated_by, working_directory, browser_stream_port, sort_order, created_at)
             SELECT
-              ${id}, ${name}, ${instructions}, ${color}, ${shape}, ${model}, ${projectId}, ${clonedFrom}, ${workingDirectory},
+              ${id}, ${name}, ${instructions}, ${color}, ${shape}, ${model}, ${projectId}, ${clonedFrom}, ${orchestratedBy}, ${workingDirectory},
               COALESCE(MAX(browser_stream_port) + 1, ${firstBrowserStreamPort(config.port)}),
               COALESCE(MAX(sort_order), 0) + 1,
               ${createdAt}

@@ -42,7 +42,10 @@ export const Bot = Schema.Struct({
   shape: BotShape,
   model: BotModel,
   projectId: Schema.NullOr(Schema.String),
-  /** The bot that made this bot as a clone, or `null` for a bot that the operator made. Only a clone can be deleted by a bot. */
+  /**
+   * The bot that this clone mirrors, or `null` for a bot that is no clone. A clone has the instructions,
+   * skills, look and model of that bot and shows under it. Only its name can change.
+   */
   clonedFrom: Schema.NullOr(BotId),
   createdAt: Schema.Number,
 });
@@ -208,9 +211,17 @@ export const Skill = Schema.Struct({
 });
 export type Skill = typeof Skill.Type;
 
+/** Where a routine runs: in the bot's own conversation, or in a clone of the bot that shows under it. */
+export const RoutinePlace = Schema.Literals(["here", "clone"]);
+export type RoutinePlace = typeof RoutinePlace.Type;
+
 export const Schedule = Schema.Struct({
   id: Schema.String,
+  /** The bot that owns the routine. A routine never belongs to a clone. */
   botId: BotId,
+  place: RoutinePlace,
+  /** The clone that runs a routine with place "clone". The next run makes a new clone when it is `null` or deleted. */
+  runnerId: Schema.NullOr(BotId),
   cron: Schema.String,
   prompt: Schema.String,
   paused: Schema.Boolean,

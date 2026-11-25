@@ -1,5 +1,6 @@
 import {
   BotNotFound,
+  CloneIsReadOnly,
   ClotsRpcs,
   InvalidCron,
   InvalidSkill,
@@ -46,6 +47,10 @@ export const HandlersLayer = ClotsRpcs.toLayer(
             bot === undefined ? Effect.fail(new BotNotFound({ botId })) : Effect.succeed(bot),
           ),
         );
+
+    /** Refuses a change of a clone's settings or skills, which mirror the bot that it was cloned from. */
+    const requireNoClone = (bot: StoredBot) =>
+      bot.clonedFrom === null ? Effect.void : Effect.fail(new CloneIsReadOnly({ botId: bot.id }));
 
     const summarize = (bot: StoredBot): BotSummary => {
       const live = sessions.live(bot.id);
@@ -140,6 +145,14 @@ export const HandlersLayer = ClotsRpcs.toLayer(
 
       UpdateBot: ({ botId, ...changes }) =>
         requireBot(botId).pipe(
+          // A clone keeps the settings of its bot, but the operator can rename it.
+          Effect.tap((bot) =>
+            changes.instructions === undefined &&
+            changes.color === undefined &&
+            changes.shape === undefined
+              ? Effect.void
+              : requireNoClone(bot),
+          ),
           Effect.tap(() => bots.update(botId, changes)),
           Effect.flatMap((bot) => sessions.noteSettingsChange(bot, changes)),
           Effect.andThen(PubSub.publish(sessions.statusChanges, undefined)),
@@ -175,12 +188,17 @@ export const HandlersLayer = ClotsRpcs.toLayer(
         requireBot(botId).pipe(Effect.flatMap((bot) => sessions.deleteBot(bot))),
 
       SetBotModel: ({ botId, model }) =>
-        requireBot(botId).pipe(
-          Effect.andThen(bots.setModel(botId, model)),
-          Effect.andThen(sessions.setModel(botId, model)),
-          Effect.andThen(PubSub.publish(sessions.statusChanges, undefined)),
-          Effect.asVoid,
-        ),
+        Effect.gen(function* () {
+          yield* requireBot(botId).pipe(Effect.tap(requireNoClone));
+          yield* bots.setModel(botId, model);
+
+          // The clones mirror the bot's model, so their running sessions switch with it.
+          const clones = (yield* bots.list).filter((bot) => bot.clonedFrom === botId);
+          yield* Effect.forEach([botId, ...clones.map((clone) => clone.id)], (id) =>
+            sessions.setModel(id, model),
+          );
+          yield* PubSub.publish(sessions.statusChanges, undefined);
+        }),
 
       SubscribeThread: ({ botId, afterSequence }) =>
         Stream.unwrap(
@@ -280,7 +298,7 @@ export const HandlersLayer = ClotsRpcs.toLayer(
 
       SaveBotSkill: ({ botId, skill, previousName }) =>
         Effect.gen(function* () {
-          const bot = yield* requireBot(botId);
+          const bot = yield* requireBot(botId).pipe(Effect.tap(requireNoClone));
           const reason = saveBotSkill(bot, skill, previousName);
 
           if (reason !== undefined) {
@@ -292,7 +310,7 @@ export const HandlersLayer = ClotsRpcs.toLayer(
 
       DeleteBotSkill: ({ botId, name }) =>
         Effect.gen(function* () {
-          const bot = yield* requireBot(botId);
+          const bot = yield* requireBot(botId).pipe(Effect.tap(requireNoClone));
           const reason = deleteBotSkill(bot, name);
 
           if (reason !== undefined) {
@@ -323,7 +341,14 @@ export const HandlersLayer = ClotsRpcs.toLayer(
 
       SetSchedulePaused: ({ id, paused }) => schedules.setPaused(id, paused),
 
-      DeleteSchedule: ({ id }) => schedules.remove(id),
+      DeleteSchedule: ({ id }) =>
+        schedules
+          .find(id)
+          .pipe(
+            Effect.flatMap((routine) =>
+              routine === undefined ? Effect.void : sessions.deleteRoutine(routine),
+            ),
+          ),
 
       GetUpdateInfo: () => Effect.promise(() => updateInfo()),
 

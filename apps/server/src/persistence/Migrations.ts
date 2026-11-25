@@ -165,6 +165,27 @@ const search = Effect.gen(function* () {
   `;
 });
 
+const mirrors = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient;
+
+  // A clone mirrors the bot in cloned_from. The bot that made it, which can be another bot, gets its reports and may delete it.
+  yield* sql`ALTER TABLE bots ADD COLUMN orchestrated_by TEXT`;
+  yield* sql`UPDATE bots SET orchestrated_by = cloned_from`;
+
+  // The parent owns every routine. A routine with place 'clone' runs in the clone in runner_id.
+  yield* sql`ALTER TABLE schedules ADD COLUMN place TEXT NOT NULL DEFAULT 'here'`;
+  yield* sql`ALTER TABLE schedules ADD COLUMN runner_id TEXT`;
+  yield* sql`
+    UPDATE schedules
+    SET place = 'clone',
+      runner_id = bot_id,
+      bot_id = (SELECT cloned_from FROM bots WHERE bots.id = schedules.bot_id)
+    WHERE bot_id IN (
+      SELECT clone.id FROM bots AS clone JOIN bots AS parent ON parent.id = clone.cloned_from
+    )
+  `;
+});
+
 /** Runs the pending migrations when the server starts. */
 export const MigrationsLayer = SqliteMigrator.layer({
   loader: SqliteMigrator.fromRecord({
@@ -179,5 +200,6 @@ export const MigrationsLayer = SqliteMigrator.layer({
     "0009_sort_order": sortOrder,
     "0010_resume": resume,
     "0011_search": search,
+    "0012_mirrors": mirrors,
   }),
 });

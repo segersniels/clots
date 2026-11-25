@@ -229,13 +229,15 @@ function SkillForm({
 
 /**
  * One own skill as a filled row. It opens on mount, so a skill that the bot writes eases in, and a
- * skill that appeared while the pane was open gets a short ring. A click opens the editor.
+ * skill that appeared while the pane was open gets a short ring. A click opens the editor. In a
+ * clone, the row only shows the skill, because the bot that the clone mirrors owns it.
  */
 function SkillRow({
   skill,
   replaces,
   isNew,
   removing,
+  readOnly,
   onEdit,
   onRemove,
 }: {
@@ -243,6 +245,7 @@ function SkillRow({
   replaces: boolean;
   isNew: boolean;
   removing: boolean;
+  readOnly: boolean;
   onEdit: () => void;
   onRemove: () => void;
 }) {
@@ -266,6 +269,35 @@ function SkillRow({
     return () => clearTimeout(timer);
   }, [ringing]);
 
+  const content = (
+    <>
+      <BoxIcon className="row-span-2 size-[17px] text-skill" />
+      <span className="col-start-2 truncate">
+        {skill.name}
+        {replaces && (
+          <span className="ml-1.5 rounded-md bg-muted px-1.5 py-px align-[1px] text-[11.5px] text-muted-foreground">
+            replaces yours
+          </span>
+        )}
+      </span>
+      <span className="col-start-2 row-start-2 truncate text-[0.8125rem] text-muted-foreground">
+        {skill.description}
+      </span>
+    </>
+  );
+
+  if (readOnly) {
+    return (
+      <Collapse open={shown && !removing}>
+        <div className="pb-1">
+          <div className="grid grid-cols-[18px_minmax(0,1fr)] items-center gap-x-2.5 gap-y-px rounded-xl bg-muted/60 py-2 pr-2.5 pl-2.5">
+            {content}
+          </div>
+        </div>
+      </Collapse>
+    );
+  }
+
   return (
     <Collapse open={shown && !removing}>
       <div className="pb-1">
@@ -277,18 +309,7 @@ function SkillRow({
             onClick={onEdit}
             className="grid grid-cols-[18px_minmax(0,1fr)] items-center gap-x-2.5 gap-y-px rounded-xl py-2 pl-2.5 text-left outline-none focus-visible:ring-1 focus-visible:ring-ring/40"
           >
-            <BoxIcon className="row-span-2 size-[17px] text-skill" />
-            <span className="col-start-2 truncate">
-              {skill.name}
-              {replaces && (
-                <span className="ml-1.5 rounded-md bg-muted px-1.5 py-px align-[1px] text-[11.5px] text-muted-foreground">
-                  replaces yours
-                </span>
-              )}
-            </span>
-            <span className="col-start-2 row-start-2 truncate text-[0.8125rem] text-muted-foreground">
-              {skill.description}
-            </span>
+            {content}
           </button>
           <DropdownMenu>
             <DropdownMenuTrigger
@@ -323,7 +344,8 @@ function SkillRow({
 
 /**
  * Lists the skills that only this bot has, from the skill files in its notes. The bot can write
- * them too, so the list follows the files while the pane is open. The editor opens in a dialog.
+ * them too, so the list follows the files while the pane is open. The editor opens in a dialog. A
+ * clone shows the skills of the bot that it mirrors, and hides the section when that bot has none.
  */
 export function BotSkills({ bot }: { bot: BotSummary }) {
   const own = useStore(client.botSkills(bot.id));
@@ -334,6 +356,7 @@ export function BotSkills({ bot }: { bot: BotSummary }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [removing, setRemoving] = useState<ReadonlySet<string>>(new Set());
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
+  const isClone = bot.clonedFrom !== null;
   // The skills of the first list are not new. Each later skill is new once.
   const seen = useRef<Set<string> | null>(null);
   if (seen.current === null && own !== null) {
@@ -376,19 +399,25 @@ export function BotSkills({ bot }: { bot: BotSummary }) {
     }
   }, [own]);
 
+  if (isClone && (own === null || own.length === 0)) {
+    return null;
+  }
+
   return (
     <section className="flex flex-col gap-1">
       <div className="flex h-7 items-center justify-between">
         <h2 className={PANE_LABEL}>Skills</h2>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label="New skill"
-          className="text-muted-foreground"
-          onClick={() => openEditor(undefined)}
-        >
-          <PlusIcon />
-        </Button>
+        {!isClone && (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="New skill"
+            className="text-muted-foreground"
+            onClick={() => openEditor(undefined)}
+          >
+            <PlusIcon />
+          </Button>
+        )}
       </div>
 
       {own !== null && own.length === 0 && (
@@ -404,6 +433,7 @@ export function BotSkills({ bot }: { bot: BotSummary }) {
               replaces={replacing.has(skill.name)}
               isNew={seen.current !== null && !seen.current.has(skill.name)}
               removing={removing.has(skill.name)}
+              readOnly={isClone}
               onEdit={() => openEditor(skill)}
               onRemove={() => setConfirmingDelete(skill.name)}
             />
