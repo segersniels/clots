@@ -68,8 +68,8 @@ export default function Home() {
           Bots that never stop working
         </h1>
         <p className="mx-auto mt-[26px] max-w-[33rem] text-[clamp(17px,2vw,20px)] leading-normal text-pretty text-muted-foreground">
-          Always-on Claude bots on your own Mac. Each one has its own instructions, memory, browser and routines, and keeps
-          going while you are away.
+          Claude bots with their own instructions, memory, browser and routines. Run them on a machine that stays on, and they
+          keep going while you are away.
         </p>
         <Button
           nativeButton={false}
@@ -90,7 +90,7 @@ export default function Home() {
             <ArrowUpRight className="size-[13px]" />
           </a>
         </div>
-        <p className="mt-3.5 text-[13px] text-muted-foreground opacity-80">Apple Silicon · Needs Claude Code with a Claude subscription</p>
+        <p className="mt-3.5 text-[13px] text-muted-foreground opacity-80">Needs Claude Code with a Claude subscription</p>
       </div>
     </main>
   );
