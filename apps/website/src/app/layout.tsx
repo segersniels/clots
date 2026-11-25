@@ -1,18 +1,9 @@
 import type { Metadata } from "next";
-import localFont from "next/font/local";
 
 import intro from "../../../../docs/assets/intro-light.png";
 import icon from "../../../web/public/icon.svg";
 import { SITE_URL } from "@/lib/site";
 import "./globals.css";
-
-/** Allo by Josh Puckett, the font of the app, from the same file. */
-const allo = localFont({
-  src: "../../../web/src/assets/fonts/AlloVariable.woff2",
-  weight: "100 900",
-  variable: "--font-allo",
-  adjustFontFallback: "Arial",
-});
 
 const TITLE = "clots · Always-on Claude Code bots";
 
@@ -51,7 +42,7 @@ const STRUCTURED_DATA = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={allo.variable}>
+    <html lang="en">
       <body>
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(STRUCTURED_DATA) }} />
         {children}

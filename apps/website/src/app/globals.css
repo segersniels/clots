@@ -1,6 +1,18 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+/* Allo by Josh Puckett, SIL Open Font License: the font of the app. */
+@import "allo-font";
+
+/* Scales Arial to the size of Allo, so text does not move when Allo loads. The values match apps/web/src/styles.css. */
+@font-face {
+  font-family: "Allo Fallback";
+  src: local("Arial");
+  size-adjust: 105.15%;
+  ascent-override: 92.13%;
+  descent-override: 22.94%;
+  line-gap-override: 0%;
+}
 
 /* The site follows the system theme. The app switches with a class instead. */
 @custom-variant dark (@media (prefers-color-scheme: dark));
@@ -37,7 +49,7 @@
 }
 
 @theme inline {
-  --font-sans: var(--font-allo), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Allo", "Allo Fallback", ui-sans-serif, system-ui, sans-serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-primary: var(--primary);
