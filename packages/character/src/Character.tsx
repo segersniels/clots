@@ -54,7 +54,15 @@ export function Character({
     props.current = { shape, mood, gaze, fitted, hops };
   });
 
-  useEffect(() => animate(new CharacterMotion(svg.current!, () => props.current)), []);
+  useEffect(() => {
+    const motion = new CharacterMotion(svg.current!, () => props.current);
+    const stop = animate(motion);
+
+    return () => {
+      stop();
+      motion.dispose();
+    };
+  }, []);
 
   const circles = (grow: number) =>
     Array.from({ length: CIRCLES }, (_, index) => {

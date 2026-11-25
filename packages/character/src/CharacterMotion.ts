@@ -28,6 +28,15 @@ const BLINK_MS = 160;
 /** How far the pupils move from the center of the eye position, in box units. */
 const EYE_REACH = { x: 3.4, y: 3 };
 
+/** The squash of an idle breath. The browser animates it, so an idle character costs no drawing. */
+const IDLE_BREATH: Keyframe[] = [{ transform: "scale(1.012, 0.978)" }, { transform: "scale(0.988, 1.022)" }];
+
+/** The length of half an idle breath, in or out. */
+const IDLE_BREATH_MS = 1700;
+
+/** The distance to their target, in box units, below which the eyes count as arrived. */
+const GAZE_REST = 0.05;
+
 /** Pads a shape to the same lobe count as the others. The extra lobes hide inside the body. */
 export function paddedLobes(shape: CharacterShape): Lobe[] {
   const lobes = [...SHAPE_GEOMETRY[shape].lobes];
@@ -85,6 +94,8 @@ export class CharacterMotion implements Animated {
   private nextBlink = performance.now() + 1200 + Math.random() * 3000;
   private gaze = { x: 0, y: 0 };
   private center: { x: number; y: number } | undefined;
+  private atRest = false;
+  private readonly idleBreath: Animation;
 
   constructor(
     private readonly svg: SVGSVGElement,
@@ -109,6 +120,23 @@ export class CharacterMotion implements Animated {
     this.fromEyes = this.toEyes = SHAPE_GEOMETRY[this.shape].eyes;
     this.fromSheenLobe = this.toSheenLobe = sheenLobeOf(this.shape);
     this.fromFit = this.toFit = this.fitOf(this.shape);
+
+    // The character breathes from the ground. The hint keeps the body on its own layer, so a breath does not paint it again.
+    svg.style.transformOrigin = "50% 100%";
+    svg.style.willChange = "transform";
+    this.idleBreath = svg.animate(IDLE_BREATH, {
+      duration: IDLE_BREATH_MS,
+      direction: "alternate",
+      iterations: Infinity,
+      easing: "ease-in-out",
+      delay: -this.phase * 1000,
+    });
+    this.idleBreath.cancel();
+  }
+
+  /** Stops the idle breath when the character leaves the page. */
+  dispose() {
+    this.idleBreath.cancel();
   }
 
   measure() {
@@ -132,6 +160,23 @@ export class CharacterMotion implements Animated {
       this.hops = hops;
       if (!reduced) this.hopStart = now;
     }
+
+    // A working or waiting character breathes in its own motion below.
+    const breathesIdle = mood === "idle" && !reduced;
+    if (breathesIdle && this.idleBreath.playState !== "running") this.idleBreath.play();
+    if (!breathesIdle && this.idleBreath.playState === "running") this.idleBreath.cancel();
+
+    // An idle character only draws for a blink or a look, so a page of idle characters costs almost no drawing.
+    const target = this.aim(t, mood, gaze);
+    const settled =
+      mood === "idle" &&
+      now - this.morphStart >= MORPH_MS &&
+      now - this.hopStart >= HOP_MS &&
+      now - this.blinkStart >= BLINK_MS &&
+      now <= this.nextBlink &&
+      Math.hypot(target.x - this.gaze.x, target.y - this.gaze.y) < GAZE_REST;
+    if (settled && this.atRest) return;
+    this.atRest = settled;
 
     const lobes = this.lobesAt(now);
     const [eyeX, eyeY, eyeGap] = this.eyesAt(now);
@@ -174,7 +219,7 @@ export class CharacterMotion implements Animated {
     this.sheen.setAttribute("ry", String(lightR * 0.11));
     this.sheen.setAttribute("transform", `rotate(-35 ${sheenX} ${sheenY})`);
 
-    this.drawEyes(now, eyeX, eyeY, eyeGap, this.aim(t, mood, gaze), reduced, mood);
+    this.drawEyes(now, eyeX, eyeY, eyeGap, target, reduced, mood);
   }
 
   private startMorph(shape: CharacterShape, now: number, reduced: boolean) {
@@ -187,6 +232,7 @@ export class CharacterMotion implements Animated {
     this.fromFit = this.fitAt(now);
     this.toFit = this.fitOf(shape);
     this.shape = shape;
+    this.atRest = false;
 
     if (reduced) return;
 
@@ -240,10 +286,10 @@ export class CharacterMotion implements Animated {
     return [lerp(fromX, toX, progress), lerp(fromY, toY, progress), lerp(fromR, toR, progress)];
   }
 
-  /** Breathes all the time, and hops after a shape change or on a loop while the character waits. */
+  /** Breathes while the character works or waits, and hops after a shape change or on a loop while it waits. */
   private bounce(now: number, mood: CharacterMood) {
     const t = now / 1000 + this.phase;
-    const breath = Math.sin(t * 1.85);
+    const breath = mood === "idle" ? 0 : Math.sin(t * 1.85);
     let scaleX = 1 - breath * 0.012;
     let scaleY = 1 + breath * 0.022;
     let lift = 0;
