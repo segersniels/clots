@@ -1023,7 +1023,10 @@ export class BotSessions extends Context.Service<
       const mentionNote = (text: string, sender: StoredBot) =>
         repository.list.pipe(
           Effect.map((bots) => {
-            const mentioned = bots.filter((bot) => bot.id !== sender.id && mentions(text, bot.name));
+            // Bots in other projects can share a name, so a mention reaches only the sender's own project.
+            const mentioned = bots.filter(
+              (bot) => bot.id !== sender.id && bot.projectId === sender.projectId && mentions(text, bot.name),
+            );
             if (mentioned.length === 0) return "";
 
             const lines = mentioned.map((bot) =>

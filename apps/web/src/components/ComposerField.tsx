@@ -215,8 +215,10 @@ export function ComposerField({
   ref?: Ref<ComposerFieldHandle>;
 }) {
   const skills = useStore(client.skills(botId));
-  // A bot does not mention itself.
-  const otherBots = useStore(client.bots).filter((bot) => bot.id !== botId);
+  const bots = useStore(client.bots);
+  const projectId = bots.find((bot) => bot.id === botId)?.projectId ?? null;
+  // A bot mentions only the other bots of its own project, so a bot with the same name in another project stays out.
+  const otherBots = bots.filter((bot) => bot.id !== botId && bot.projectId === projectId);
   const known = knownNames(
     skills.map((skill) => skill.name),
     otherBots.map((bot) => bot.name),
