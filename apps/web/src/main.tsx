@@ -6,6 +6,7 @@ import { followSystemColorScheme } from "./lib/color-scheme.ts";
 import { startBotNotifications } from "./notifications.ts";
 import { routeTree } from "./routeTree.gen.ts";
 import "./styles.css";
+import { keepWorkingThreadsCurrent } from "./thread-keep-alive.ts";
 
 const router = createRouter({ routeTree });
 
@@ -21,6 +22,7 @@ if (desktop !== null) document.documentElement.classList.add("desktop", `desktop
 
 followSystemColorScheme();
 startBotNotifications((botId) => void router.navigate({ to: "/bots/$botId", params: { botId } }));
+keepWorkingThreadsCurrent();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
