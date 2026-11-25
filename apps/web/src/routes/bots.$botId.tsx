@@ -142,7 +142,7 @@ function BotPage() {
     <section className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col">
       {/* The header floats over the thread, which fades out below it. A scroll over the header still reaches the thread. */}
       <header className="window-drag pointer-events-none absolute inset-x-0 top-0 z-10 grid h-13 grid-cols-[1fr_auto_1fr] items-center px-3 *:pointer-events-auto">
-        <Button variant="ghost" size="icon" aria-label="All bots" className="md:hidden" render={<Link to="/" />}>
+        <Button variant="ghost" size="icon" aria-label="All bots" className="md:hidden" nativeButton={false} render={<Link to="/" />}>
           <ArrowLeftIcon />
         </Button>
 
