@@ -57,23 +57,21 @@ export const startUpdates = async (onChange: (state: AppUpdateState) => void) =>
   });
 
   setState({ status: "current" });
-  void check().catch(() => undefined);
-  setInterval(() => void check().catch(() => undefined), CHECK_INTERVAL_MS);
+  check();
+  setInterval(check, CHECK_INTERVAL_MS);
 };
 
-/** Asks GitHub for a new release. A failed check rejects and keeps the last state. */
-const check = async () => {
+/** Asks GitHub for a new release. A failed check, for example without a network, keeps the last state. */
+const check = () => {
   // A check during a download or before the restart would forget the downloaded version.
   if (state.status === "downloading" || state.status === "ready") return;
 
-  await autoUpdater.checkForUpdates();
+  void autoUpdater.checkForUpdates().catch(() => undefined);
 };
 
-/** Checks for a new release now, for the menu, and returns the state after the check. */
-export const checkForUpdates = async () => {
-  if (state.status !== "off") await check();
-
-  return state;
+/** Checks for a new release now, for the menu. The sidebar shows what the check finds. */
+export const checkForUpdates = () => {
+  if (state.status !== "off") check();
 };
 
 /** Downloads the version that the last check found. The error event reports a failed download. */

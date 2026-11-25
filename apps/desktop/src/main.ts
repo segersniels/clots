@@ -1,6 +1,6 @@
 import type { ConnectResult } from "@clots/contracts";
 import { isNewerVersion } from "@clots/contracts/version";
-import { app, BrowserWindow, dialog, ipcMain, Menu, MenuItem, net, shell, type IpcMainInvokeEvent } from "electron";
+import { app, BrowserWindow, ipcMain, Menu, MenuItem, net, shell, type IpcMainInvokeEvent } from "electron";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
@@ -167,70 +167,6 @@ const connect = async (input: string): Promise<ConnectResult> => {
   return { ok: true };
 };
 
-/** Quits the app and opens the downloaded version. */
-const restartToUpdate = () => {
-  // The window hides on close instead of closing, which would stop the quit that installs the update.
-  quitting = true;
-  installUpdate();
-};
-
-/** Checks for a new app version on the operator's request and tells the result in a dialog. */
-const checkForUpdatesFromMenu = async () => {
-  let update;
-
-  try {
-    update = await checkForUpdates();
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error);
-    void dialog.showMessageBox({ type: "warning", message: "Clots could not check for updates.", detail });
-
-    return;
-  }
-
-  // An ad-hoc signed build, such as one from a fork, cannot install updates.
-  if (update.status === "off") {
-    void dialog.showMessageBox({ message: "This copy of Clots cannot update itself.", detail: "Download new versions from GitHub." });
-
-    return;
-  }
-
-  if (update.status === "current") {
-    void dialog.showMessageBox({ message: "You are up to date.", detail: `Clots ${app.getVersion()} is the newest version.` });
-
-    return;
-  }
-
-  if (update.status === "available" || update.status === "failed") {
-    const { response } = await dialog.showMessageBox({
-      message: `Clots ${update.version} is available.`,
-      detail: `You have version ${app.getVersion()}. Your bots keep working while the app updates.`,
-      buttons: ["Download", "Later"],
-      defaultId: 0,
-      cancelId: 1,
-    });
-
-    if (response === 0) downloadUpdate();
-
-    return;
-  }
-
-  if (update.status === "ready") {
-    const { response } = await dialog.showMessageBox({
-      message: `Clots ${update.version} is ready.`,
-      detail: "Restart the app to finish the update. Your bots keep working.",
-      buttons: ["Restart", "Later"],
-      defaultId: 0,
-      cancelId: 1,
-    });
-
-    if (response === 0) restartToUpdate();
-
-    return;
-  }
-
-  void dialog.showMessageBox({ message: `Clots ${update.version} is downloading.`, detail: `${Math.round(update.percent)}% done.` });
-};
-
 ipcMain.handle("app:reveal-window", () => {
   if (window?.isMinimized()) window.restore();
 
@@ -243,7 +179,11 @@ ipcMain.handle("app:set-badge-count", (_event, count: number) => void app.setBad
 ipcMain.handle("app:update-state", () => updateState());
 ipcMain.handle("app:download-update", () => downloadUpdate());
 
-ipcMain.handle("app:install-update", () => restartToUpdate());
+ipcMain.handle("app:install-update", () => {
+  // The window hides on close instead of closing, which would stop the quit that installs the update.
+  quitting = true;
+  installUpdate();
+});
 
 handleSetup("setup:checks", () => runChecks());
 handleSetup("setup:login", () => loginClaude());
@@ -262,9 +202,9 @@ void app.whenReady().then(() => {
 
   const defaultMenu = Menu.getApplicationMenu();
 
-  // On macOS the first menu is the app menu. The update check goes under About, as in other Mac apps.
+  // On macOS the first menu is the app menu. The update check goes under About, and the sidebar shows what it finds.
   if (process.platform === "darwin") {
-    const checkItem = new MenuItem({ label: "Check for Updates…", click: () => void checkForUpdatesFromMenu() });
+    const checkItem = new MenuItem({ label: "Check for Updates…", click: () => checkForUpdates() });
     defaultMenu?.items[0]?.submenu?.insert(1, checkItem);
   }
 
