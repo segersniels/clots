@@ -352,13 +352,20 @@ export const HandlersLayer = ClotsRpcs.toLayer(
           Effect.map(({ routine }) => routine),
         ),
 
-      UpdateSchedule: ({ id, cron, prompt }) =>
+      UpdateSchedule: ({ id, cron, prompt, place }) =>
         Effect.gen(function* () {
           const next = nextRunAt(cron, Date.now());
           if (next === undefined) {
             return yield* new InvalidCron({ cron });
           }
 
+          const routine = yield* schedules.find(id);
+          const owner = routine === undefined ? undefined : yield* bots.find(routine.botId);
+          if (routine === undefined || owner === undefined) {
+            return;
+          }
+
+          yield* sessions.moveRoutine(owner, routine, place);
           yield* schedules.update(id, cron, prompt, next);
         }),
 

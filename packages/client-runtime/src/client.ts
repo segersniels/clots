@@ -91,7 +91,8 @@ export interface ClotsClient {
     prompt: string,
     place: RoutinePlace,
   ): Promise<Schedule>;
-  updateSchedule(id: string, cron: string, prompt: string): Promise<void>;
+  /** Changes a routine. A move to "clone" makes a new clone that runs it. */
+  updateSchedule(id: string, cron: string, prompt: string, place: RoutinePlace): Promise<void>;
   setSchedulePaused(id: string, paused: boolean): Promise<void>;
   deleteSchedule(id: string): Promise<void>;
   getUpdateInfo(): Promise<UpdateInfo>;
@@ -306,7 +307,8 @@ export const makeClotsClient = (origin: string): ClotsClient => {
       call((rpc) => rpc.ResolveLoginRequest({ botId, requestId, decision })),
     createSchedule: (botId, cron, prompt, place) =>
       call((rpc) => rpc.CreateSchedule({ botId, cron, prompt, place })),
-    updateSchedule: (id, cron, prompt) => call((rpc) => rpc.UpdateSchedule({ id, cron, prompt })),
+    updateSchedule: (id, cron, prompt, place) =>
+      call((rpc) => rpc.UpdateSchedule({ id, cron, prompt, place })),
     setSchedulePaused: (id, paused) => call((rpc) => rpc.SetSchedulePaused({ id, paused })),
     deleteSchedule: (id) => call((rpc) => rpc.DeleteSchedule({ id })),
     getUpdateInfo: () => call((rpc) => rpc.GetUpdateInfo()),

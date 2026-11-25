@@ -161,6 +161,44 @@ const toolText = (text: string) => ({ content: [{ type: "text" as const, text }]
 /** Names a tool for the operator. An MCP tool such as "mcp__clots__send_bot_message" shows as "send_bot_message". */
 const shownToolName = (name: string) => name.replace(/^mcp__.+?__/, "");
 
+/** The verbs that a step shows for the tools that work on one file. */
+const FILE_VERBS: Readonly<Record<string, string>> = {
+  Read: "Reading",
+  Write: "Writing",
+  Edit: "Editing",
+};
+
+/**
+ * Titles a tool call for the operator. The bot's own description wins. Without one, the title shows
+ * what the tool works on, such as the command, the file or the bot it messages.
+ */
+const stepTitle = (
+  toolName: string,
+  input: Readonly<Record<string, unknown>>,
+  messagedBot: string | undefined,
+) => {
+  const { description, command, file_path: filePath } = input;
+
+  if (typeof description === "string") {
+    return description;
+  }
+
+  if (typeof command === "string") {
+    return command.trim().split("\n")[0] ?? "";
+  }
+
+  const fileVerb = FILE_VERBS[toolName];
+  if (fileVerb !== undefined && typeof filePath === "string") {
+    return `${fileVerb} ${basename(filePath)}`;
+  }
+
+  if (messagedBot !== undefined) {
+    return `Messaging @${messagedBot}`;
+  }
+
+  return `Using ${shownToolName(toolName)}`;
+};
+
 /** The image files that the thread shows when a bot opens one with Read, by extension. */
 const SHOWN_IMAGE_TYPES: Readonly<Record<string, string>> = {
   ".png": "image/png",
@@ -323,6 +361,15 @@ export class BotSessions extends Context.Service<
     >;
     /** Sends a routine's prompt to the bot that runs it. A routine whose clone is gone gets a new clone. */
     runRoutine(owner: StoredBot, routine: Schedule): Effect.Effect<void>;
+    /**
+     * Moves a routine to the bot's own conversation or to a new clone. A clone that ran the routine
+     * stays, with its thread.
+     */
+    moveRoutine(
+      owner: StoredBot,
+      routine: Schedule,
+      place: RoutinePlace,
+    ): Effect.Effect<void, TooManyClones>;
     /** Deletes a routine, and the clone that runs it. */
     deleteRoutine(routine: Schedule): Effect.Effect<void>;
     /** Marks in the thread that the operator renamed the bot or changed its instructions. Other changes add nothing. */
@@ -587,10 +634,28 @@ export class BotSessions extends Context.Service<
           let runner = current;
           if (runner?.clonedFrom !== owner.id) {
             runner = yield* makeRunner(owner, `${owner.name} routine`);
-            yield* schedules.setRunner(routine.id, runner.id);
+            yield* schedules.setPlace(routine.id, "clone", runner.id);
           }
 
           yield* send(runner, "routine", routine.prompt);
+        });
+
+      const moveRoutine = (owner: StoredBot, routine: Schedule, place: RoutinePlace) =>
+        Effect.gen(function* () {
+          if (place === routine.place) {
+            return;
+          }
+
+          if (place === "here") {
+            return yield* schedules.setPlace(routine.id, "here", null);
+          }
+
+          if (clonesMadeBy(yield* repository.list, owner) >= MAX_CLONES) {
+            return yield* new TooManyClones({ max: MAX_CLONES });
+          }
+
+          const runner = yield* makeRunner(owner, `${owner.name} routine`);
+          yield* schedules.setPlace(routine.id, "clone", runner.id);
         });
 
       const deleteRoutine = (routine: Schedule) =>
@@ -1649,7 +1714,7 @@ export class BotSessions extends Context.Service<
             return;
           }
 
-          // The finished tool call carries a short description of what the bot does.
+          // The finished tool call carries its input, which says what the bot does.
           for (const block of message.message.content) {
             if (block.type !== "tool_use") {
               continue;
@@ -1664,14 +1729,15 @@ export class BotSessions extends Context.Service<
               );
             }
 
-            const description = (block.input as { description?: unknown }).description;
+            const input = block.input as Readonly<Record<string, unknown>>;
+            const messagedBot =
+              shownToolName(block.name) === "send_bot_message" && typeof input.bot === "string"
+                ? yield* findBot(input.bot)
+                : undefined;
+            const title = stepTitle(block.name, input, messagedBot?.name);
 
             // A transcript has no stream events, so after a restart the step starts here.
             if (!runtime.live.steps.some((step) => step.id === block.id)) {
-              const title =
-                typeof description === "string"
-                  ? description
-                  : `Using ${shownToolName(block.name)}`;
               setLive(runtime, {
                 steps: [...runtime.live.steps, { id: block.id, title, status: "running" }],
               });
@@ -1679,12 +1745,8 @@ export class BotSessions extends Context.Service<
               continue;
             }
 
-            if (typeof description !== "string") {
-              continue;
-            }
-
             const steps = runtime.live.steps.map((step) =>
-              step.id === block.id ? { ...step, title: description } : step,
+              step.id === block.id ? { ...step, title } : step,
             );
             setLive(runtime, { steps });
           }
@@ -2097,6 +2159,7 @@ export class BotSessions extends Context.Service<
 
         send,
         runRoutine,
+        moveRoutine,
         deleteRoutine,
 
         interrupt: (botId) =>

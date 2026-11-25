@@ -122,18 +122,19 @@ function RoutineForm({
   const [customCron, setCustomCron] = useState(
     schedule !== undefined && !isPreset ? schedule.cron : "",
   );
-  const [place, setPlace] = useState<RoutinePlace>("here");
+  const [place, setPlace] = useState<RoutinePlace>(schedule?.place ?? "here");
   const [invalidCron, setInvalidCron] = useState(false);
   const [tooManyClones, setTooManyClones] = useState(false);
   const [saving, setSaving] = useState(false);
   const cron = preset === CUSTOM ? customCron.trim() : preset;
   // An edit that changes nothing would only restart the schedule, so Save waits for a change.
   const changed =
-    schedule === undefined || prompt.trim() !== schedule.prompt || cron !== schedule.cron;
+    schedule === undefined ||
+    prompt.trim() !== schedule.prompt ||
+    cron !== schedule.cron ||
+    place !== schedule.place;
   const canSave =
     prompt.trim() !== "" && cron !== "" && changed && !invalidCron && !tooManyClones && !saving;
-  // A routine keeps its thread, so only a new routine can choose.
-  const canChoosePlace = schedule === undefined;
   const places = [
     { value: "here", label: "This conversation", icon: MessageSquareIcon },
     { value: "clone", label: `A clone of ${bot.name}`, icon: CopyIcon },
@@ -153,7 +154,7 @@ function RoutineForm({
       if (schedule === undefined) {
         await client.createSchedule(bot.id, cron, prompt.trim(), place);
       } else {
-        await client.updateSchedule(schedule.id, cron, prompt.trim());
+        await client.updateSchedule(schedule.id, cron, prompt.trim(), place);
       }
 
       onDone();
@@ -240,30 +241,28 @@ function RoutineForm({
             </SelectGroup>
           </SelectContent>
         </Select>
-        {canChoosePlace && (
-          <Select
-            items={places}
-            value={place}
-            onValueChange={(value) => {
-              setPlace(value as RoutinePlace);
-              setTooManyClones(false);
-            }}
-          >
-            <SelectTrigger aria-label="Runs in" title="Runs in" className={ROW_SELECT_TRIGGER}>
-              <PlaceIcon className="text-muted-foreground" />
-              <SelectValue className="min-w-0 truncate" />
-            </SelectTrigger>
-            <SelectContent align="start">
-              <SelectGroup>
-                {places.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        )}
+        <Select
+          items={places}
+          value={place}
+          onValueChange={(value) => {
+            setPlace(value as RoutinePlace);
+            setTooManyClones(false);
+          }}
+        >
+          <SelectTrigger aria-label="Runs in" title="Runs in" className={ROW_SELECT_TRIGGER}>
+            <PlaceIcon className="text-muted-foreground" />
+            <SelectValue className="min-w-0 truncate" />
+          </SelectTrigger>
+          <SelectContent align="start">
+            <SelectGroup>
+              {places.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
       </div>
 
       {tooManyClones && (

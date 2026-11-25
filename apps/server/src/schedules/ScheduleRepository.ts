@@ -1,4 +1,4 @@
-import type { BotId, Schedule } from "@clots/contracts";
+import type { BotId, RoutinePlace, Schedule } from "@clots/contracts";
 import { Context, Cron, Effect, Layer, PubSub, Result } from "effect";
 import { SqlClient } from "effect/sql";
 
@@ -41,8 +41,8 @@ export class ScheduleRepository extends Context.Service<
     update(id: string, cron: string, prompt: string, nextRunAt: number): Effect.Effect<void>;
     setPaused(id: string, paused: boolean): Effect.Effect<void>;
     setNextRunAt(id: string, nextRunAt: number): Effect.Effect<void>;
-    /** Sets the clone that runs a routine, after the old one was deleted. */
-    setRunner(id: string, runnerId: BotId): Effect.Effect<void>;
+    /** Sets where a routine runs, and the clone that runs it for place "clone". */
+    setPlace(id: string, place: RoutinePlace, runnerId: BotId | null): Effect.Effect<void>;
     remove(id: string): Effect.Effect<void>;
     /** Fires after each write, so that clients can read the list again. */
     readonly changes: PubSub.PubSub<void>;
@@ -121,8 +121,10 @@ export class ScheduleRepository extends Context.Service<
         setNextRunAt: (id, nextRunAt) =>
           write(sql`UPDATE schedules SET next_run_at = ${nextRunAt} WHERE id = ${id}`),
 
-        setRunner: (id, runnerId) =>
-          write(sql`UPDATE schedules SET runner_id = ${runnerId} WHERE id = ${id}`),
+        setPlace: (id, place, runnerId) =>
+          write(
+            sql`UPDATE schedules SET place = ${place}, runner_id = ${runnerId} WHERE id = ${id}`,
+          ),
 
         remove: (id) => write(sql`DELETE FROM schedules WHERE id = ${id}`),
       });
