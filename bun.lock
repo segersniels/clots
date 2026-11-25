@@ -5,6 +5,7 @@
     "": {
       "name": "clots",
       "devDependencies": {
+        "@clots/oxlint": "workspace:*",
         "oxlint": "^1.95.0",
         "turbo": "^2.11.13",
         "typescript": "catalog:",
@@ -146,6 +147,9 @@
         "typescript": "catalog:",
       },
     },
+    "packages/oxlint": {
+      "name": "@clots/oxlint",
+    },
     "spikes/e2e": {
       "name": "@clots/spike-e2e",
       "dependencies": {
@@ -270,6 +274,8 @@
     "@clots/contracts": ["@clots/contracts@workspace:packages/contracts"],
 
     "@clots/desktop": ["@clots/desktop@workspace:apps/desktop"],
+
+    "@clots/oxlint": ["@clots/oxlint@workspace:packages/oxlint"],
 
     "@clots/server": ["@clots/server@workspace:apps/server"],
 

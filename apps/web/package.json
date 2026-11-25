@@ -6,7 +6,8 @@
     "dev": "vite",
     "build": "vite build",
     "build:setup": "vite build --config vite.setup.config.ts",
-    "lint": "oxlint src",
+    "lint": "oxlint . && bun fmt --check .",
+    "lint:fix": "oxlint . --fix && bun fmt .",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

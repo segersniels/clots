@@ -2,11 +2,20 @@
   "name": "@clots/contracts",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts", "./version": "./src/version.ts" },
+  "exports": {
+    ".": "./src/index.ts",
+    "./version": "./src/version.ts"
+  },
   "scripts": {
-    "lint": "oxlint src",
+    "lint": "oxlint . && bun fmt --check .",
+    "lint:fix": "oxlint . --fix && bun fmt .",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": { "@clots/character": "workspace:*", "effect": "catalog:" },
-  "devDependencies": { "typescript": "catalog:" }
+  "dependencies": {
+    "@clots/character": "workspace:*",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
 }

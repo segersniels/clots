@@ -1,0 +1,12 @@
+{
+  "name": "@clots/oxlint",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/code-style.mjs"
+  },
+  "scripts": {
+    "lint": "oxlint . && bun fmt --check .",
+    "lint:fix": "oxlint . --fix && bun fmt ."
+  }
+}

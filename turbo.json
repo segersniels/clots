@@ -17,7 +17,16 @@
       "cache": false,
       "persistent": true
     },
-    "lint": {},
+    "lint": {
+      "dependsOn": ["^lint"],
+      "outputs": [],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/.oxlintrc.json", "$TURBO_ROOT$/bunfig.toml", "$TURBO_ROOT$/packages/oxlint/src/**"]
+    },
+    "lint:fix": {
+      "dependsOn": ["^lint:fix"],
+      "outputs": [],
+      "cache": false
+    },
     "typecheck": {
       "dependsOn": [
         "^typecheck"

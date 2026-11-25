@@ -1,0 +1,4 @@
+[fmt]
+printWidth = 100
+sortPackageJson = true
+ignorePatterns = ["**/routeTree.gen.ts"]

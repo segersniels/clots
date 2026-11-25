@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "lint": "oxlint src",
+    "lint": "oxlint . && bun fmt --check .",
+    "lint:fix": "oxlint . --fix && bun fmt .",
     "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {

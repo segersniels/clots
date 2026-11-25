@@ -2,12 +2,21 @@
   "name": "@clots/client-runtime",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts" },
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "scripts": {
-    "lint": "oxlint src",
+    "lint": "oxlint . && bun fmt --check .",
+    "lint:fix": "oxlint . --fix && bun fmt .",
     "typecheck": "tsc --noEmit",
     "test": "bun test"
   },
-  "dependencies": { "@clots/contracts": "workspace:*", "effect": "catalog:" },
-  "devDependencies": { "@types/bun": "catalog:", "typescript": "catalog:" }
+  "dependencies": {
+    "@clots/contracts": "workspace:*",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "typescript": "catalog:"
+  }
 }

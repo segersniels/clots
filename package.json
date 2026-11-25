@@ -22,12 +22,14 @@
     "dev": "CLOTS_WEB_DEV_PORT=5173 turbo run dev",
     "build": "turbo run build",
     "build:cli": "turbo run build --filter=@clots/web --filter=@clots/sidecar && bun apps/server/scripts/build-cli.ts",
-    "lint": "turbo run lint",
+    "lint": "bun fmt --check .oxlintrc.json bunfig.toml && turbo run lint",
+    "lint:fix": "bun fmt .oxlintrc.json bunfig.toml && turbo run lint:fix",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "start": "bun run --cwd apps/server start"
   },
   "devDependencies": {
+    "@clots/oxlint": "workspace:*",
     "oxlint": "^1.95.0",
     "turbo": "^2.11.13",
     "typescript": "catalog:"

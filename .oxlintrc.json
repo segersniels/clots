@@ -1,0 +1,19 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "jsPlugins": ["@clots/oxlint"],
+  "ignorePatterns": ["**/routeTree.gen.ts"],
+  "rules": {
+    "code-style/blank-line-after-logical-block": "error",
+    "code-style/blank-line-before-control-transfer": "error",
+    "code-style/blank-line-between-switch-cases": "error",
+    "code-style/blank-line-before-logical-block-after-multiline": "error",
+    "code-style/use-jsdoc-for-function-comments": "error",
+    "code-style/use-jsdoc-for-multiline-block-comments": "error",
+    "code-style/use-jsdoc-for-multiline-line-comments": "error",
+    "code-style/use-line-comment-for-single-line-comments": "error",
+    "curly": ["error", "all"],
+    "no-irregular-whitespace": "error",
+    "no-multi-str": "error",
+    "no-unexpected-multiline": "error"
+  }
+}
