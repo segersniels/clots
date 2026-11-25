@@ -347,7 +347,9 @@ export function ComposerField({
       }
     }
 
+    // Escape closes only the picker, not a dialog around the field.
     if (pickerOpen && event.key === "Escape") {
+      event.stopPropagation();
       setDismissedAt(query.from);
 
       return true;
