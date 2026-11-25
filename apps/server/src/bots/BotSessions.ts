@@ -268,7 +268,7 @@ const systemPromptFor = (bot: StoredBot) =>
     `When a page needs the operator (a login, a captcha, a payment), call the ${HANDOFF_TOOL} tool and wait.`,
     bot.parentName === null
       ? ""
-      : `You are a clone of @${bot.parentName}: you have its instructions and its skills, and they stay the same as its own. You cannot change them or make routines. When a task needs to know what @${bot.parentName} did, read its notes directory ${bot.parentDirectory} and its thread with read_bot_thread.`,
+      : `You are a clone of @${bot.parentName}: you have its instructions, its skills and its memory, and they stay the same as its own. You cannot change them or make routines. When a task needs to know what @${bot.parentName} did, read its notes directory ${bot.parentDirectory} and its thread with read_bot_thread.`,
     // Only a bot with its own skills gets the line, so the prompt of every other bot stays the same.
     ...(botPlugins(bot).length === 0 ? [] : [OWN_SKILLS_NOTE]),
     bot.instructions.trim() === "" ? "" : `# Instructions\n\n${bot.instructions}`,
@@ -1790,8 +1790,8 @@ export class BotSessions extends Context.Service<
               // clots shows the bot's name, so Claude Code does not need a request to name the session.
               title: bot.name,
               settings: {
-                // Claude Code keeps its memory per working directory, so all bots in a project would share it. Each bot keeps its own.
-                autoMemoryDirectory: join(bot.workingDirectory, "memory"),
+                // Claude Code keeps its memory per working directory, so all bots in a project would share it. Each bot keeps its own, and a clone shares the memory of the bot that it mirrors.
+                autoMemoryDirectory: join(bot.parentDirectory ?? bot.workingDirectory, "memory"),
                 // Each request pays for the whole thread again. Without this, a thread on a 1M model compacts only near 970k tokens.
                 autoCompactWindow: AUTO_COMPACT_WINDOW,
               },

@@ -10,9 +10,9 @@ import {
   type BotSummary,
 } from "@clots/contracts";
 import { Effect, PubSub, Stream } from "effect";
-import { existsSync, statSync } from "node:fs";
+import { cpSync, existsSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 
 import { readAccount } from "../account/Account.ts";
 import { deleteBotSkill, readBotSkills, saveBotSkill, writeBotSkills } from "../bots/BotPlugin.ts";
@@ -177,12 +177,32 @@ export const HandlersLayer = ClotsRpcs.toLayer(
         ),
 
       DuplicateBot: ({ botId }) =>
-        requireBot(botId).pipe(
-          Effect.flatMap(({ name, instructions, color, shape, model, projectId }) =>
-            bots.create({ name: `${name} copy`, instructions, color, shape, model, projectId }),
-          ),
-          Effect.tap(() => PubSub.publish(sessions.statusChanges, undefined)),
-        ),
+        Effect.gen(function* () {
+          const source = yield* requireBot(botId);
+          const { name, instructions, color, shape, model, projectId } = source;
+          const copy = yield* bots.create({
+            name: `${name} copy`,
+            instructions,
+            color,
+            shape,
+            model,
+            projectId,
+          });
+
+          // The copy starts with the memory and the skills of the bot, and after that it keeps its own.
+          const sourceDirectory = source.parentDirectory ?? source.workingDirectory;
+          for (const folder of ["memory", "plugin"]) {
+            if (existsSync(join(sourceDirectory, folder))) {
+              cpSync(join(sourceDirectory, folder), join(copy.workingDirectory, folder), {
+                recursive: true,
+              });
+            }
+          }
+
+          yield* PubSub.publish(sessions.statusChanges, undefined);
+
+          return copy;
+        }),
 
       DeleteBot: ({ botId }) =>
         requireBot(botId).pipe(Effect.flatMap((bot) => sessions.deleteBot(bot))),
