@@ -104,6 +104,9 @@ const uniqueName = (wanted: string, bots: ReadonlyArray<StoredBot>) => {
 /** Builds the text that a tool returns. */
 const toolText = (text: string) => ({ content: [{ type: "text" as const, text }] });
 
+/** Names a tool for the operator. An MCP tool such as "mcp__clots__send_bot_message" shows as "send_bot_message". */
+const shownToolName = (name: string) => name.replace(/^mcp__.+?__/, "");
+
 /** The image files that the thread shows when a bot opens one with Read, by extension. */
 const SHOWN_IMAGE_TYPES: Readonly<Record<string, string>> = {
   ".png": "image/png",
@@ -365,7 +368,7 @@ export class BotSessions extends Context.Service<
 
             const approval = {
               id,
-              toolName,
+              toolName: shownToolName(toolName),
               input: JSON.stringify(input, null, 2),
               canAllowAlways: suggestions !== undefined && suggestions.length > 0,
             };
@@ -833,7 +836,7 @@ export class BotSessions extends Context.Service<
             const event = message.event;
 
             if (event.type === "content_block_start" && event.content_block.type === "tool_use") {
-              const step = { id: event.content_block.id, title: `Using ${event.content_block.name}`, status: "running" as const };
+              const step = { id: event.content_block.id, title: `Using ${shownToolName(event.content_block.name)}`, status: "running" as const };
               setLive(runtime, { steps: [...runtime.live.steps, step] });
             }
 
@@ -850,7 +853,7 @@ export class BotSessions extends Context.Service<
 
             // A transcript has no stream events, so after a restart the step starts here.
             if (!runtime.live.steps.some((step) => step.id === block.id)) {
-              const title = typeof description === "string" ? description : `Using ${block.name}`;
+              const title = typeof description === "string" ? description : `Using ${shownToolName(block.name)}`;
               setLive(runtime, { steps: [...runtime.live.steps, { id: block.id, title, status: "running" }] });
 
               continue;
