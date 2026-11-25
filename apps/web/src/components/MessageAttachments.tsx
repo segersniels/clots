@@ -21,7 +21,8 @@ function ImageAttachment({ url, name }: { url: string; name: string }) {
         aria-label={`Open ${name}`}
         className="cursor-zoom-in rounded-2xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
       >
-        <img src={url} alt={name} className="max-h-56 max-w-full rounded-2xl border" />
+        {/* A fixed height keeps the thread still while the image loads. The muted box holds its place. */}
+        <img src={url} alt={name} decoding="async" className="h-56 w-auto min-w-24 max-w-full rounded-2xl border bg-muted object-contain" />
       </DialogTrigger>
       <DialogContent showCloseButton={false} className="w-auto max-w-[calc(100vw-2rem)] bg-transparent p-0 ring-0 sm:max-w-[calc(100vw-4rem)]">
         <DialogTitle className="sr-only">{name}</DialogTitle>
