@@ -30,6 +30,9 @@ export const AttachmentRouteLayer = HttpRouter.add(
     );
     if (file === undefined) return notFound;
 
-    return yield* HttpServerResponse.file(join(directory, file)).pipe(Effect.orElseSucceed(() => notFound));
+    // An attachment id names one file that never changes, so the browser keeps it and a remount shows it at once.
+    return yield* HttpServerResponse.file(join(directory, file), {
+      headers: { "cache-control": "private, max-age=31536000, immutable" },
+    }).pipe(Effect.orElseSucceed(() => notFound));
   }),
 );
