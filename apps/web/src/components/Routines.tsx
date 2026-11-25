@@ -234,7 +234,7 @@ function RoutineRow({
   const Icon = schedule.paused ? CirclePauseIcon : ClockIcon;
 
   return (
-    <Collapse open={shown}>
+    <Collapse open={shown} unclipWhenOpen>
       <div ref={row} className="pb-1">
         <Collapse open={!editing}>
           <div className="grid grid-cols-[18px_minmax(0,1fr)_28px] items-center gap-x-2.5 gap-y-px rounded-xl bg-muted/60 py-2 pr-1.5 pl-2.5">
@@ -274,7 +274,7 @@ function RoutineRow({
             </DropdownMenu>
           </div>
         </Collapse>
-        <Collapse open={editing}>
+        <Collapse open={editing} unclipWhenOpen>
           {formKey.current > 0 && <RoutineForm key={formKey.current} botId={botId} schedule={schedule} onDone={endEdit} />}
         </Collapse>
       </div>
@@ -342,7 +342,7 @@ export function Routines({ botId }: { botId: BotId }) {
       )}
 
       <div className="-mt-1">
-        <Collapse open={adding}>
+        <Collapse open={adding} unclipWhenOpen>
           <RoutineForm
             botId={botId}
             onDone={() => {
