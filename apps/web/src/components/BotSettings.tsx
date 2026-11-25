@@ -13,6 +13,12 @@ import { ComposerField, type ComposerFieldHandle } from "./ComposerField.tsx";
 export const CHIP_FIELD_CLASSES =
   "max-h-60 overflow-y-auto rounded-xl bg-muted/60 transition-[background-color,box-shadow] duration-150 focus-within:bg-muted focus-within:ring-1 focus-within:ring-ring/40";
 
+/** The label row of a section in the details pane. Its text lines up with the group labels of the bot list. */
+export const PANE_LABEL = "flex h-7 items-center px-1 text-[0.8125rem] text-muted-foreground";
+
+/** The line that a section in the details pane shows while it has no rows. It sits on the label line. */
+export const PANE_EMPTY = "px-1 text-sm text-muted-foreground";
+
 /** Caps the picker of a pane field at about six rows, so it covers at most the row above and never its label. */
 export const CHIP_PICKER_CLASSES = "max-h-[13.5rem]";
 
@@ -97,8 +103,8 @@ export function BotInstructions({ bot }: { bot: BotSummary }) {
   }, [flashing]);
 
   return (
-    <section className="flex flex-col gap-2">
-      <h2 className="px-1 text-[0.8125rem] text-muted-foreground">Instructions</h2>
+    <section className="flex flex-col gap-1">
+      <h2 className={PANE_LABEL}>Instructions</h2>
       <div className="relative">
         <ComposerField
           ref={field}
@@ -109,7 +115,7 @@ export function BotInstructions({ bot }: { bot: BotSummary }) {
           onTextChange={setInstructions}
           onBlur={saveInstructions}
           autoFocus={false}
-          className={`${CHIP_FIELD_CLASSES} min-h-24 ${flashing ? "ring-2 ring-attention/50" : ""}`}
+          className={`${CHIP_FIELD_CLASSES} min-h-13 ${flashing ? "ring-2 ring-attention/50" : ""}`}
           pickerClassName={CHIP_PICKER_CLASSES}
         />
       </div>

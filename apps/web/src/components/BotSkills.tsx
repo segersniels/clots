@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
 import { client, useStore } from "../client.ts";
+import { PANE_EMPTY, PANE_LABEL } from "./BotSettings.tsx";
 import { Collapse } from "./Collapse.tsx";
 import { CreateDialog, CreateDialogFooter, FILLED_FIELD } from "./CreateDialog.tsx";
 
@@ -221,14 +222,14 @@ function SkillRow({
 
   return (
     <Collapse open={shown && !removing}>
-      <div className="pb-1.5">
+      <div className="pb-1">
         <div
           className={`group grid grid-cols-[minmax(0,1fr)_28px] items-center rounded-xl bg-muted/60 pr-1.5 transition-[background-color,box-shadow] duration-300 ease-out hover:bg-muted ${ringing ? "ring-[1.5px] ring-attention/55" : "ring-0 ring-attention/0"}`}
         >
           <button
             type="button"
             onClick={onEdit}
-            className="grid grid-cols-[18px_minmax(0,1fr)] items-center gap-x-2.5 gap-y-px rounded-xl py-2 pl-3 text-left outline-none focus-visible:ring-1 focus-visible:ring-ring/40"
+            className="grid grid-cols-[18px_minmax(0,1fr)] items-center gap-x-2.5 gap-y-px rounded-xl py-2 pl-2.5 text-left outline-none focus-visible:ring-1 focus-visible:ring-ring/40"
           >
             <BoxIcon className="row-span-2 size-[17px] text-skill" />
             <span className="col-start-2 truncate">
@@ -313,18 +314,18 @@ export function BotSkills({ bot }: { bot: BotSummary }) {
   }, [own]);
 
   return (
-    <section className="flex flex-col gap-2">
-      <div className="flex items-center justify-between">
-        <h2 className="px-1 text-[0.8125rem] text-muted-foreground">Skills</h2>
+    <section className="flex flex-col gap-1">
+      <div className="flex h-7 items-center justify-between">
+        <h2 className={PANE_LABEL}>Skills</h2>
         <Button variant="ghost" size="icon-sm" aria-label="New skill" className="text-muted-foreground" onClick={() => openEditor(undefined)}>
           <PlusIcon />
         </Button>
       </div>
 
-      {own !== null && own.length === 0 && <p className="px-1 text-muted-foreground">No skills yet. Add one, or ask {bot.name} to write one.</p>}
+      {own !== null && own.length === 0 && <p className={PANE_EMPTY}>No skills yet. Add one, or ask {bot.name} to write one.</p>}
 
       {own !== null && own.length > 0 && (
-        <div className="-mb-1.5">
+        <div className="-mb-1">
           {own.map((skill) => (
             <SkillRow
               key={skill.name}

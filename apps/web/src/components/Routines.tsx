@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { client, useStore } from "../client.ts";
 import { knownNames, type KnownNames } from "../references.ts";
 import { formatClock, formatNextDay } from "../time.ts";
-import { CHIP_FIELD_CLASSES, CHIP_PICKER_CLASSES } from "./BotSettings.tsx";
+import { CHIP_FIELD_CLASSES, CHIP_PICKER_CLASSES, PANE_EMPTY, PANE_LABEL } from "./BotSettings.tsx";
 import { Collapse } from "./Collapse.tsx";
 import { ComposerField, type ComposerFieldHandle } from "./ComposerField.tsx";
 import { ReferenceText } from "./ReferenceText.tsx";
@@ -235,9 +235,9 @@ function RoutineRow({
 
   return (
     <Collapse open={shown}>
-      <div ref={row} className="pb-1.5">
+      <div ref={row} className="pb-1">
         <Collapse open={!editing}>
-          <div className="grid grid-cols-[18px_minmax(0,1fr)_28px] items-center gap-x-2.5 gap-y-px rounded-xl bg-muted/60 py-2 pr-1.5 pl-3">
+          <div className="grid grid-cols-[18px_minmax(0,1fr)_28px] items-center gap-x-2.5 gap-y-px rounded-xl bg-muted/60 py-2 pr-1.5 pl-2.5">
             <Icon className={`row-span-2 size-[17px] text-muted-foreground transition-opacity ${schedule.paused ? "opacity-50" : ""}`} />
             <p title={schedule.prompt} className={`col-start-2 truncate transition-opacity ${schedule.paused ? "opacity-50" : ""}`}>
               <ReferenceText text={schedule.prompt} known={known} bots={bots} />
@@ -306,9 +306,9 @@ export function Routines({ botId }: { botId: BotId }) {
   const focusNewRoutine = () => requestAnimationFrame(() => newRoutine.current?.focus());
 
   return (
-    <section className="flex flex-col gap-2">
-      <div className="flex items-center justify-between">
-        <h2 className="px-1 text-[0.8125rem] text-muted-foreground">Routines</h2>
+    <section className="flex flex-col gap-1">
+      <div className="flex h-7 items-center justify-between">
+        <h2 className={PANE_LABEL}>Routines</h2>
         <Button
           ref={newRoutine}
           variant="ghost"
@@ -321,10 +321,10 @@ export function Routines({ botId }: { botId: BotId }) {
         </Button>
       </div>
 
-      {schedules.length === 0 && !adding && <p className="px-1 text-muted-foreground">No routines yet.</p>}
+      {schedules.length === 0 && !adding && <p className={PANE_EMPTY}>No routines yet.</p>}
 
       {schedules.length > 0 && (
-        <div className="-mb-1.5">
+        <div className="-mb-1">
           {schedules.map((schedule) => (
             <RoutineRow
               key={schedule.id}
@@ -341,7 +341,7 @@ export function Routines({ botId }: { botId: BotId }) {
         </div>
       )}
 
-      <div className="-mt-2">
+      <div className="-mt-1">
         <Collapse open={adding}>
           <RoutineForm
             botId={botId}
@@ -349,7 +349,7 @@ export function Routines({ botId }: { botId: BotId }) {
               close();
               focusNewRoutine();
             }}
-            className="pt-2"
+            className="pt-1"
           />
         </Collapse>
       </div>

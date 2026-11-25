@@ -41,7 +41,14 @@ import { UpdatePill, useUpdates } from "./UpdateControl.tsx";
 import { ProjectMenu } from "./ProjectMenu.tsx";
 import { NewDialog, SearchDialog, useSearchShortcuts, type SearchCommands } from "./SearchDialog.tsx";
 
-const EMPTY_HINT = "px-2.5 py-1.5 text-[0.8125rem] text-muted-foreground/70";
+/** The line of an empty group. It sits on the label line, like the empty lines of the details pane. */
+const EMPTY_HINT = "px-1 text-sm text-muted-foreground";
+
+/**
+ * The label row of a group: 28 px high, with its text on the label line. The hover background reaches
+ * past the line, so its padding moves into a negative margin.
+ */
+const GROUP_LABEL = "-mx-1.5 flex h-7 w-[calc(100%+0.75rem)] items-center rounded-lg px-2.5 text-[0.8125rem]";
 
 /** The window width from which the sidebar shows beside the main area. It matches the Tailwind `md` breakpoint. */
 const WIDE_WINDOW = "(min-width: 48rem)";
@@ -336,7 +343,8 @@ function SortableRow({ bot, clones }: Row) {
 function BotRows({ rows }: { rows: ReadonlyArray<Row> }) {
   return (
     <SortableContext items={rows.map((row) => row.bot.id)} strategy={verticalListSortingStrategy}>
-      <div className="flex flex-col gap-1">
+      {/* An empty group hides the list, so its empty line keeps the same 4 px under the label as a row. */}
+      <div className="flex flex-col gap-1 empty:hidden">
         {rows.map((row) => (
           <SortableRow key={row.bot.id} {...row} />
         ))}
@@ -469,7 +477,7 @@ function GroupToggle({ name, open, onToggle, title }: { name: string; open: bool
       type="button"
       aria-expanded={open}
       onClick={onToggle}
-      className="flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-[0.8125rem] text-muted-foreground transition-colors duration-150 hover:bg-sidebar-accent"
+      className={`${GROUP_LABEL} justify-between text-muted-foreground transition-colors duration-150 hover:bg-sidebar-accent`}
       title={title}
     >
       <span className="truncate">{name}</span>
@@ -500,7 +508,7 @@ function ProjectSection({
     <BotDropZone group={project.id} highlighted={highlighted}>
       <ProjectMenu project={project} botCount={botCount} onRename={() => setRenaming(true)} renameField={renameField}>
         {renaming ? (
-          <div className="flex w-full items-center rounded-lg px-2.5 py-1.5 text-[0.8125rem]">
+          <div className={GROUP_LABEL}>
             <RenameField
               ref={renameField}
               name={project.name}
@@ -629,7 +637,7 @@ export function BotList() {
 
       <DndContext {...drag.context}>
         <ScrollArea className="min-h-0 flex-1">
-          <div className="flex flex-col gap-3 px-2 pb-3">
+          <div className="flex flex-col gap-5 px-3 pb-3">
             {projects.map((project) => (
               <ProjectSection
                 key={project.id}
