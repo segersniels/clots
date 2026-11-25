@@ -1,4 +1,4 @@
-import type { DesktopAppBridge, DesktopBridge, InstallStep } from "@clots/contracts";
+import type { AppUpdateState, DesktopAppBridge, DesktopBridge, InstallStep } from "@clots/contracts";
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 
 /** The calls of the setup page. Only the app's own setup page gets them, never the web client of a server. */
@@ -22,9 +22,18 @@ const bridge: DesktopBridge = {
 
 if (location.protocol === "file:") contextBridge.exposeInMainWorld("clotsDesktop", bridge);
 
-/** The calls that every page gets, so the web client can show notifications that lead back to the app. */
+/** The calls that every page gets: notifications that lead back to the app, and the app's own update. */
 const appBridge: DesktopAppBridge = {
   revealWindow: () => ipcRenderer.invoke("app:reveal-window"),
+  updateState: () => ipcRenderer.invoke("app:update-state"),
+  onUpdateState: (onState) => {
+    const listener = (_event: IpcRendererEvent, state: AppUpdateState) => onState(state);
+    ipcRenderer.on("app:update-changed", listener);
+
+    return () => ipcRenderer.removeListener("app:update-changed", listener);
+  },
+  downloadUpdate: () => ipcRenderer.invoke("app:download-update"),
+  installUpdate: () => ipcRenderer.invoke("app:install-update"),
 };
 
 contextBridge.exposeInMainWorld("clotsApp", appBridge);

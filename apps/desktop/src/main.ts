@@ -5,6 +5,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { cancelLogin, installedVersion, installServer, LOCAL_SERVER_URL, loginClaude, runChecks } from "./local.ts";
+import { downloadUpdate, installUpdate, startUpdates, updateState } from "./updates.ts";
 
 /** Resolves a file of the app. The bundler replaces `__dirname`, so the app path is the anchor. */
 const appFile = (path: string) => join(app.getAppPath(), path);
@@ -169,6 +170,15 @@ ipcMain.handle("app:reveal-window", () => {
   app.focus({ steal: true });
 });
 
+ipcMain.handle("app:update-state", () => updateState());
+ipcMain.handle("app:download-update", () => downloadUpdate());
+
+ipcMain.handle("app:install-update", () => {
+  // The window hides on close instead of closing, which would stop the quit that installs the update.
+  quitting = true;
+  installUpdate();
+});
+
 handleSetup("setup:checks", () => runChecks());
 handleSetup("setup:login", () => loginClaude());
 handleSetup("setup:cancel-login", () => cancelLogin());
@@ -192,6 +202,9 @@ void app.whenReady().then(() => {
   Menu.setApplicationMenu(menu);
 
   createWindow();
+  void startUpdates((state) => {
+    if (window?.isDestroyed() === false) window.webContents.send("app:update-changed", state);
+  });
 
   // On macOS the dock icon shows the hidden window again.
   app.on("activate", () => {

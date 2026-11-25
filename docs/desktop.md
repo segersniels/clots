@@ -3,7 +3,7 @@
 The desktop app (`apps/desktop`) is an Electron window around the web client. It holds no copy of the client: it shows the client that your clots server serves. A server update therefore also updates the app.
 
 > [!NOTE]
-> The app is for Apple Silicon Macs. It has an ad-hoc signature and is not notarized by Apple yet.
+> The app is for Apple Silicon Macs. Releases are signed with a Developer ID and notarized by Apple.
 
 ## Install
 
@@ -13,11 +13,7 @@ curl --proto '=https' --tlsv1.2 -fsSL https://raw.githubusercontent.com/segersni
 
 The script copies Clots from the latest release's disk image to Applications. A file that `curl` downloads has no quarantine flag, so macOS opens the app without a warning.
 
-To install by hand, download [Clots.dmg](https://github.com/segersniels/clots/releases/latest/download/Clots.dmg) and drag Clots to Applications. macOS blocks an app from the internet that Apple did not notarize, so clear the download flag once:
-
-```shell
-xattr -cr /Applications/Clots.app
-```
+To install by hand, download [Clots.dmg](https://github.com/segersniels/clots/releases/latest/download/Clots.dmg) and drag Clots to Applications.
 
 ## First start
 
@@ -44,7 +40,9 @@ To change this later, use the menu **Server → Change Server…**.
 The sidebar shows new versions:
 
 - **The server** updates itself when you click **Update**. This works for a server on this Mac and for one on another machine.
-- **The app** shows **Clots app** with the new version. The click opens the release page. Run the install command again, or download the new DMG and replace the app in Applications. With **On this Mac**, the new app also brings the new server: it installs it on the next start.
+- **The app** checks GitHub for a new release when it starts and every hour, and shows **Clots app** with the new version. Click **Update** to download it in the background, then **Restart** to open the new version. An update that you do not install with **Restart** installs when you quit the app. With **On this Mac**, the new app also brings the new server: it installs it on the next start.
+
+An app with an ad-hoc signature, such as one that you build yourself or one from before the first signed release, cannot update itself, because macOS replaces only an app with a Developer ID signature. Its **Clots app** row opens the release page instead. Run the install command again, or download the new DMG and replace the app in Applications.
 
 ## Run from source
 
@@ -63,7 +61,7 @@ bun run --cwd apps/desktop package:mac
 
 This builds the `clots` command, the app and `apps/desktop/release/Clots.dmg` for your Mac's processor, and opens the DMG. Drag Clots to Applications.
 
-A DMG that you build on your own Mac opens without a warning, because macOS only checks apps that come from the internet.
+The build has an ad-hoc signature and no notarization, so it needs no Apple account. A DMG that you build on your own Mac opens without a warning, because macOS only checks apps that come from the internet.
 
 ## What the app does
 

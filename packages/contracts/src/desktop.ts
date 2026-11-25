@@ -34,10 +34,30 @@ export interface DesktopBridge {
 }
 
 /**
+ * Where the Clots app is with its own update. `off` means that the app cannot update itself: it runs
+ * from source, or it has no Developer ID signature, which macOS needs to replace the app.
+ */
+export type AppUpdateState =
+  | { readonly status: "off" }
+  | { readonly status: "current" }
+  | { readonly status: "available"; readonly version: string }
+  | { readonly status: "downloading"; readonly version: string; readonly percent: number }
+  | { readonly status: "ready"; readonly version: string }
+  | { readonly status: "failed"; readonly version: string; readonly message: string };
+
+/**
  * The calls of the Clots app that every page may make, also the web client of a remote server.
- * They only touch the app's own window, so they need no guard.
+ * They only touch the app's own window and its signed update, so they need no guard.
  */
 export interface DesktopAppBridge {
   /** Brings the app's window to the front, for example after a click on a notification. */
   revealWindow(): Promise<void>;
+  /** Reads the update state now. An app from before the updater has none of the update calls. */
+  updateState?(): Promise<AppUpdateState>;
+  /** Calls `onState` on each change of the update state. Returns the call that stops it. */
+  onUpdateState?(onState: (state: AppUpdateState) => void): () => void;
+  /** Downloads the new version in the background. */
+  downloadUpdate?(): Promise<void>;
+  /** Quits the app, replaces it with the downloaded version, and opens it again. */
+  installUpdate?(): Promise<void>;
 }
