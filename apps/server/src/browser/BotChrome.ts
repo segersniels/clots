@@ -9,6 +9,9 @@ export const realAgentBrowser = runtimePaths.agentBrowser;
 /** The agent-browser commands that do not use the page, so they do not start a Chrome. */
 const COMMANDS_WITHOUT_PAGE = new Set(["close", "session", "skills", "install", "doctor", "help", "--help", "-h", "--version"]);
 
+/** The size of each bot's browser screen, which the take-over window restores. */
+export const SCREEN_SIZE = { width: 1280, height: 800 };
+
 /** The Chrome that clots runs for one bot. */
 export interface BotChrome {
   readonly executable: string;
@@ -49,7 +52,7 @@ export const ensureChrome = async ({ executable, port, profile, userAgent }: Bot
       "--password-store=basic",
       // A real 2x scale gives sharp retina frames in the preview.
       "--force-device-scale-factor=2",
-      "--window-size=1280,800",
+      `--window-size=${SCREEN_SIZE.width},${SCREEN_SIZE.height}`,
       ...(userAgent === undefined ? [] : [`--user-agent=${userAgent}`]),
       "about:blank",
     ],

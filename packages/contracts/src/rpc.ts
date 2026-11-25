@@ -89,9 +89,10 @@ export class ProjectDirectoryNotFound extends Schema.TaggedError<ProjectDirector
 
 /**
  * A navigation from the take-over toolbar. `open` takes a URL as its target, `tab` and `closeTab` a
- * tab id from the stream, and `stop` the target id of the page that loads. `newTab` takes none.
+ * tab id from the stream, and `stop` the target id of the page that loads. `newTab` and `resetViewport`
+ * take none.
  */
-export const BrowserAction = Schema.Literals(["back", "forward", "reload", "stop", "open", "tab", "newTab", "closeTab"]);
+export const BrowserAction = Schema.Literals(["back", "forward", "reload", "stop", "open", "tab", "newTab", "closeTab", "resetViewport"]);
 export type BrowserAction = typeof BrowserAction.Type;
 
 export class ClotsRpcs extends RpcGroup.make(

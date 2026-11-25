@@ -153,6 +153,12 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
   const navigate = (action: Parameters<typeof client.navigateBrowser>[1], target?: string) =>
     void client.navigateBrowser(botId, action, target);
 
+  /** Opens the take-over window at the normal screen size, also when the bot made its page tall or narrow. */
+  const openTakeOver = () => {
+    setTakeOver(true);
+    navigate("resetViewport");
+  };
+
   /** Follows the shape of the page, and keeps it, so the next take-over of this bot opens at that size. */
   const followFrameShape = (image: HTMLImageElement) => {
     const ratio = image.naturalWidth / image.naturalHeight;
@@ -262,8 +268,8 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
                 tabIndex={0}
                 draggable={false}
                 onLoad={(event) => followFrameShape(event.currentTarget)}
-                onClick={() => setTakeOver(true)}
-                onKeyDown={(event) => event.key === "Enter" && setTakeOver(true)}
+                onClick={openTakeOver}
+                onKeyDown={(event) => event.key === "Enter" && openTakeOver()}
                 className="w-full cursor-pointer rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
               />
             </div>

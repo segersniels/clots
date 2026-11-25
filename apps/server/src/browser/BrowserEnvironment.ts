@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 
 import type { StoredBot } from "../bots/BotRepository.ts";
 import { runtimePaths } from "../paths.ts";
-import { closeChrome, realAgentBrowser, stopLoading } from "./BotChrome.ts";
+import { closeChrome, realAgentBrowser, SCREEN_SIZE, stopLoading } from "./BotChrome.ts";
 import { installBrowser, installedBrowser } from "./BrowserInstall.ts";
 
 /** The directory that holds the real `agent-browser` CLI. */
@@ -131,6 +131,9 @@ const commandFor = (action: BrowserAction, target: string | undefined) => {
 
   if (action === "newTab") return ["tab", "new"];
   if (action === "closeTab") return ["tab", "close", ...targetArgs];
+
+  // A bot can resize its page, for example to check a phone layout. Scale 2 keeps the frames sharp, as the Chrome flags do.
+  if (action === "resetViewport") return ["set", "viewport", String(SCREEN_SIZE.width), String(SCREEN_SIZE.height), "2"];
 
   return [action, ...targetArgs];
 };
