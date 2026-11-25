@@ -5,6 +5,9 @@ import { join } from "node:path";
 
 import { runtimePaths } from "./paths.ts";
 
+/** The port of the operator's own clots server. */
+export const DEFAULT_PORT = 4587;
+
 /** The host settings of one clots server. */
 export class ClotsConfig extends Context.Service<
   ClotsConfig,
@@ -34,7 +37,7 @@ export class ClotsConfig extends Context.Service<
 
     return ClotsConfig.of({
       home: process.env.CLOTS_HOME ?? join(homedir(), ".clots"),
-      port: Number(process.env.CLOTS_PORT ?? 4587),
+      port: Number(process.env.CLOTS_PORT ?? DEFAULT_PORT),
       claudePath,
       webRoot: existsSync(webRoot) ? webRoot : undefined,
       webDevPort: process.env.CLOTS_WEB_DEV_PORT === undefined ? undefined : Number(process.env.CLOTS_WEB_DEV_PORT),

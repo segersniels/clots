@@ -10,13 +10,17 @@ import { SqlClient, type Statement } from "effect/sql";
 import { mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
-import { ClotsConfig } from "../config.ts";
+import { ClotsConfig, DEFAULT_PORT } from "../config.ts";
 
 /** The model of a new bot. The operator changes it per bot. */
 const DEFAULT_MODEL: BotModel = "opus";
 
-/** The first port that clots gives to a bot's browser stream. */
-const FIRST_BROWSER_STREAM_PORT = 48100;
+/**
+ * Finds the first port that a server gives to a bot's browser stream. The DevTools port of each bot
+ * is 1000 higher. A server on another port, such as a test server, gets a range of its own below the
+ * operator's, so its bots never reach the browser of one of the operator's bots.
+ */
+const firstBrowserStreamPort = (serverPort: number) => (serverPort === DEFAULT_PORT ? 48100 : 40000 + (serverPort % 100) * 10);
 
 /** A bot with the host fields that clients do not see. */
 export interface StoredBot extends Bot {
@@ -158,7 +162,7 @@ export class BotRepository extends Context.Service<
             INSERT INTO bots (id, name, instructions, color, shape, model, project_id, cloned_from, working_directory, browser_stream_port, sort_order, created_at)
             SELECT
               ${id}, ${name}, ${instructions}, ${color}, ${shape}, ${model}, ${projectId}, ${clonedFrom}, ${workingDirectory},
-              COALESCE(MAX(browser_stream_port) + 1, ${FIRST_BROWSER_STREAM_PORT}),
+              COALESCE(MAX(browser_stream_port) + 1, ${firstBrowserStreamPort(config.port)}),
               COALESCE(MAX(sort_order), 0) + 1,
               ${createdAt}
             FROM bots
