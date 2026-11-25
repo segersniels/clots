@@ -48,6 +48,7 @@ import {
   botSkillsSignature,
   ensurePluginManifest,
   OWN_SKILLS_NOTE,
+  saveBotSkill,
   showOwnSkills,
   toOwnSkills,
 } from "./BotPlugin.ts";
@@ -990,6 +991,125 @@ export class BotSessions extends Context.Service<
                 return toolText(
                   `Sent to @${bot.name}. Read its answer later with read_bot_thread.`,
                 );
+              },
+            ),
+            tool(
+              "update_bot",
+              "Change the name or the instructions of a clots bot: yourself, or another bot in your project. Do it only when the operator asks for it. The bot gets the change with its next message, after its current work.",
+              {
+                bot: z
+                  .string()
+                  .optional()
+                  .describe("The bot's id, or its name such as @Engineer. The default is you."),
+                name: z.string().trim().min(1).optional().describe("The new name."),
+                instructions: z
+                  .string()
+                  .optional()
+                  .describe(
+                    "The new instructions, in full: they replace the old ones. They are the bot's part of its system prompt.",
+                  ),
+              },
+              async ({ bot: reference, name, instructions }) => {
+                const target =
+                  reference === undefined ? self : await Effect.runPromise(findBot(reference));
+
+                if (target === undefined) {
+                  return toolText(`No bot is called ${reference}. list_bots shows the bots.`);
+                }
+
+                if (target.projectId !== self.projectId) {
+                  return toolText(
+                    `@${target.name} is not in your project, so only the operator can change it.`,
+                  );
+                }
+
+                // Bots find each other by name, so two bots must not share one.
+                const bots = await Effect.runPromise(repository.list);
+                const nameTaken =
+                  name !== undefined &&
+                  bots.some(
+                    (bot) => bot.id !== target.id && bot.name.toLowerCase() === name.toLowerCase(),
+                  );
+
+                if (nameTaken) {
+                  return toolText(`Another bot is called ${name} already. Pick another name.`);
+                }
+
+                const changes = { name, instructions };
+                await Effect.runPromise(
+                  repository
+                    .update(target.id, changes)
+                    .pipe(
+                      Effect.andThen(noteSettingsChange(target, changes)),
+                      Effect.andThen(PubSub.publish(statusChanges, undefined)),
+                    ),
+                );
+
+                return toolText(`Updated @${name ?? target.name}.`);
+              },
+            ),
+            tool(
+              "save_bot_skill",
+              "Add a skill to a clots bot, or change one: yourself, or another bot in your project. Only that bot loads it, as /bot:<name>. For a skill from the web, read it first and fill in its parts here. The bot gets the skill with its next message, after its current work.",
+              {
+                bot: z
+                  .string()
+                  .optional()
+                  .describe("The bot's id, or its name such as @Engineer. The default is you."),
+                name: z
+                  .string()
+                  .describe(
+                    "The skill's name: lowercase letters, digits and hyphens, up to 64 characters, such as launch-posts.",
+                  ),
+                description: z
+                  .string()
+                  .describe(
+                    'When the skill applies, such as "Use when something ships." Claude Code loads the skill by it.',
+                  ),
+                body: z
+                  .string()
+                  .describe("The skill's steps in Markdown, without the frontmatter."),
+                previous_name: z
+                  .string()
+                  .optional()
+                  .describe(
+                    "The current name of a skill to change. Leave it out to add a new skill.",
+                  ),
+              },
+              async ({ bot: reference, name, description, body, previous_name }) => {
+                const target =
+                  reference === undefined ? self : await Effect.runPromise(findBot(reference));
+
+                if (target === undefined) {
+                  return toolText(`No bot is called ${reference}. list_bots shows the bots.`);
+                }
+
+                if (target.projectId !== self.projectId) {
+                  return toolText(
+                    `@${target.name} is not in your project, so only the operator can change it.`,
+                  );
+                }
+
+                const reason = saveBotSkill(target, { name, description, body }, previous_name);
+
+                switch (reason) {
+                  case "name":
+                    return toolText(
+                      "A skill name has only lowercase letters, digits and hyphens, up to 64 characters.",
+                    );
+
+                  case "taken":
+                    return toolText(
+                      `@${target.name} has a skill called ${name} already. Set previous_name to change it.`,
+                    );
+
+                  case "missing":
+                    return toolText(`@${target.name} has no skill called ${previous_name}.`);
+                }
+
+                await Effect.runPromise(checkOwnSkills(target));
+
+                return toolText(`Saved /bot:${name} for @${target.name}.`);
               },
             ),
             tool(
