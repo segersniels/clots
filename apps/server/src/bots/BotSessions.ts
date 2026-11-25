@@ -216,7 +216,7 @@ const withSettingsNote = (prompt: SDKUserMessage, note: string): SDKUserMessage 
 const systemPromptFor = (bot: StoredBot) =>
   [
     `You are ${bot.name}, an always-on bot that the operator talks to through clots.`,
-    `You have one ongoing thread. Your notes directory is your durable memory: keep notes in ${bot.workingDirectory}/CLAUDE.md and other files there.`,
+    `You have one ongoing thread. Your notes directory, ${bot.workingDirectory}, holds your memory and the files you make.`,
     bot.projectDirectory === null
       ? "Your notes directory is also your current directory."
       : `You work on the project "${bot.projectName}". Its directory, ${bot.projectDirectory}, is your current directory.`,

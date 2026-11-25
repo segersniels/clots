@@ -15,7 +15,7 @@ Open the Clots app, or the web client: `http://127.0.0.1:4587` on the host, or y
 4. Enter the instructions. The instructions say what the bot does and how it behaves. clots adds them to the system prompt of Claude Code.
 5. Click **Get started**.
 
-Each bot gets its own working directory under `~/.clots/bots/`. The bot keeps its notes there, for example in `CLAUDE.md`. That is its durable memory.
+Each bot gets its own working directory under `~/.clots/bots/`. The bot keeps its memory there, in `memory/`: Claude Code's automatic memory, separate for each bot. A `CLAUDE.md` in that directory also loads into each session.
 
 ## Projects
 
@@ -25,7 +25,7 @@ A project groups bots, and it can point at a folder on the server, for example a
 2. Enter a name. Optionally enter the directory, for example `~/code/mejl`.
 3. Open a bot's details (click its name at the top of the chat) and pick the project under **Project**.
 
-A bot of a project with a directory works in that directory. It then also gets the `CLAUDE.md`, the skills and the settings of that folder. Its own notes stay in its notes directory under `~/.clots/bots/`.
+A bot of a project with a directory works in that directory. It then also gets the `CLAUDE.md`, the skills and the settings of that folder. Its own memory stays in its directory under `~/.clots/bots/`.
 
 When you move a bot to another project, it starts a new Claude Code session, because a session belongs to one directory. The chat history stays, but the bot does not remember it.
 

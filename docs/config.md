@@ -27,7 +27,8 @@ CLAUDE_CONFIG_DIR=~/.claude-work CLOTS_HOME=~/.clots-work CLOTS_PORT=4588 clots 
 ~/.clots/
   clots.db            SQLite: bots, threads, messages, schedules, projects
   bots/<bot id>/      The working directory of one bot
-    CLAUDE.md         The bot's own notes (the bot writes them)
+    memory/           The bot's own memory (Claude Code's automatic memory)
+    CLAUDE.md         Optional notes that load into each session
     attachments/      The files that you sent to the bot
     .browser-profile/ The bot's browser profile, with its logins
   tailscale/          The state of the sidecar, and status.json
