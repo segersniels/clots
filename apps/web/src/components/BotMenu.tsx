@@ -122,7 +122,7 @@ export function BotMenu({
           </ContextMenuItem>
           <ContextMenuItem onClick={duplicate}>
             <UserRoundPlusIcon className={ICON} />
-            Clone
+            Duplicate
           </ContextMenuItem>
 
           <ContextMenuSeparator />
