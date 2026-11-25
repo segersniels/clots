@@ -7,6 +7,10 @@ import { dirname, join } from "node:path";
 import { cancelLogin, installedVersion, installServer, LOCAL_SERVER_URL, loginClaude, runChecks } from "./local.ts";
 import { downloadUpdate, installUpdate, startUpdates, updateState } from "./updates.ts";
 
+// The app menu shows the name in About, Hide and Quit. The data folder stays where versions named after the package kept it.
+app.setPath("userData", app.getPath("userData"));
+app.setName("Clots");
+
 /** Resolves a file of the app. The bundler replaces `__dirname`, so the app path is the anchor. */
 const appFile = (path: string) => join(app.getAppPath(), path);
 const configPath = () => join(app.getPath("userData"), "config.json");
