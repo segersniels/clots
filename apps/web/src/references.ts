@@ -69,7 +69,7 @@ export const matchItems = <T extends { readonly name: string; readonly descripti
 const referenceAt = (text: string, index: number, known: KnownNames) => {
   if (index > 0 && !/\s/.test(text[index - 1]!)) return null;
 
-  if (text[index] === "/") {
+  if (text[index] === "/" || text[index] === "$") {
     const name = /^[a-zA-Z0-9](?:[\w:.-]*\w)?/.exec(text.slice(index + 1))?.[0];
 
     return name !== undefined && known.skills.has(name) ? { kind: "skill" as const, name } : null;
@@ -84,7 +84,7 @@ const referenceAt = (text: string, index: number, known: KnownNames) => {
   return null;
 };
 
-/** Splits a message into plain text and references. A `/word` or `@word` that names nothing known stays plain text. */
+/** Splits a message into plain text and references. A `/word`, `$word` or `@word` that names nothing known stays plain text. */
 export const splitReferences = (text: string, known: KnownNames): ReadonlyArray<MessagePart> => {
   const parts: MessagePart[] = [];
   let plainFrom = 0;
