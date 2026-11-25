@@ -11,8 +11,8 @@ declare global {
 
 /**
  * Shows a system notification when a bot finishes a turn while the Clots window is in the
- * background, as a chat app does for a new message. A click opens that bot. Only the Clots app
- * does this: a browser tab stays quiet.
+ * background, as a chat app does for a new message. A click opens that bot. It also keeps the
+ * number of unread bots on the app icon. Only the Clots app does this: a browser tab stays quiet.
  */
 export const startBotNotifications = (openBot: (botId: BotId) => void) => {
   const app = window.clotsApp;
@@ -21,9 +21,16 @@ export const startBotNotifications = (openBot: (botId: BotId) => void) => {
 
   // The first list is the state at start, not a change, so it notifies nobody.
   let working: Set<BotId> | undefined;
+  let unreadCount: number | undefined;
 
   client.bots.subscribe(() => {
     const bots = client.bots.get();
+
+    // The app icon counts the unread bots, as a chat app counts its unread chats.
+    const unread = bots.filter((bot) => bot.unread).length;
+    if (unread !== unreadCount) void app.setBadgeCount?.(unread);
+    unreadCount = unread;
+
     const before = working;
     working = new Set(bots.filter((bot) => bot.status === "working").map((bot) => bot.id));
 

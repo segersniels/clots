@@ -60,4 +60,6 @@ export interface DesktopAppBridge {
   downloadUpdate?(): Promise<void>;
   /** Quits the app, replaces it with the downloaded version, and opens it again. */
   installUpdate?(): Promise<void>;
+  /** Shows the number of unread bots on the app icon. Zero removes the badge. An older app has no badge. */
+  setBadgeCount?(count: number): Promise<void>;
 }

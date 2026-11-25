@@ -170,6 +170,8 @@ ipcMain.handle("app:reveal-window", () => {
   app.focus({ steal: true });
 });
 
+ipcMain.handle("app:set-badge-count", (_event, count: number) => void app.setBadgeCount(count));
+
 ipcMain.handle("app:update-state", () => updateState());
 ipcMain.handle("app:download-update", () => downloadUpdate());
 

@@ -34,6 +34,7 @@ const appBridge: DesktopAppBridge = {
   },
   downloadUpdate: () => ipcRenderer.invoke("app:download-update"),
   installUpdate: () => ipcRenderer.invoke("app:install-update"),
+  setBadgeCount: (count) => ipcRenderer.invoke("app:set-badge-count", count),
 };
 
 contextBridge.exposeInMainWorld("clotsApp", appBridge);
