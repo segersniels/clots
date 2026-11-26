@@ -84,7 +84,7 @@ function SkillPreviewScene({
     const pause = (ms: number) => wait(ms, stop.signal);
 
     const play = async () => {
-      for (;;) {
+      while (true) {
         setSent(false);
         setDraft(EMPTY_DRAFT);
         await pause(700);

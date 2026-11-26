@@ -403,23 +403,28 @@ function NewBotForm({
   const create = async (event: FormEvent) => {
     event.preventDefault();
     setCreating(true);
+    const request = {
+      name: name.trim(),
+      instructions: template?.instructions ?? "",
+      color,
+      shape,
+      projectId,
+      skills: template?.skills ?? [],
+    };
 
     try {
-      const bot = await client.createBot({
-        name: name.trim(),
-        instructions: template?.instructions ?? "",
-        color,
-        shape,
-        projectId,
-        skills: template?.skills ?? [],
-      });
+      const bot = await client.createBot(request);
       await untilListed(bot.id);
       createdBot = bot.id;
       onCreated();
       await navigate({ to: "/bots/$botId", params: { botId: bot.id } });
-    } finally {
+    } catch (error) {
       setCreating(false);
+
+      throw error;
     }
+
+    setCreating(false);
   };
 
   const shownTemplate = template ?? lastTemplate;
@@ -571,16 +576,17 @@ function NewProjectForm({ onCreated }: { onCreated: () => void }) {
   const create = async (event: FormEvent) => {
     event.preventDefault();
     setCreating(true);
+    const projectDirectory = directory.trim() === "" ? null : directory.trim();
 
     try {
-      await client.createProject(name.trim(), directory.trim() === "" ? null : directory.trim());
+      await client.createProject(name.trim(), projectDirectory);
       onCreated();
     } catch {
       // The server rejects a directory that does not exist on the host.
       setDirectoryMissing(true);
-    } finally {
-      setCreating(false);
     }
+
+    setCreating(false);
   };
 
   return (

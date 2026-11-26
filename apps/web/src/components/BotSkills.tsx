@@ -113,9 +113,11 @@ function SkillForm({
     }
 
     setSaving(true);
+    // The compiler cannot compile optional chaining inside a try block.
+    const editedName = skill?.name;
 
     try {
-      await client.saveBotSkill(bot.id, finished, skill?.name);
+      await client.saveBotSkill(bot.id, finished, editedName);
       onDone();
     } catch (error) {
       setFailure(failureOf(error));

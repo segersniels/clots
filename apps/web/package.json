@@ -8,7 +8,8 @@
     "build:setup": "vite build --config vite.setup.config.ts",
     "lint": "oxlint . && bun fmt --check .",
     "lint:fix": "oxlint . --fix && bun fmt .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",

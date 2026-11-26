@@ -193,11 +193,9 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
     setFrameRatio(DEFAULT_SCREEN_RATIO);
     resettingViewport.current = true;
 
-    try {
-      await client.navigateBrowser(botId, "resetViewport");
-    } finally {
+    await client.navigateBrowser(botId, "resetViewport").finally(() => {
       resettingViewport.current = false;
-    }
+    });
   };
 
   /** Follows the shape of the page, and keeps it, so the next take-over of this bot opens at that size. */
