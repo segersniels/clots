@@ -1,7 +1,7 @@
 import { Character } from "@clots/character";
 import type { BotId, LoginSource } from "@clots/contracts";
 import { CheckIcon, ChevronDownIcon, CircleAlertIcon, XIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -14,9 +14,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Spinner } from "@/components/ui/spinner";
+import { useMountEffect } from "@/hooks/use-mount-effect";
 
 import { client } from "../client.ts";
 import { formatAgo } from "../time.ts";
+import { Timeout } from "./OnMount.tsx";
 
 /** Tells the operator what a copied login can do to the other bot. */
 export const LOGIN_RISK = "Both bots then share one session. Some sites sign one of them out.";
@@ -76,42 +78,18 @@ export function LoginBar({
   address: string;
 }) {
   const host = hostOf(address);
-  const [sources, setSources] = useState<ReadonlyArray<LoginSource>>([]);
   const [phase, setPhase] = useState<Phase>({ kind: "offer" });
   const [hiddenHosts, setHiddenHosts] = useState<ReadonlySet<string>>(new Set());
   // A copy changes the bot's logins, so the bar asks the server again after it.
   const [checks, setChecks] = useState(0);
 
-  useEffect(() => {
-    setSources([]);
-
-    if (host === undefined) {
-      return;
-    }
-
-    let current = true;
-    client
-      .findLogins(botId, address)
-      .then((found) => current && setSources(found))
-      .catch(() => undefined);
-
-    return () => {
-      current = false;
-    };
-  }, [botId, host, checks]);
-
-  useEffect(() => {
-    if (phase.kind !== "done") {
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      setPhase({ kind: "offer" });
-      setChecks((count) => count + 1);
-    }, DONE_MS);
-
-    return () => clearTimeout(timer);
-  }, [phase]);
+  // A new bot, site or check drops the logins of the last one until the server answers.
+  const lookup = `${botId} ${host} ${checks}`;
+  const [found, setFound] = useState<{
+    lookup: string;
+    sources: ReadonlyArray<LoginSource>;
+  }>({ lookup, sources: [] });
+  const sources = found.lookup === lookup ? found.sources : [];
 
   const copy = async (from: LoginSource) => {
     setPhase({ kind: "copying", from });
@@ -265,6 +243,23 @@ export function LoginBar({
   return (
     // The bar floats over the page, so the page and its frame do not move when it shows.
     <div className="pointer-events-none absolute inset-x-0 top-3 z-10 grid justify-items-center">
+      {host !== undefined && (
+        <LoginLookup
+          key={lookup}
+          botId={botId}
+          address={address}
+          onFound={(sources) => setFound({ lookup, sources })}
+        />
+      )}
+      {phase.kind === "done" && (
+        <Timeout
+          ms={DONE_MS}
+          onEnd={() => {
+            setPhase({ kind: "offer" });
+            setChecks((count) => count + 1);
+          }}
+        />
+      )}
       {shown.previous !== null && (
         <div
           key={shown.previous.key}
@@ -285,6 +280,31 @@ export function LoginBar({
       )}
     </div>
   );
+}
+
+/** Asks the server once for the logins that other bots have on the site of the page. */
+function LoginLookup({
+  botId,
+  address,
+  onFound,
+}: {
+  botId: BotId;
+  address: string;
+  onFound: (sources: ReadonlyArray<LoginSource>) => void;
+}) {
+  useMountEffect(() => {
+    let current = true;
+    client
+      .findLogins(botId, address)
+      .then((found) => current && onFound(found))
+      .catch(() => undefined);
+
+    return () => {
+      current = false;
+    };
+  });
+
+  return null;
 }
 
 /** Hides the bar for the site of the page until the take-over closes. */

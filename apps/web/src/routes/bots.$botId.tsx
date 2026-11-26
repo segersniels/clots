@@ -2,13 +2,14 @@ import { Character } from "@clots/character";
 import type { BotId } from "@clots/contracts";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeftIcon, XIcon } from "lucide-react";
-import { useEffect, useRef, useState, type TransitionEvent } from "react";
+import { useRef, useState, type TransitionEvent } from "react";
 import { usePanelRef, type PanelSize } from "react-resizable-panels";
 
 import { Button } from "@/components/ui/button";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { useMountEffect } from "@/hooks/use-mount-effect";
 import { saveLastBot } from "@/lib/last-bot";
 import { readPaneOpen, readPaneWidth, savePaneOpen, savePaneWidth } from "@/lib/pane-width";
 
@@ -44,8 +45,57 @@ const WIDE_WINDOW = "(min-width: 64rem)";
 /** The transitions that slide the details pane over the chat on a narrow window. */
 const SLIDE_TRANSITIONS = ["translate", "opacity"];
 
+/**
+ * Reads the open bot: when it opens, and when a turn ends while it is open. A turn that ends in the
+ * open conversation is read, even when the server missed the view and marked the bot. A bot that the
+ * operator marks unread keeps the mark, because its status does not change.
+ */
+function ReadOpenBot({ botId }: { botId: BotId }) {
+  useMountEffect(() => {
+    saveLastBot(botId);
+    void client.setBotUnread(botId, false);
+
+    const openBot = () => client.bots.get().find((candidate) => candidate.id === botId);
+    let previousStatus = openBot()?.status;
+
+    return client.bots.subscribe(() => {
+      const bot = openBot();
+      const turnEnded = previousStatus !== "idle" && bot?.status === "idle";
+      previousStatus = bot?.status;
+      if (turnEnded && bot?.unread === true) {
+        void client.setBotUnread(botId, false);
+      }
+    });
+  });
+
+  return null;
+}
+
+/** Forgets a bot that is gone, for example deleted on another device, and goes home. */
+function LeaveMissingBot() {
+  const navigate = useNavigate();
+
+  useMountEffect(() => {
+    saveLastBot(null);
+    void navigate({ to: "/", replace: true });
+  });
+
+  return null;
+}
+
 function BotPage() {
   const botId = Route.useParams().botId as BotId;
+
+  // To open a bot is to read it. The key reads each bot that opens.
+  return (
+    <>
+      <ReadOpenBot key={botId} botId={botId} />
+      <BotView botId={botId} />
+    </>
+  );
+}
+
+function BotView({ botId }: { botId: BotId }) {
   const { message: jumpTo } = Route.useSearch();
   const navigate = useNavigate();
   const bots = useStore(client.bots);
@@ -59,46 +109,16 @@ function BotPage() {
   const [detailsMounted, setDetailsMounted] = useState(detailsOpen);
   // The column animates only when it opens, closes or resets. During a drag it follows the pointer at once.
   const [animating, setAnimating] = useState(false);
-  // A ref, so that a drag does not render the whole page on each move.
-  const detailsWidth = useRef(readPaneWidth(DETAILS_WIDTH_KEY, DEFAULT_DETAILS_WIDTH));
-
-  // To open a bot is to read it.
-  useEffect(() => {
-    saveLastBot(botId);
-    void client.setBotUnread(botId, false);
-  }, [botId]);
-
-  const status = bot?.status;
-  const unread = bot?.unread === true;
-  const previousStatus = useRef(status);
-
-  /**
-   * A turn that ends in the open conversation is read, even when the server missed the view and marked
-   * the bot. A bot that the operator marks unread keeps the mark, because its status does not change.
-   */
-  useEffect(() => {
-    const turnEnded = previousStatus.current !== "idle" && status === "idle";
-    previousStatus.current = status;
-    if (turnEnded && unread) {
-      void client.setBotUnread(botId, false);
-    }
-  }, [botId, status, unread]);
-
-  // The bot is gone, for example deleted on another device, so the app forgets it and goes home.
-  const missing = bots.length > 0 && bot === undefined;
-  useEffect(() => {
-    if (!missing) {
-      return;
-    }
-
-    saveLastBot(null);
-    void navigate({ to: "/", replace: true });
-  }, [missing, navigate]);
+  // The pane renders with the width after the last drag. The ref follows the pointer, so a drag does not render the whole page on each move.
+  const [settledDetailsWidth, setSettledDetailsWidth] = useState(() =>
+    readPaneWidth(DETAILS_WIDTH_KEY, DEFAULT_DETAILS_WIDTH),
+  );
+  const detailsWidth = useRef(settledDetailsWidth);
 
   // A bot that the operator just created asks for its instructions in its thread, with the caret there.
-  const createdBotId = useRef<BotId | null>(null);
+  const [createdBotId, setCreatedBotId] = useState<BotId | null>(null);
   if (takeCreatedBot(botId)) {
-    createdBotId.current = botId;
+    setCreatedBotId(botId);
   }
 
   const toggleDetails = () => {
@@ -131,6 +151,11 @@ function BotPage() {
     }
   };
 
+  // The bot is gone, for example deleted on another device, so the app forgets it and goes home.
+  if (bots.length > 0 && bot === undefined) {
+    return <LeaveMissingBot />;
+  }
+
   // The bot list arrives a moment after the page opens.
   if (bot === undefined) {
     return null;
@@ -143,6 +168,7 @@ function BotPage() {
     }
 
     detailsWidth.current = DEFAULT_DETAILS_WIDTH;
+    setSettledDetailsWidth(DEFAULT_DETAILS_WIDTH);
     savePaneWidth(DETAILS_WIDTH_KEY, DEFAULT_DETAILS_WIDTH);
     if (!reduceMotion) {
       setAnimating(true);
@@ -224,7 +250,7 @@ function BotPage() {
         key={botId}
         botId={botId}
         botName={bot.name}
-        justCreated={createdBotId.current === botId}
+        justCreated={createdBotId === botId}
         jumpTo={jumpTo}
         onJumped={() =>
           void navigate({ to: "/bots/$botId", params: { botId }, search: {}, replace: true })
@@ -290,6 +316,7 @@ function BotPage() {
     // On a wide window the pane is a column that grows, so the chat makes room at the same pace.
     <ResizablePanelGroup
       onTransitionEnd={finishTransition}
+      onLayoutChanged={() => setSettledDetailsWidth(detailsWidth.current)}
       className={animating ? "*:transition-[flex-grow] *:duration-300 *:ease-drawer" : ""}
     >
       <ResizablePanel id="chat" minSize={360}>
@@ -307,7 +334,7 @@ function BotPage() {
         panelRef={details}
         collapsible
         collapsedSize={0}
-        defaultSize={detailsOpen ? detailsWidth.current : 0}
+        defaultSize={detailsOpen ? settledDetailsWidth : 0}
         minSize={256}
         maxSize={560}
         groupResizeBehavior="preserve-pixel-size"
@@ -321,7 +348,7 @@ function BotPage() {
           {/* While the column grows or shrinks, the content keeps its width, so it does not reflow on each frame. */}
           <div
             className="flex h-full flex-col"
-            style={{ width: animating ? detailsWidth.current : "100%" }}
+            style={{ width: animating ? settledDetailsWidth : "100%" }}
           >
             {detailsContent}
           </div>

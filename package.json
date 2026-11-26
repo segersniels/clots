@@ -30,6 +30,7 @@
   },
   "devDependencies": {
     "@clots/oxlint": "workspace:*",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "oxlint": "^1.95.0",
     "turbo": "^2.11.13",
     "typescript": "catalog:"

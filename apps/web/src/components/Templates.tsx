@@ -1,13 +1,14 @@
 import { Character } from "@clots/character";
 import type { BotSkill } from "@clots/contracts";
 import { BoxIcon, ChevronDownIcon } from "lucide-react";
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 
 import type { BotTemplate } from "../templates.ts";
 import { Collapse } from "./Collapse.tsx";
 import { ROW } from "./SearchDialog.tsx";
+import { OnMount } from "./OnMount.tsx";
 
 /** How long the page waits before its character hops, so the hop starts once the page has slid in. */
 const HOP_DELAY_MS = 120;
@@ -76,11 +77,7 @@ export function TemplateList({
   const [highlighted, setHighlighted] = useState(0);
   const list = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (active) {
-      list.current?.focus({ preventScroll: true });
-    }
-  }, [active]);
+  const focusList = () => list.current?.focus({ preventScroll: true });
 
   const moveHighlight = (event: KeyboardEvent) => {
     if (event.key === "Enter") {
@@ -103,6 +100,7 @@ export function TemplateList({
 
   return (
     <div className="flex h-full flex-col">
+      {active && <OnMount run={focusList} />}
       <p className="mt-1 mb-2.5 text-[13px] text-muted-foreground">
         Start from a ready-made bot. You can change everything later.
       </p>
@@ -191,21 +189,18 @@ export function TemplatePage({
   const body = useRef<HTMLDivElement>(null);
   const use = useRef<HTMLButtonElement>(null);
 
-  // Each open starts at the top with a hop, and Enter uses the template.
-  useEffect(() => {
-    if (!active) {
-      return;
-    }
-
+  /** Starts each open at the top with a hop, and makes Enter use the template. */
+  const startPage = () => {
     body.current?.scrollTo({ top: 0 });
     use.current?.focus({ preventScroll: true });
     const timer = setTimeout(() => setHops((count) => count + 1), HOP_DELAY_MS);
 
     return () => clearTimeout(timer);
-  }, [active, template]);
+  };
 
   return (
     <div className="flex h-full flex-col">
+      {active && <OnMount key={template.id} run={startPage} />}
       <div
         ref={body}
         className="min-h-0 flex-1 overflow-y-auto px-6 pt-11 pb-4 [mask-image:linear-gradient(transparent_36px,#000_60px,#000_calc(100%-24px),transparent)] [scrollbar-width:none]"

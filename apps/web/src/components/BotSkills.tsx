@@ -1,6 +1,6 @@
 import type { BotSkill, BotSummary } from "@clots/contracts";
 import { BoxIcon, MoreHorizontalIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 
 import {
   AlertDialog,
@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useMountEffect } from "@/hooks/use-mount-effect";
 
 import { client, useStore } from "../client.ts";
 import { PANE_EMPTY, PANE_LABEL } from "./BotSettings.tsx";
@@ -253,21 +254,21 @@ function SkillRow({
   const [ringing, setRinging] = useState(isNew);
 
   // The row mounts closed and opens on the next frame, so a new skill eases in.
-  useEffect(() => {
+  useMountEffect(() => {
     const frame = requestAnimationFrame(() => setShown(true));
 
     return () => cancelAnimationFrame(frame);
-  }, []);
+  });
 
-  useEffect(() => {
-    if (!ringing) {
+  useMountEffect(() => {
+    if (!isNew) {
       return;
     }
 
     const timer = setTimeout(() => setRinging(false), RING_MS);
 
     return () => clearTimeout(timer);
-  }, [ringing]);
+  });
 
   const content = (
     <>
@@ -358,9 +359,20 @@ export function BotSkills({ bot }: { bot: BotSummary }) {
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
   const isClone = bot.clonedFrom !== null;
   // The skills of the first list are not new. Each later skill is new once.
-  const seen = useRef<Set<string> | null>(null);
-  if (seen.current === null && own !== null) {
-    seen.current = new Set(own.map((skill) => skill.name));
+  const [lists, setLists] = useState<{
+    own: typeof own;
+    seen: ReadonlySet<string> | null;
+  }>({ own, seen: null });
+
+  // A row reads whether it is new when it mounts, so the names of a list count as seen when the next list arrives.
+  if (lists.own !== own) {
+    setLists({
+      own,
+      seen:
+        lists.own === null
+          ? lists.seen
+          : new Set([...(lists.seen ?? []), ...lists.own.map((skill) => skill.name)]),
+    });
   }
 
   const ownNames = new Set((own ?? []).map((skill) => skill.name));
@@ -391,13 +403,6 @@ export function BotSkills({ bot }: { bot: BotSummary }) {
       );
     }, CLOSE_MS);
   };
-
-  // A row reads whether it is new when it mounts, so the names count as seen after that render.
-  useEffect(() => {
-    for (const skill of own ?? []) {
-      seen.current?.add(skill.name);
-    }
-  }, [own]);
 
   if (isClone && (own === null || own.length === 0)) {
     return null;
@@ -431,7 +436,7 @@ export function BotSkills({ bot }: { bot: BotSummary }) {
               key={skill.name}
               skill={skill}
               replaces={replacing.has(skill.name)}
-              isNew={seen.current !== null && !seen.current.has(skill.name)}
+              isNew={lists.seen !== null && !lists.seen.has(skill.name)}
               removing={removing.has(skill.name)}
               readOnly={isClone}
               onEdit={() => openEditor(skill)}

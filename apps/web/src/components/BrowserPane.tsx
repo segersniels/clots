@@ -1,6 +1,5 @@
 import { BROWSER_STREAM_PATH, type BotId } from "@clots/contracts";
 import {
-  useEffect,
   useRef,
   useState,
   type ClipboardEvent,
@@ -12,6 +11,7 @@ import {
 import { SquareIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { useMountEffect } from "@/hooks/use-mount-effect";
 
 import { client, useStore } from "../client.ts";
 import {
@@ -78,25 +78,23 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
   const [stopping, setStopping] = useState(false);
   const socket = useRef<WebSocket | null>(null);
   // The section keeps the last frame while it closes, so the card does not go blank as it leaves.
-  const lastFrame = useRef(frame);
-  if (frame !== null) {
-    lastFrame.current = frame;
-  }
+  const [lastFrame, setLastFrame] = useState(frame);
 
   // Frames in the bot's own page size can arrive while the take-over resets it, and must not change the window.
   const resettingViewport = useRef(false);
-  // The socket opens again after a drop, and the new one must ask for the same frame rate.
-  const takeOverNow = useRef(takeOver);
-  takeOverNow.current = takeOver;
 
   /** Asks the stream for the frame rate that fits: smooth while the operator controls the page. */
-  const sendFrameRate = (opened: WebSocket) =>
+  const sendFrameRate = (opened: WebSocket, controlled: boolean) =>
     opened.send(
-      JSON.stringify({ type: "config", maxFps: takeOverNow.current ? TAKE_OVER_FPS : PREVIEW_FPS }),
+      JSON.stringify({ type: "config", maxFps: controlled ? TAKE_OVER_FPS : PREVIEW_FPS }),
     );
+
+  // The socket opens again after a drop, and the new one must ask for the same frame rate.
+  const takeOverNow = useRef(takeOver);
   const screen = useRef<HTMLImageElement>(null);
 
-  useEffect(() => {
+  // The parent keys the pane by the bot, so one stream serves the pane's whole life.
+  useMountEffect(() => {
     let closed = false;
     let retry: ReturnType<typeof setTimeout> | undefined;
 
@@ -104,7 +102,7 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
       const url = `${window.location.origin.replace(/^http/, "ws")}${BROWSER_STREAM_PATH}/${botId}`;
       const opened = new WebSocket(url);
       socket.current = opened;
-      opened.addEventListener("open", () => sendFrameRate(opened));
+      opened.addEventListener("open", () => sendFrameRate(opened, takeOverNow.current));
 
       opened.addEventListener("message", (event) => {
         const message = JSON.parse(String(event.data));
@@ -135,7 +133,9 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
           return;
         }
 
-        setFrame(`data:image/jpeg;base64,${message.data}`);
+        const received = `data:image/jpeg;base64,${message.data}`;
+        setFrame(received);
+        setLastFrame(received);
         setPageWidth(message.metadata.deviceWidth);
 
         // The ack tells the browser that this client is ready for the next frame.
@@ -160,16 +160,18 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
       clearTimeout(retry);
       socket.current?.close();
     };
-  }, [botId]);
+  });
 
-  useEffect(() => {
+  /** Opens or closes the take-over, and asks the open stream for the frame rate that fits. */
+  const changeTakeOver = (next: boolean) => {
+    setTakeOver(next);
+    takeOverNow.current = next;
+
     const opened = socket.current;
-    if (opened?.readyState !== WebSocket.OPEN) {
-      return;
+    if (opened?.readyState === WebSocket.OPEN) {
+      sendFrameRate(opened, next);
     }
-
-    sendFrameRate(opened);
-  }, [takeOver]);
+  };
 
   /** Closes the browser to free its memory. The bot opens it again with its logins when it needs it. */
   const stopBrowser = async () => {
@@ -187,7 +189,7 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
 
   /** Opens the take-over window at the normal screen size, also when the bot made its page tall or narrow. */
   const openTakeOver = async () => {
-    setTakeOver(true);
+    changeTakeOver(true);
     setFrameRatio(DEFAULT_SCREEN_RATIO);
     resettingViewport.current = true;
 
@@ -219,7 +221,7 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
     }
   };
 
-  const sendMouse = (eventType: string) => (event: MouseEvent<HTMLImageElement>) => {
+  const sendMouse = (eventType: string, event: MouseEvent<HTMLImageElement>) => {
     const bounds = event.currentTarget.getBoundingClientRect();
 
     send({
@@ -246,7 +248,7 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
     });
   };
 
-  const sendKey = (eventType: string) => (event: KeyboardEvent) => {
+  const sendKey = (eventType: string, event: KeyboardEvent) => {
     if (!takeOver) {
       return;
     }
@@ -315,10 +317,10 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
             </Button>
           </div>
 
-          {lastFrame.current !== null && (
+          {lastFrame !== null && (
             <div className="pt-1.5">
               <img
-                src={lastFrame.current}
+                src={lastFrame}
                 alt={`${botName}'s screen`}
                 tabIndex={0}
                 draggable={false}
@@ -334,7 +336,7 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
             <BrowserWindow
               botName={botName}
               open={takeOver}
-              onOpenChange={setTakeOver}
+              onOpenChange={changeTakeOver}
               frameRatio={frameRatio}
               initialFocus={screen}
             >
@@ -372,12 +374,12 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
                       alt={`${botName}'s screen`}
                       tabIndex={0}
                       draggable={false}
-                      onMouseDown={sendMouse("mousePressed")}
-                      onMouseUp={sendMouse("mouseReleased")}
-                      onMouseMove={sendMouse("mouseMoved")}
+                      onMouseDown={(event) => sendMouse("mousePressed", event)}
+                      onMouseUp={(event) => sendMouse("mouseReleased", event)}
+                      onMouseMove={(event) => sendMouse("mouseMoved", event)}
                       onWheel={sendWheel}
-                      onKeyDown={sendKey("keyDown")}
-                      onKeyUp={sendKey("keyUp")}
+                      onKeyDown={(event) => sendKey("keyDown", event)}
+                      onKeyUp={(event) => sendKey("keyUp", event)}
                       onPaste={pasteText}
                       // The page fits the window by its width, or by its height when it is tall.
                       className="block max-h-(--page-max-height) max-w-full cursor-default outline-none"

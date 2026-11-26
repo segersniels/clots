@@ -23,7 +23,7 @@ import {
   WrenchIcon,
   type LucideIcon,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffectEvent, useRef, useState, type ReactNode } from "react";
 
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Button } from "@/components/ui/button";
@@ -48,6 +48,7 @@ import {
   TraceLine,
   TraceTitle,
 } from "@/components/ui/trace";
+import { useMountEffect } from "@/hooks/use-mount-effect";
 
 import { client, useStore } from "../client.ts";
 import { readCachedThread, saveCachedThread } from "../thread-cache.ts";
@@ -58,6 +59,7 @@ import { EmptyThread } from "./EmptyThread.tsx";
 import { LOGIN_RISK } from "./LoginBar.tsx";
 import { MessageAttachments } from "./MessageAttachments.tsx";
 import { knownNames } from "../references.ts";
+import { OnMount, Timeout } from "./OnMount.tsx";
 
 /** A new time label shows when this much time passed since the previous message. */
 const TIME_LABEL_GAP_MS = 30 * 60 * 1000;
@@ -274,41 +276,44 @@ const MESSAGES_PER_PAGE = 50;
 function OlderMessagesLoader({ hasOlder, onLoad }: { hasOlder: boolean; onLoad: () => void }) {
   const { start: canScrollUp } = useMessageScrollerScrollable();
   // A thread opens at its end, but reads as being at the top until it gets there. That moment must not load anything.
-  const leftTheTop = useRef(false);
+  const [leftTheTop, setLeftTheTop] = useState(false);
+  if (canScrollUp && !leftTheTop) {
+    setLeftTheTop(true);
+  }
 
-  useEffect(() => {
-    if (canScrollUp) {
-      leftTheTop.current = true;
+  // Each arrival at the top mounts the loader again, so one visit loads one page.
+  if (canScrollUp || !hasOlder || !leftTheTop) {
+    return null;
+  }
 
-      return;
-    }
-
-    if (hasOlder && leftTheTop.current) {
-      onLoad();
-    }
-  }, [hasOlder, canScrollUp, onLoad]);
-
-  return null;
+  return <OnMount run={onLoad} />;
 }
 
 /** How long a message that the search opened keeps the mark that tints its bubble. It matches the fade in the styles. */
 const JUMP_HIGHLIGHT_MS = 1200;
 
-/** Scrolls the thread to a message as soon as the scroller has it, then reports that it did. */
+/**
+ * Scrolls the thread to a message as soon as the scroller has it, then reports that it did. It
+ * scrolls once per mount, so the caller keys it by the message.
+ */
 function ScrollToMessage({ messageId, onScrolled }: { messageId: string; onScrolled: () => void }) {
   const { scrollToMessage } = useMessageScroller();
+  const reportScrolled = useEffectEvent(onScrolled);
 
-  useEffect(() => {
-    let frame = requestAnimationFrame(function scrollWhenReady() {
+  useMountEffect(() => {
+    let frame = 0;
+    const scrollWhenReady = () => {
       if (scrollToMessage(messageId, { align: "center" })) {
-        onScrolled();
+        reportScrolled();
       } else {
         frame = requestAnimationFrame(scrollWhenReady);
       }
-    });
+    };
+
+    frame = requestAnimationFrame(scrollWhenReady);
 
     return () => cancelAnimationFrame(frame);
-  }, [messageId]);
+  });
 
   return null;
 }
@@ -330,18 +335,18 @@ export function Chat({
   onJumped?: () => void;
 }) {
   // The open conversation is read, even while the window is in the background, so the bot does not turn unread.
-  useEffect(() => client.viewBot(botId), [botId]);
+  useMountEffect(() => client.viewBot(botId));
   const thread = useStore(client.thread(botId));
   // After the app starts again, the thread shows its last messages from before, until the server sends the history.
   const [cached] = useState(() => (thread.synced ? null : readCachedThread(botId)));
   const messages = thread.synced || cached === null ? thread.messages : cached;
   // The messages that the thread shows first stay still. Only later ones that arrive live ease in.
-  const shownThrough = useRef(
+  const [shownThrough, setShownThrough] = useState(
     thread.synced ? thread.lastSequence : (cached?.at(-1)?.sequence ?? null),
   );
 
-  if (shownThrough.current === null && thread.synced) {
-    shownThrough.current = thread.lastSequence;
+  if (shownThrough === null && thread.synced) {
+    setShownThrough(thread.lastSequence);
   }
 
   // Only a thread with nothing to show yet fades in. A thread in memory or in the cache is there at once.
@@ -359,11 +364,23 @@ export function Chat({
   const firstShown = Math.max(0, messages.length - shownCount);
 
   // The synced thread is the one to show at the next start.
-  useEffect(() => {
-    if (thread.synced) {
-      saveCachedThread(botId, thread.messages);
-    }
-  }, [botId, thread.synced, thread.messages]);
+  useMountEffect(() => {
+    const store = client.thread(botId);
+    let saved: typeof thread.messages | undefined;
+    const save = () => {
+      const { synced, messages } = store.get();
+
+      if (synced && messages !== saved) {
+        saved = messages;
+        saveCachedThread(botId, messages);
+      }
+    };
+
+    save();
+
+    return store.subscribe(save);
+  });
+
   // A stable callback, so that one visit to the top loads one page and not one per render.
   const showOlder = useCallback(() => setShownCount((count) => count + MESSAGES_PER_PAGE), []);
   const [highlightedId, setHighlightedId] = useState<string>();
@@ -374,27 +391,17 @@ export function Chat({
       : messages.findIndex((message) => message.id === jumpTo);
 
   // A search result opens the thread at its message. An older message first needs enough pages on screen.
-  useEffect(() => {
-    if (jumpIndex < 0) {
-      return;
-    }
+  const [pagedJumpIndex, setPagedJumpIndex] = useState(-1);
+  if (jumpIndex !== pagedJumpIndex) {
+    setPagedJumpIndex(jumpIndex);
 
     const pagesNeeded = Math.ceil((messages.length - jumpIndex) / MESSAGES_PER_PAGE);
 
-    if (pagesNeeded * MESSAGES_PER_PAGE > shownCount) {
+    if (jumpIndex >= 0 && pagesNeeded * MESSAGES_PER_PAGE > shownCount) {
       setShownCount(pagesNeeded * MESSAGES_PER_PAGE);
     }
-  }, [jumpIndex]);
+  }
 
-  useEffect(() => {
-    if (highlightedId === undefined) {
-      return;
-    }
-
-    const timer = setTimeout(() => setHighlightedId(undefined), JUMP_HIGHLIGHT_MS);
-
-    return () => clearTimeout(timer);
-  }, [highlightedId]);
   const skills = useStore(client.skills(botId));
   const bots = useStore(client.bots);
   const bot = bots.find((candidate) => candidate.id === botId);
@@ -417,11 +424,7 @@ export function Chat({
    * subscription replays, such as the ones a hidden window missed, appear at once with the rest.
    */
   const entrance = (sequence: number) => {
-    if (
-      shownThrough.current === null ||
-      sequence <= shownThrough.current ||
-      sequence <= thread.replayedThrough
-    ) {
+    if (shownThrough === null || sequence <= shownThrough || sequence <= thread.replayedThrough) {
       return "";
     }
 
@@ -439,11 +442,19 @@ export function Chat({
           <OlderMessagesLoader hasOlder={firstShown > 0} onLoad={showOlder} />
           {jumpTo !== undefined && jumpIndex >= firstShown && (
             <ScrollToMessage
+              key={jumpTo}
               messageId={jumpTo}
               onScrolled={() => {
                 setHighlightedId(jumpTo);
                 onJumped?.();
               }}
+            />
+          )}
+          {highlightedId !== undefined && (
+            <Timeout
+              ms={JUMP_HIGHLIGHT_MS}
+              key={`highlight-${highlightedId}`}
+              onEnd={() => setHighlightedId(undefined)}
             />
           )}
           {/* The thread runs under the floating header and fades out there. The top padding clears the header. */}

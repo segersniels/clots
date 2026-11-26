@@ -1,6 +1,6 @@
 import type { BackgroundTask, BotId } from "@clots/contracts";
 import { BotIcon, LoaderCircleIcon, SquareIcon, TerminalIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import { client, useStore } from "../client.ts";
+import { Timeout } from "./OnMount.tsx";
 
 /** How long a row or the pill takes to fade out. */
 const FADE_MS = 150;
@@ -59,67 +60,67 @@ export function BackgroundTasks({ botId }: { botId: BotId }) {
     setOpen(false);
   }
 
-  // A row whose task ended goes once its fade is over.
-  useEffect(() => {
-    if (!rows.some((row) => row.leaving)) {
-      return;
-    }
-
-    const timer = setTimeout(
-      () => setRows((current) => current.filter((row) => !row.leaving)),
-      FADE_MS,
-    );
-
-    return () => clearTimeout(timer);
-  }, [rows]);
-
   if (rows.length === 0) {
     return null;
   }
 
   const count = tasks.length > 0 ? tasks.length : lastCount;
+  const leavingIds = rows
+    .filter((row) => row.leaving)
+    .map((row) => row.task.id)
+    .join(" ");
 
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger
-        render={
-          <Button
-            variant="secondary"
-            className={`gap-2 rounded-full px-2.5 font-medium transition-[opacity,background-color] duration-150 starting:opacity-0 data-popup-open:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] motion-reduce:transition-none ${tasks.length === 0 ? "pointer-events-none opacity-0" : ""}`}
-          />
-        }
-      >
-        <LoaderCircleIcon className="size-4 animate-spin motion-reduce:animate-none" />
-        <span>
-          {count}
-          <span className="hidden @min-[7.5rem]:inline"> running</span>
-        </span>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" collisionPadding={8} className="max-h-53.5 w-80">
-        {rows.map(({ task, leaving }) => (
-          <DropdownMenuItem
-            key={task.id}
-            aria-label={`Stop ${task.description}`}
-            closeOnClick={false}
-            disabled={leaving || stopping.has(task.id)}
-            className={`py-1 pr-1 transition-opacity duration-150 starting:opacity-0 motion-reduce:transition-none ${leaving ? "opacity-0" : ""}`}
-            onClick={() => {
-              setStopping((current) => new Set(current).add(task.id));
-              void client.stopTask(botId, task.id);
-            }}
-          >
-            {task.kind === "agent" ? (
-              <BotIcon className="text-muted-foreground" />
-            ) : (
-              <TerminalIcon className="text-muted-foreground" />
-            )}
-            <span className="min-w-0 flex-1 truncate">{task.description}</span>
-            <span className="flex size-5 items-center justify-center rounded-sm text-muted-foreground group-focus/dropdown-menu-item:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_8%)] group-focus/dropdown-menu-item:text-foreground">
-              <SquareIcon className="size-2.5 fill-current" />
-            </span>
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <>
+      {/* A row whose task ended goes once its fade is over. */}
+      {leavingIds !== "" && (
+        <Timeout
+          ms={FADE_MS}
+          key={leavingIds}
+          onEnd={() => setRows((current) => current.filter((row) => !row.leaving))}
+        />
+      )}
+      <DropdownMenu open={open} onOpenChange={setOpen}>
+        <DropdownMenuTrigger
+          render={
+            <Button
+              variant="secondary"
+              className={`gap-2 rounded-full px-2.5 font-medium transition-[opacity,background-color] duration-150 starting:opacity-0 data-popup-open:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] motion-reduce:transition-none ${tasks.length === 0 ? "pointer-events-none opacity-0" : ""}`}
+            />
+          }
+        >
+          <LoaderCircleIcon className="size-4 animate-spin motion-reduce:animate-none" />
+          <span>
+            {count}
+            <span className="hidden @min-[7.5rem]:inline"> running</span>
+          </span>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" collisionPadding={8} className="max-h-53.5 w-80">
+          {rows.map(({ task, leaving }) => (
+            <DropdownMenuItem
+              key={task.id}
+              aria-label={`Stop ${task.description}`}
+              closeOnClick={false}
+              disabled={leaving || stopping.has(task.id)}
+              className={`py-1 pr-1 transition-opacity duration-150 starting:opacity-0 motion-reduce:transition-none ${leaving ? "opacity-0" : ""}`}
+              onClick={() => {
+                setStopping((current) => new Set(current).add(task.id));
+                void client.stopTask(botId, task.id);
+              }}
+            >
+              {task.kind === "agent" ? (
+                <BotIcon className="text-muted-foreground" />
+              ) : (
+                <TerminalIcon className="text-muted-foreground" />
+              )}
+              <span className="min-w-0 flex-1 truncate">{task.description}</span>
+              <span className="flex size-5 items-center justify-center rounded-sm text-muted-foreground group-focus/dropdown-menu-item:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_8%)] group-focus/dropdown-menu-item:text-foreground">
+                <SquareIcon className="size-2.5 fill-current" />
+              </span>
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>
   );
 }

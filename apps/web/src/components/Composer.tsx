@@ -1,7 +1,6 @@
 import { MAX_UPLOAD_BYTES, type BotId, type BotStatus, type Upload } from "@clots/contracts";
 import { ArrowUpIcon, FileTextIcon, PlusIcon, SquareIcon, XIcon } from "lucide-react";
 import {
-  useEffect,
   useImperativeHandle,
   useRef,
   useState,
@@ -22,6 +21,7 @@ import {
 } from "@/components/ui/attachment";
 import { InputGroup, InputGroupAddon, InputGroupButton } from "@/components/ui/input-group";
 import { useMessageScroller } from "@/components/ui/message-scroller";
+import { useMountEffect } from "@/hooks/use-mount-effect";
 
 import { client } from "../client.ts";
 import { drafts, saveDraft } from "../drafts.ts";
@@ -86,17 +86,31 @@ export function Composer({
   const { scrollToEnd } = useMessageScroller();
   const canSend = draft.trim() !== "" || files.length > 0;
 
-  // The draft outlives the composer, so it is still there when the operator comes back to the bot.
-  useEffect(() => {
-    draftFiles.set(botId, files);
-    saveDraft(botId, { text: draft, fileCount: files.length });
-  }, [botId, draft, files]);
+  /** Keeps the draft, so it is still there when the operator comes back to the bot. The draft outlives the composer. */
+  const keepDraft = (text: string, kept: ReadonlyArray<DraftFile>) => {
+    draftFiles.set(botId, kept);
+    saveDraft(botId, { text, fileCount: kept.length });
+  };
+
+  // A draft that another window saved comes without its files, so the composer counts them again when it opens.
+  useMountEffect(() => keepDraft(draft, files));
+
+  /** Takes the text that the operator types. A send changes the files before it renders, so the kept files are the current ones. */
+  const changeText = (text: string) => {
+    setDraft(text);
+    keepDraft(text, draftFiles.get(botId) ?? []);
+  };
+
+  const changeFiles = (next: ReadonlyArray<DraftFile>) => {
+    setFiles(next);
+    keepDraft(draft, next);
+  };
 
   const addFiles = (added: Iterable<File>) => {
     const accepted = [...added].filter((file) => file.size <= MAX_UPLOAD_BYTES);
     setTooLarge(accepted.length < [...added].length);
-    setFiles((current) => [
-      ...current,
+    changeFiles([
+      ...files,
       ...accepted.map((file) => ({
         id: crypto.randomUUID(),
         file,
@@ -110,7 +124,7 @@ export function Composer({
       URL.revokeObjectURL(removed.previewUrl);
     }
 
-    setFiles((current) => current.filter((file) => file.id !== removed.id));
+    changeFiles(files.filter((file) => file.id !== removed.id));
   };
 
   const send = async (event?: FormEvent) => {
@@ -126,6 +140,7 @@ export function Composer({
     const sending = files;
     field.current?.clear();
     setFiles([]);
+    keepDraft("", []);
     setTooLarge(false);
 
     try {
@@ -136,8 +151,9 @@ export function Composer({
       );
     } catch {
       // A failed send keeps the message and its files, so the operator can send it again.
-      field.current?.setText(text);
       setFiles(sending);
+      keepDraft(text, sending);
+      field.current?.setText(text);
 
       return;
     }
@@ -235,7 +251,7 @@ export function Composer({
             botId={botId}
             placeholder={files.length > 0 ? "Add a message, or hit send" : `Message ${botName}`}
             initialText={draft}
-            onTextChange={setDraft}
+            onTextChange={changeText}
             onEnter={() => void send()}
             onFiles={addFiles}
             autoFocus={autoFocus}

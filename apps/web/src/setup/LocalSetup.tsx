@@ -9,7 +9,7 @@ import {
   RotateCwIcon,
   XIcon,
 } from "lucide-react";
-import { Children, useEffect, useState, type ReactNode } from "react";
+import { Children, useRef, useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/item";
 import { Progress } from "@/components/ui/progress";
 import { Spinner } from "@/components/ui/spinner";
+import { useMountEffect } from "@/hooks/use-mount-effect";
 import { desktop } from "./bridge.ts";
 import { Screen, ScreenDescription, ScreenFooter, ScreenTitle } from "./Screen.tsx";
 
@@ -134,6 +135,17 @@ function ExternalButton({ href, children }: { href: string; children: ReactNode 
   );
 }
 
+/** Opens clots after a short pause on the done state. Leaving the checklist first cancels it. */
+function OpenLocalSoon() {
+  useMountEffect(() => {
+    const timer = setTimeout(() => void desktop.openLocal(), OPEN_DELAY_MS);
+
+    return () => clearTimeout(timer);
+  });
+
+  return null;
+}
+
 /**
  * Checks what a local clots server needs, helps to fix what is missing, then installs and starts
  * the server. When it runs, the app opens clots.
@@ -142,10 +154,40 @@ export function LocalSetup({ onBack }: { onBack: () => void }) {
   const [checks, setChecks] = useState<SetupChecks>();
   const [loggingIn, setLoggingIn] = useState(false);
   const [server, setServer] = useState<ServerPhase>({ name: "waiting" });
+  const serverStarted = useRef(false);
 
-  const refresh = () => void desktop.checks().then(setChecks);
+  const install = async () => {
+    setServer({ name: "installing", step: "install" });
+    const result = await desktop.installServer((step) => setServer({ name: "installing", step }));
+    setServer(
+      result.ok
+        ? { name: "running" }
+        : { name: "failed", message: result.message, log: result.log },
+    );
+  };
 
-  useEffect(() => {
+  const applyChecks = (next: SetupChecks) => {
+    setChecks(next);
+
+    // The server row waits for the rows above it. A server that already runs needs no install, unless the app brings a newer one.
+    const ready = next.claude.status === "ok" && next.login.status === "ok";
+    if (!ready || serverStarted.current) {
+      return;
+    }
+
+    serverStarted.current = true;
+    if (next.server.status === "ok" && !REINSTALL) {
+      setServer({ name: "running" });
+
+      return;
+    }
+
+    void install();
+  };
+
+  const refresh = () => void desktop.checks().then(applyChecks);
+
+  useMountEffect(() => {
     refresh();
 
     const timer = setInterval(() => {
@@ -159,44 +201,7 @@ export function LocalSetup({ onBack }: { onBack: () => void }) {
       clearInterval(timer);
       window.removeEventListener("focus", refresh);
     };
-  }, []);
-
-  const ready = checks?.claude.status === "ok" && checks.login.status === "ok";
-
-  const install = async () => {
-    setServer({ name: "installing", step: "install" });
-    const result = await desktop.installServer((step) => setServer({ name: "installing", step }));
-    setServer(
-      result.ok
-        ? { name: "running" }
-        : { name: "failed", message: result.message, log: result.log },
-    );
-  };
-
-  // The server row waits for the rows above it. A server that already runs needs no install, unless the app brings a newer one.
-  useEffect(() => {
-    if (!ready || server.name !== "waiting") {
-      return;
-    }
-
-    if (checks.server.status === "ok" && !REINSTALL) {
-      setServer({ name: "running" });
-
-      return;
-    }
-
-    void install();
-  }, [ready, checks?.server.status, server.name]);
-
-  useEffect(() => {
-    if (server.name !== "running") {
-      return;
-    }
-
-    const timer = setTimeout(() => void desktop.openLocal(), OPEN_DELAY_MS);
-
-    return () => clearTimeout(timer);
-  }, [server.name]);
+  });
 
   const logIn = async () => {
     setLoggingIn(true);
@@ -344,6 +349,7 @@ export function LocalSetup({ onBack }: { onBack: () => void }) {
 
       {server.name === "running" && (
         <div className="mt-4 flex items-center gap-4 animate-in fade-in slide-in-from-bottom-1 duration-300 ease-out motion-reduce:animate-none">
+          <OpenLocalSoon />
           <Character shape="tumble" color="green" mood="waiting" size={40} />
           <div>
             <p className="text-[0.9375rem] font-medium">clots runs on this Mac</p>

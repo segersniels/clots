@@ -32,12 +32,13 @@ import {
   PlusIcon,
   SearchIcon,
 } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useRef, useState, type ReactNode, type RefObject } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { useMountEffect } from "@/hooks/use-mount-effect";
 import { readPaneOpen, savePaneOpen } from "@/lib/pane-width";
 
 import { client, useStore } from "../client.ts";
@@ -200,23 +201,17 @@ function describeDraft({ text, fileCount }: Draft) {
 
 /**
  * Makes a clot glance down at its draft now and then, as if it reads what the operator started.
- * It looks down for a bit more than half of each cycle of about four seconds.
+ * It looks down for a bit more than half of each cycle of about four seconds, while it is mounted.
  */
-function useGlance(active: boolean) {
-  const [glancing, setGlancing] = useState(false);
-
-  useEffect(() => {
-    if (!active) {
-      return;
-    }
-
+function DraftGlance({ onGlance }: { onGlance: (glancing: boolean) => void }) {
+  useMountEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
     const lookDown = () => {
-      setGlancing(true);
+      onGlance(true);
       timer = setTimeout(lookUp, 2300);
     };
     const lookUp = () => {
-      setGlancing(false);
+      onGlance(false);
       timer = setTimeout(lookDown, 1900);
     };
 
@@ -224,9 +219,9 @@ function useGlance(active: boolean) {
     timer = setTimeout(lookDown, Math.random() * 4200);
 
     return () => clearTimeout(timer);
-  }, [active]);
+  });
 
-  return active && glancing;
+  return null;
 }
 
 function BotRow({ bot }: { bot: BotSummary }) {
@@ -253,11 +248,12 @@ function BotRow({ bot }: { bot: BotSummary }) {
     statusTone = "text-foreground";
   }
 
-  const glancing = useGlance(showDraft && mood === "idle" && !reduceMotion);
+  const glanceShown = showDraft && mood === "idle" && !reduceMotion;
+  const [glancing, setGlancing] = useState(false);
 
-  useEffect(() => {
+  useMountEffect(() => {
     listHasShown = true;
-  }, []);
+  });
 
   return (
     <BotMenu bot={bot} onRename={() => setRenaming(true)} renameField={renameField}>
@@ -278,8 +274,9 @@ function BotRow({ bot }: { bot: BotSummary }) {
           color={bot.color}
           mood={mood}
           size={36}
-          gaze={glancing ? DRAFT_GAZE : undefined}
+          gaze={glanceShown && glancing ? DRAFT_GAZE : undefined}
         />
+        {glanceShown && <DraftGlance onGlance={setGlancing} />}
         <span className="min-w-0 flex-1">
           <span className="flex items-baseline gap-2">
             {renaming ? (
@@ -426,15 +423,17 @@ function BotRows({ rows }: { rows: ReadonlyArray<Row> }) {
 function useBotDrag(storeGroups: Groups) {
   const [dragged, setDragged] = useState<{ botId: BotId; from: string } | null>(null);
   const [override, setOverride] = useState<Groups | null>(null);
-  const groups = override ?? storeGroups;
-  const storeOrder = JSON.stringify(storeGroups);
 
   // The server saved the drop, so the store order is the same as the dragged order now.
-  useEffect(() => {
-    if (dragged === null && override !== null && JSON.stringify(override) === storeOrder) {
-      setOverride(null);
-    }
-  }, [dragged, override, storeOrder]);
+  if (
+    dragged === null &&
+    override !== null &&
+    JSON.stringify(override) === JSON.stringify(storeGroups)
+  ) {
+    setOverride(null);
+  }
+
+  const groups = override ?? storeGroups;
 
   const sensors = useSensors(
     // A drag starts after a short move, so a click still opens the bot.
@@ -642,6 +641,13 @@ function ProjectSection({
   );
 }
 
+/** Removes the cached threads of bots that no longer exist. A new bot list mounts it again by its `key`. */
+function ThreadCacheCleanup({ botIds }: { botIds: string }) {
+  useMountEffect(() => forgetDeletedThreads(botIds.split(",") as Array<BotId>));
+
+  return null;
+}
+
 export function BotList() {
   const bots = useStore(client.bots);
   const openBotId = useParams({ strict: false }).botId;
@@ -664,13 +670,6 @@ export function BotList() {
   const botsById = new Map(bots.map((bot) => [bot.id, bot]));
   const groupOfBot = (bot: BotSummary) => bot.projectId ?? PERSONAL;
   const botIds = bots.map((bot) => bot.id).join();
-
-  // Bots also go away by their own hand or on another device. An empty list may not have arrived yet, so it forgets nothing.
-  useEffect(() => {
-    if (botIds !== "") {
-      forgetDeletedThreads(botIds.split(",") as Array<BotId>);
-    }
-  }, [botIds]);
 
   /** Checks whether a bot shows under its orchestrator, which is the case when both are in the same group. */
   const isGroupedClone = (bot: BotSummary) => {
@@ -725,6 +724,8 @@ export function BotList() {
 
   return (
     <nav className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
+      {/* Bots also go away by their own hand or on another device. An empty list may not have arrived yet, so it forgets nothing. */}
+      {botIds !== "" && <ThreadCacheCleanup key={botIds} botIds={botIds} />}
       <header className="window-drag window-buttons-inset flex h-13 shrink-0 items-center justify-end gap-1.5 px-3">
         <Button
           variant="secondary"

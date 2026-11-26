@@ -15,20 +15,14 @@ import {
   RotateCwIcon,
   ServerIcon,
 } from "lucide-react";
-import {
-  useEffect,
-  useEffectEvent,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { useEffectEvent, useState, type ReactNode } from "react";
 
 import { client, useStore } from "@/client.ts";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ProgressIndicator, ProgressTrack } from "@/components/ui/progress";
 import { Spinner } from "@/components/ui/spinner";
+import { useMountEffect } from "@/hooks/use-mount-effect";
 
 /** How often a client asks the server again for the latest release. The desktop app checks itself as often. */
 const CHECK_INTERVAL_MS = 15 * 60_000;
@@ -73,18 +67,18 @@ const hasAppUpdate = (info: UpdateInfo | undefined) =>
 function useAppUpdate() {
   const [state, setState] = useState<AppUpdateState>({ status: "off" });
 
-  useEffect(() => {
+  useMountEffect(() => {
     const bridge = window.clotsApp;
 
     if (bridge?.updateState === undefined || bridge.onUpdateState === undefined) {
       return;
     }
 
-    const stop = bridge.onUpdateState(setState);
-    void bridge.updateState().then(setState);
+    const stop = bridge.onUpdateState((next) => setState(next));
+    void bridge.updateState().then((current) => setState(current));
 
     return stop;
-  }, []);
+  });
 
   return state;
 }
@@ -94,7 +88,7 @@ type UpdatePhase =
   | { readonly name: "checking" }
   | { readonly name: "current" }
   | { readonly name: "downloading"; readonly target: string }
-  | { readonly name: "restarting"; readonly target: string; readonly since: number }
+  | { readonly name: "restarting"; readonly target: string }
   | { readonly name: "done"; readonly target: string }
   | { readonly name: "failed"; readonly message: string };
 
@@ -103,60 +97,66 @@ type UpdatePhase =
  * restart and reconnect. The footer does not say "Connecting…" while this client restarts the server.
  */
 export function useUpdates() {
-  const connection = useStore(client.connection);
   const [info, setInfo] = useState<UpdateInfo>();
   const [phase, setPhase] = useState<UpdatePhase>({ name: "idle" });
   const app = useAppUpdate();
 
-  // A new connection can mean a new server version, so the client asks again on each one.
-  useEffect(() => {
-    if (connection !== "connected") {
-      return;
-    }
-
-    const check = () => void client.getUpdateInfo().then(setInfo, () => undefined);
-    check();
-    const timer = setInterval(check, CHECK_INTERVAL_MS);
-
-    return () => clearInterval(timer);
-  }, [connection]);
+  /** Shows a phase for `ms`, then moves on to `next`. A phase that came meanwhile stays. */
+  const showFor = (shown: UpdatePhase, ms: number, next: UpdatePhase = { name: "idle" }) => {
+    setPhase(shown);
+    setTimeout(() => setPhase((current) => (current === shown ? next : current)), ms);
+  };
 
   // The restart ends when the client is connected to the new version again.
-  useEffect(() => {
-    if (phase.name !== "restarting") {
+  const endRestart = useEffectEvent((serverVersion: string) => {
+    if (
+      phase.name !== "restarting" ||
+      serverVersion !== phase.target ||
+      client.connection.get() !== "connected"
+    ) {
       return;
     }
 
-    if (connection === "connected" && info?.current === phase.target) {
-      setPhase({ name: "done", target: phase.target });
+    showFor({ name: "done", target: phase.target }, DONE_MS);
+  });
 
-      return;
-    }
+  // A new connection can mean a new server version, so the client asks again on each one.
+  useMountEffect(() => {
+    let connected = false;
+    let timer: ReturnType<typeof setInterval> | undefined;
+    const check = () =>
+      void client.getUpdateInfo().then(
+        (found) => {
+          setInfo(found);
+          endRestart(found.current);
+        },
+        () => undefined,
+      );
 
-    const timer = setTimeout(
-      () =>
-        setPhase({
-          name: "failed",
-          message: "The server did not come back after the restart. Check it on its machine.",
-        }),
-      phase.since + RESTART_TIMEOUT_MS - Date.now(),
-    );
+    const follow = () => {
+      const now = client.connection.get() === "connected";
+      if (now === connected) {
+        return;
+      }
 
-    return () => clearTimeout(timer);
-  }, [phase, connection, info?.current]);
+      connected = now;
+      clearInterval(timer);
+      if (!connected) {
+        return;
+      }
 
-  useEffect(() => {
-    if (phase.name !== "done" && phase.name !== "current") {
-      return;
-    }
+      check();
+      timer = setInterval(check, CHECK_INTERVAL_MS);
+    };
 
-    const timer = setTimeout(
-      () => setPhase({ name: "idle" }),
-      phase.name === "done" ? DONE_MS : UP_TO_DATE_MS,
-    );
+    follow();
+    const stop = client.connection.subscribe(follow);
 
-    return () => clearTimeout(timer);
-  }, [phase.name]);
+    return () => {
+      stop();
+      clearInterval(timer);
+    };
+  });
 
   const latest = info?.latest;
 
@@ -184,17 +184,19 @@ export function useUpdates() {
       setInfo(found);
     }
 
-    setPhase(
-      found !== undefined && (found.serverUpdate || appHasUpdate(found, appState ?? app))
-        ? { name: "idle" }
-        : { name: "current" },
-    );
+    if (found !== undefined && (found.serverUpdate || appHasUpdate(found, appState ?? app))) {
+      setPhase({ name: "idle" });
+
+      return;
+    }
+
+    showFor({ name: "current" }, UP_TO_DATE_MS);
   };
 
   // Check for Updates in the app menu runs the same check as the search command.
   const onMenuCheck = useEffectEvent(() => void checkNow());
 
-  useEffect(() => window.clotsApp?.onCheckForUpdates?.(onMenuCheck), []);
+  useMountEffect(() => window.clotsApp?.onCheckForUpdates?.(onMenuCheck));
 
   const updateServer = async () => {
     if (latest === undefined) {
@@ -205,7 +207,10 @@ export function useUpdates() {
 
     try {
       await client.updateServer();
-      setPhase({ name: "restarting", target: latest.version, since: Date.now() });
+      showFor({ name: "restarting", target: latest.version }, RESTART_TIMEOUT_MS, {
+        name: "failed",
+        message: "The server did not come back after the restart. Check it on its machine.",
+      });
     } catch (error) {
       const message = (error as { message?: unknown }).message;
       setPhase({
@@ -238,13 +243,14 @@ export interface Progress {
 
 /** Draws the thin progress line along the bottom edge of the row. It starts at `from` and moves to `to` on the next frame. */
 export function ProgressLine({ from, to, durationMs }: Progress) {
-  const [width, setWidth] = useState(from ?? to);
+  const [started, setStarted] = useState(false);
+  const width = started ? to : (from ?? to);
 
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => setWidth(to));
+  useMountEffect(() => {
+    const frame = requestAnimationFrame(() => setStarted(true));
 
     return () => cancelAnimationFrame(frame);
-  }, [to]);
+  });
 
   return (
     <span
@@ -284,11 +290,11 @@ function UpdateProgress({ percent, finished = false }: { percent?: number; finis
   const [creep, setCreep] = useState(0);
 
   // The creep starts on the next frame, so the bar grows from the start.
-  useEffect(() => {
+  useMountEffect(() => {
     const frame = requestAnimationFrame(() => setCreep(CREEP_END_PERCENT));
 
     return () => cancelAnimationFrame(frame);
-  }, []);
+  });
 
   let value = finished ? 100 : creep;
   let duration = finished ? FILL_FINISH_MS : FILL_MS;
@@ -611,9 +617,8 @@ export function UpdatePill({ updates }: { updates: Updates }) {
   const { info, phase, app, appUpdate, serverUpdate } = updates;
   const [open, setOpen] = useState(false);
   const view = pillViewOf(updates);
-  const shown = useRef<PillView>("available");
+  const [lastView, setLastView] = useState<PillView>("available");
   const [gone, setGone] = useState(view === undefined);
-  const label = useRef<HTMLSpanElement>(null);
   const [labelWidth, setLabelWidth] = useState<number>();
 
   // A pill that left frees its place, so the text next to the account circle has the whole line.
@@ -626,14 +631,8 @@ export function UpdatePill({ updates }: { updates: Updates }) {
     setOpen(false);
   }
 
-  // The pill sits at the end of the line, so a snapping width would make its left edge jump. It follows its label instead.
-  useLayoutEffect(() => {
-    const element = label.current;
-
-    if (element === null) {
-      return;
-    }
-
+  /** Follows the label's width. The pill sits at the end of the line, so a snapping width would make its left edge jump. */
+  const followLabel = (element: HTMLSpanElement) => {
     // A hidden pill measures zero. It keeps its last width, so it does not grow from nothing when it comes back.
     const observer = new ResizeObserver(() => {
       if (element.offsetWidth > 0) {
@@ -643,14 +642,15 @@ export function UpdatePill({ updates }: { updates: Updates }) {
     observer.observe(element);
 
     return () => observer.disconnect();
-  }, []);
+  };
 
   // A closing pill keeps its last look, so it fades out as it was.
-  if (view !== undefined) {
-    shown.current = view;
+  if (view !== undefined && view !== lastView) {
+    setLastView(view);
   }
 
-  const look = PILL[shown.current];
+  const shown = view ?? lastView;
+  const look = PILL[shown];
   const serverShown =
     serverUpdate || ["downloading", "restarting", "done", "failed"].includes(phase.name);
   let heading = "Update available";
@@ -682,17 +682,13 @@ export function UpdatePill({ updates }: { updates: Updates }) {
             <button
               type="button"
               disabled={!look.opens}
-              title={
-                shown.current === "available"
-                  ? `Update clots to ${info?.latest?.version}`
-                  : undefined
-              }
+              title={shown === "available" ? `Update clots to ${info?.latest?.version}` : undefined}
               style={{ width: labelWidth === undefined ? undefined : labelWidth + PILL_PADDING_PX }}
               className="relative flex h-8 items-center overflow-hidden rounded-full bg-sidebar-accent/80 pr-3 pl-[5px] text-[13px] font-medium whitespace-nowrap outline-none focus-visible:ring-1 focus-visible:ring-ring/40 [transition:background-color_150ms_var(--ease-out),scale_150ms_var(--ease-out),width_200ms_var(--ease-out)] enabled:hover:bg-sidebar-accent enabled:active:scale-[0.97] data-popup-open:bg-sidebar-accent motion-reduce:[transition:background-color_150ms_var(--ease-out)] motion-reduce:active:scale-100"
             />
           }
         >
-          <span ref={label} className="relative flex shrink-0">
+          <span ref={followLabel} className="relative flex shrink-0">
             <span
               key={look.label}
               className="flex items-center gap-[7px] transition-opacity duration-150 starting:opacity-0"

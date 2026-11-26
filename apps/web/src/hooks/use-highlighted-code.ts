@@ -1,40 +1,54 @@
-import * as React from "react";
+import { useCallback, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 
 import { loadHighlighter } from "@/lib/highlighter";
+
+/** A highlighter for one language, or `null` for a language that is not listed. */
+type Highlighter = Awaited<ReturnType<typeof loadHighlighter>>;
+
+/** The highlighters that finished loading, by language, so every code block of a language shares one. */
+const loadedHighlighters = new Map<string, Highlighter>();
 
 export function useHighlightedCode(value: string, language: string) {
   // A trailing newline would render as an extra empty line.
   const code = value.endsWith("\n") ? value.slice(0, -1) : value;
-  const [loaded, setLoaded] = React.useState<{
-    language: string;
-    highlighter: Awaited<ReturnType<typeof loadHighlighter>>;
-  } | null>(null);
-  const highlighter = loaded?.language === language ? loaded.highlighter : null;
+  const subscribe = useCallback(
+    (onLoaded: () => void) => {
+      let cancelled = false;
 
-  React.useEffect(() => {
-    let cancelled = false;
+      if (!loadedHighlighters.has(language)) {
+        loadHighlighter(language)
+          .then((next) => {
+            // Two blocks can load one language at once. The first highlighter stays, so neither block highlights again.
+            if (!loadedHighlighters.has(language)) {
+              loadedHighlighters.set(language, next);
+            }
 
-    loadHighlighter(language)
-      .then((next) => {
-        if (!cancelled) {
-          setLoaded({ language, highlighter: next });
-        }
-      })
-      .catch(() => {});
+            if (!cancelled) {
+              onLoaded();
+            }
+          })
+          .catch(() => {});
+      }
 
-    return () => {
-      cancelled = true;
-    };
-  }, [language]);
+      return () => {
+        cancelled = true;
+      };
+    },
+    [language],
+  );
+  const highlighter = useSyncExternalStore(
+    subscribe,
+    () => loadedHighlighters.get(language) ?? null,
+  );
 
   /**
    * The complete lines, highlighted. While the code streams, only the new
    * lines are tokenized, starting from the grammar state of the last one.
    */
-  const [done, setDone] = React.useState<{
+  const [done, setDone] = useState<{
     highlighter: typeof highlighter;
     text: string;
-    lines: React.ReactNode[];
+    lines: ReactNode[];
     state?: Parameters<NonNullable<typeof highlighter>["highlight"]>[1];
   }>({ highlighter: null, text: "", lines: [] });
 
@@ -64,7 +78,7 @@ export function useHighlightedCode(value: string, language: string) {
   // The last line is still being written, so it is tokenized on every render.
   const tail = code.slice(end);
 
-  return React.useMemo(() => {
+  return useMemo(() => {
     if (!highlighter) {
       return code.split("\n");
     }

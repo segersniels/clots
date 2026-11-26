@@ -1,9 +1,11 @@
 import { Character, type Gaze } from "@clots/character";
 import type { BotId, BotSummary } from "@clots/contracts";
 import { CheckIcon } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
+import { flushSync } from "react-dom";
 
 import { Button } from "@/components/ui/button";
+import { useMountEffect } from "@/hooks/use-mount-effect";
 
 import { client } from "../client.ts";
 import { flashInstructions } from "./BotSettings.tsx";
@@ -72,28 +74,23 @@ export function EmptyThread({
   const [hops, setHops] = useState(0);
   const field = useRef<ComposerFieldHandle>(null);
   const saved = useRef(bot.instructions);
-  // The field is inert until its step renders, so it takes the caret after that.
-  const focusField = useRef(false);
   const empty = text.trim() === "";
 
-  useEffect(() => {
-    if (step !== "field" || !focusField.current) {
-      return;
-    }
-
-    focusField.current = false;
-    field.current?.focus();
-  }, [step]);
-
   // The instructions can change in the details pane while the thread shows them.
-  useEffect(() => {
-    if (bot.instructions === saved.current) {
-      return;
-    }
+  useMountEffect(() =>
+    client.bots.subscribe(() => {
+      const instructions = client.bots
+        .get()
+        .find((candidate) => candidate.id === bot.id)?.instructions;
 
-    saved.current = bot.instructions;
-    field.current?.setText(bot.instructions);
-  }, [bot.instructions]);
+      if (instructions === undefined || instructions === saved.current) {
+        return;
+      }
+
+      saved.current = instructions;
+      field.current?.setText(instructions);
+    }),
+  );
 
   /** Saves the field through the same update as the details pane. */
   const save = () => {
@@ -127,8 +124,9 @@ export function EmptyThread({
 
   const edit = () => {
     skippedBots.delete(bot.id);
-    focusField.current = true;
-    setStep("field");
+    // The field is inert until its step renders, so it takes the caret after that.
+    flushSync(() => setStep("field"));
+    field.current?.focus();
   };
 
   const start = (example: string) => {

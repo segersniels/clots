@@ -1,13 +1,15 @@
 import { Character } from "@clots/character";
 import type { BotId, BotSummary } from "@clots/contracts";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useMountEffect } from "@/hooks/use-mount-effect";
 
 import { client } from "../client.ts";
 import { CharacterPicker } from "./CharacterPicker.tsx";
 import { ComposerField, type ComposerFieldHandle } from "./ComposerField.tsx";
+import { OnMount } from "./OnMount.tsx";
 
 /** The look of a form field with skill and bot chips: the filled surface of the details pane. Each use adds its height. */
 export const CHIP_FIELD_CLASSES =
@@ -103,30 +105,34 @@ export function BotInstructions({ bot }: { bot: BotSummary }) {
     }
   };
 
-  // The instructions can change in another place, such as the thread of a new bot.
-  useEffect(() => {
+  const syncField = () => {
     if (bot.instructions !== instructions.trim()) {
       field.current?.setText(bot.instructions);
     }
-  }, [bot.instructions]);
+  };
 
-  useEffect(() => {
-    instructionFlashes.set(bot.id, () => setFlashing(true));
+  useMountEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    instructionFlashes.set(bot.id, () => {
+      setFlashing(true);
+
+      // A save during the ring does not make it last longer.
+      if (timer !== undefined) {
+        return;
+      }
+
+      timer = setTimeout(() => {
+        timer = undefined;
+        setFlashing(false);
+      }, FLASH_MS);
+    });
 
     return () => {
       instructionFlashes.delete(bot.id);
+      clearTimeout(timer);
     };
-  }, [bot.id]);
-
-  useEffect(() => {
-    if (!flashing) {
-      return;
-    }
-
-    const timer = setTimeout(() => setFlashing(false), FLASH_MS);
-
-    return () => clearTimeout(timer);
-  }, [flashing]);
+  });
 
   if (bot.clonedFrom !== null) {
     if (bot.instructions.trim() === "") {
@@ -147,6 +153,8 @@ export function BotInstructions({ bot }: { bot: BotSummary }) {
   return (
     <section className="flex flex-col gap-1">
       <h2 className={PANE_LABEL}>Instructions</h2>
+      {/* The instructions can change in another place, such as the thread of a new bot. */}
+      <OnMount key={bot.instructions} run={syncField} />
       <div className="relative">
         <ComposerField
           ref={field}

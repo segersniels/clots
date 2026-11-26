@@ -12,7 +12,6 @@ import {
   XIcon,
 } from "lucide-react";
 import {
-  useEffect,
   useState,
   type CSSProperties,
   type KeyboardEvent,
@@ -25,6 +24,7 @@ import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui
 import { Spinner } from "@/components/ui/spinner";
 
 import { ProgressLine } from "./UpdateControl.tsx";
+import { Timeout } from "./OnMount.tsx";
 
 /** One tab of the bot's browser, as the stream lists it. */
 export interface BrowserTab {
@@ -319,16 +319,6 @@ export function AddressBar({
   const [copied, setCopied] = useState(false);
   const { secure, host, rest } = splitAddress(address);
 
-  useEffect(() => {
-    if (!copied) {
-      return;
-    }
-
-    const timer = setTimeout(() => setCopied(false), COPIED_MS);
-
-    return () => clearTimeout(timer);
-  }, [copied]);
-
   const copy = async () => {
     await navigator.clipboard.writeText(address);
     setCopied(true);
@@ -350,6 +340,7 @@ export function AddressBar({
         typed === null ? "bg-muted/60" : "bg-popover ring-2 ring-attention"
       }`}
     >
+      {copied && <Timeout ms={COPIED_MS} onEnd={() => setCopied(false)} />}
       <LockIcon
         className={`size-3.5 shrink-0 text-muted-foreground ${secure ? "" : "invisible"}`}
       />

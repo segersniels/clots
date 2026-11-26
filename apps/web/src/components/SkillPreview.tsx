@@ -1,8 +1,9 @@
 import type { BotSummary } from "@clots/contracts";
 import { BoxIcon } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffectEvent, useState } from "react";
 
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
+import { useMountEffect } from "@/hooks/use-mount-effect";
 
 import { useMediaQuery } from "../hooks/use-media-query.ts";
 import { BUBBLE } from "./Chat.tsx";
@@ -49,19 +50,32 @@ function SkillChip({ name }: { name: string }) {
  * picker shows the skill, Enter makes the chip, and the chip lands as the operator's bubble.
  * Each round reads the fields again. With reduced motion, only the sent message shows.
  */
-export function SkillPreview({ bot, name, when }: { bot: BotSummary; name: string; when: string }) {
+export function SkillPreview(props: { bot: BotSummary; name: string; when: string }) {
   const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
-  const fields = useRef({ name, when });
+
+  // A change of reduced motion mounts the preview again, so the loop starts or stops.
+  return <SkillPreviewScene key={String(reducedMotion)} reducedMotion={reducedMotion} {...props} />;
+}
+
+/** Plays the loop of the skill preview, or shows only the sent message with reduced motion. */
+function SkillPreviewScene({
+  bot,
+  name,
+  when,
+  reducedMotion,
+}: {
+  bot: BotSummary;
+  name: string;
+  when: string;
+  reducedMotion: boolean;
+}) {
   const [round, setRound] = useState({ name, when });
   const [draft, setDraft] = useState(EMPTY_DRAFT);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [sent, setSent] = useState(false);
+  const readFields = useEffectEvent(() => ({ name, when }));
 
-  useEffect(() => {
-    fields.current = { name, when };
-  });
-
-  useEffect(() => {
+  useMountEffect(() => {
     if (reducedMotion) {
       return;
     }
@@ -75,7 +89,7 @@ export function SkillPreview({ bot, name, when }: { bot: BotSummary; name: strin
         setDraft(EMPTY_DRAFT);
         await pause(700);
 
-        const current = fields.current;
+        const current = readFields();
         setRound(current);
 
         const slash = `/${(current.name || NAME_PLACEHOLDER).slice(0, 3)}`;
@@ -99,9 +113,9 @@ export function SkillPreview({ bot, name, when }: { bot: BotSummary; name: strin
     play().catch(() => {});
 
     return () => stop.abort();
-  }, [reducedMotion]);
+  });
 
-  // A loop that reduced motion stopped halfway leaves its state, so reduced motion ignores it.
+  // Reduced motion has no loop, so it shows the fields as they are.
   const shown = reducedMotion ? { name, when } : round;
   const typed = reducedMotion ? EMPTY_DRAFT : draft;
 

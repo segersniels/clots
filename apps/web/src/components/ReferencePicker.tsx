@@ -1,5 +1,5 @@
 import { cn } from "cn";
-import { useEffect, useRef, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 
@@ -8,6 +8,11 @@ export interface PickerItem {
   readonly name: string;
   readonly description: string;
   readonly icon: ReactNode;
+}
+
+/** Scrolls the active row into view when it becomes the active row. */
+function scrollIntoView(row: HTMLElement | null) {
+  row?.scrollIntoView({ block: "nearest" });
 }
 
 /**
@@ -33,16 +38,8 @@ export function ReferencePicker({
   onHover: (index: number) => void;
   className?: string | undefined;
 }) {
-  const list = useRef<HTMLDivElement>(null);
-
-  // The keys move the active row, so it must stay in view.
-  useEffect(() => {
-    list.current?.children[activeIndex]?.scrollIntoView({ block: "nearest" });
-  }, [activeIndex]);
-
   return (
     <div
-      ref={list}
       role="listbox"
       aria-label={label}
       data-open={open}
@@ -60,6 +57,8 @@ export function ReferencePicker({
           variant="ghost"
           role="option"
           aria-selected={index === activeIndex}
+          // The keys move the active row, so it must stay in view.
+          ref={index === activeIndex ? scrollIntoView : undefined}
           tabIndex={-1}
           onMouseDown={(event) => {
             event.preventDefault();

@@ -3,7 +3,6 @@ import type { BotColor, BotId, BotShape } from "@clots/contracts";
 import { useNavigate } from "@tanstack/react-router";
 import { ChevronLeftIcon, ChevronRightIcon, XIcon } from "lucide-react";
 import {
-  useEffect,
   useRef,
   useState,
   type ComponentProps,
@@ -11,6 +10,7 @@ import {
   type ReactNode,
   type SyntheticEvent,
 } from "react";
+import { flushSync } from "react-dom";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -22,6 +22,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { useMountEffect } from "@/hooks/use-mount-effect";
 
 import { client } from "../client.ts";
 import { TEMPLATES, type BotTemplate } from "../templates.ts";
@@ -297,7 +298,7 @@ export function NewBotDialog({
         projectId={projectId}
         proposedName={name}
         startOnTemplates={startOnTemplates}
-        goBack={goBack}
+        goBackRef={goBack}
         onCreated={() => onOpenChange(false)}
       />
     </CreateDialog>
@@ -313,14 +314,14 @@ function NewBotForm({
   projectId: proposedProject,
   proposedName,
   startOnTemplates,
-  goBack,
+  goBackRef,
   onCreated,
 }: {
   projectId: string | null;
   proposedName: string;
   startOnTemplates: boolean;
   /** Receives what Escape does in the current view. The form view leaves it empty, so Escape closes the dialog. */
-  goBack: { current: (() => void) | null };
+  goBackRef: { current: (() => void) | null };
   onCreated: () => void;
 }) {
   const navigate = useNavigate();
@@ -335,49 +336,60 @@ function NewBotForm({
   const [creating, setCreating] = useState(false);
   const nameField = useRef<HTMLInputElement>(null);
   const pill = useRef<HTMLButtonElement>(null);
-  const focusOnForm = useRef<"name" | "pill" | null>(null);
 
   // The last template stays in the line under the name while the line fades out after Clear.
-  const lastTemplate = useRef<BotTemplate | null>(null);
+  const [lastTemplate, setLastTemplate] = useState<BotTemplate | null>(null);
 
-  useEffect(() => {
-    goBack.current =
-      view === "form" ? null : () => (view === "page" ? setView("list") : showForm());
-  });
+  /** Builds what Escape does in a view. The form has none, so Escape closes the dialog. */
+  const backFrom = (shown: typeof view) => {
+    if (shown === "form") {
+      return null;
+    }
 
-  // The form gets the focus back where the operator left it, or on the name of a picked template, selected so typing replaces it.
-  useEffect(() => {
-    if (view !== "form" || focusOnForm.current === null) {
+    if (shown === "page") {
+      return () => showView("list");
+    }
+
+    return () => showForm("pill");
+  };
+
+  const showView = (next: "list" | "page") => {
+    goBackRef.current = backFrom(next);
+    setView(next);
+  };
+
+  /** Shows the form. The focus goes back where the operator left it, or on the name of a picked template, selected so typing replaces it. */
+  const showForm = (focus: "name" | "pill") => {
+    goBackRef.current = null;
+
+    // The form is inert until it shows, so it can take the focus only after the render.
+    flushSync(() => setView("form"));
+
+    if (focus === "name") {
+      nameField.current?.select();
+
       return;
     }
 
-    if (focusOnForm.current === "name") {
-      nameField.current?.select();
-    } else {
-      pill.current?.focus();
-    }
-
-    focusOnForm.current = null;
-  }, [view]);
-
-  const showForm = () => {
-    focusOnForm.current = "pill";
-    setView("form");
+    pill.current?.focus();
   };
+
+  useMountEffect(() => {
+    goBackRef.current = backFrom(view);
+  });
 
   const openTemplate = (picked: BotTemplate) => {
     setViewing(picked);
-    setView("page");
+    showView("page");
   };
 
-  const useTemplate = (picked: BotTemplate) => {
-    lastTemplate.current = picked;
+  const pickTemplate = (picked: BotTemplate) => {
+    setLastTemplate(picked);
     setTemplate(picked);
     setName(picked.name);
     setShape(picked.shape);
     setColor(picked.color);
-    focusOnForm.current = "name";
-    setView("form");
+    showForm("name");
   };
 
   const clearTemplate = () => {
@@ -410,7 +422,7 @@ function NewBotForm({
     }
   };
 
-  const shownTemplate = template ?? lastTemplate.current;
+  const shownTemplate = template ?? lastTemplate;
 
   return (
     <>
@@ -421,7 +433,7 @@ function NewBotForm({
             variant="ghost"
             size="icon-sm"
             className="-ml-1.5"
-            onClick={() => (view === "page" ? setView("list") : showForm())}
+            onClick={() => (view === "page" ? showView("list") : showForm("pill"))}
           >
             <ChevronLeftIcon />
             <span className="sr-only">Back</span>
@@ -437,7 +449,7 @@ function NewBotForm({
           <button
             ref={pill}
             type="button"
-            onClick={() => setView("list")}
+            onClick={() => showView("list")}
             className="flex h-7 items-center gap-1.5 rounded-full bg-muted/60 pr-2.5 pl-1.5 text-[13px] font-medium outline-none transition-colors duration-150 hover:bg-muted focus-visible:ring-1 focus-visible:ring-ring/40"
           >
             <Character shape="trio" color="purple" size={18} />
@@ -524,8 +536,8 @@ function NewBotForm({
             <TemplatePage
               template={viewing}
               active={view === "page"}
-              onBack={() => setView("list")}
-              onUse={() => useTemplate(viewing)}
+              onBack={() => showView("list")}
+              onUse={() => pickTemplate(viewing)}
             />
           )}
         </div>

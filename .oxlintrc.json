@@ -1,7 +1,18 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "jsPlugins": ["@clots/oxlint"],
+  "jsPlugins": [
+    "@clots/oxlint",
+    {
+      "name": "react-hooks-js",
+      "specifier": "eslint-plugin-react-hooks"
+    }
+  ],
   "ignorePatterns": ["**/routeTree.gen.ts"],
+  "settings": {
+    "react-hooks": {
+      "additionalEffectHooks": "(useMountEffect)"
+    }
+  },
   "rules": {
     "code-style/blank-line-after-logical-block": "error",
     "code-style/blank-line-before-control-transfer": "error",
@@ -15,5 +26,58 @@
     "no-irregular-whitespace": "error",
     "no-multi-str": "error",
     "no-unexpected-multiline": "error"
-  }
+  },
+  "overrides": [
+    {
+      "files": [
+        "apps/web/**",
+        "apps/desktop/**",
+        "apps/website/**",
+        "packages/character/**",
+        "packages/client-runtime/**"
+      ],
+      "rules": {
+        "react-hooks-js/rules-of-hooks": "error",
+        "react-hooks-js/exhaustive-deps": "warn",
+        "react-hooks-js/static-components": "error",
+        "react-hooks-js/use-memo": "error",
+        "react-hooks-js/void-use-memo": "error",
+        "react-hooks-js/preserve-manual-memoization": "error",
+        "react-hooks-js/incompatible-library": "warn",
+        "react-hooks-js/immutability": "error",
+        "react-hooks-js/globals": "error",
+        "react-hooks-js/refs": "error",
+        "react-hooks-js/set-state-in-effect": "error",
+        "react-hooks-js/error-boundaries": "error",
+        "react-hooks-js/purity": "error",
+        "react-hooks-js/set-state-in-render": "error",
+        "react-hooks-js/unsupported-syntax": "warn",
+        "react-hooks-js/config": "error",
+        "react-hooks-js/gating": "error"
+      }
+    },
+    {
+      "files": ["apps/web/src/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "react",
+                "importNames": ["useEffect", "useLayoutEffect"],
+                "message": "Derive the value, handle the event, use a key, or use useMountEffect for external sync on mount."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["apps/web/src/components/ui/**", "apps/web/src/hooks/use-mount-effect.ts"],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    }
+  ]
 }

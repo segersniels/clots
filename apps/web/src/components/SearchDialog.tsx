@@ -16,10 +16,11 @@ import {
   UserRoundPlusIcon,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffectEvent, useRef, useState, type ReactNode } from "react";
 
 import { client, useStore } from "@/client.ts";
 import { Dialog, DialogOverlay, DialogPortal, DialogTitle } from "@/components/ui/dialog";
+import { useMountEffect } from "@/hooks/use-mount-effect";
 import { setTheme } from "@/lib/color-scheme.ts";
 import { formatRecent } from "@/time.ts";
 
@@ -174,64 +175,64 @@ export function useSearchShortcuts({
   const navigate = useNavigate();
   const bots = useStore(client.bots);
 
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (!(ON_MAC ? event.metaKey : event.ctrlKey) || event.shiftKey || event.altKey) {
-        return;
-      }
+  const onKeyDown = useEffectEvent((event: KeyboardEvent) => {
+    if (!(ON_MAC ? event.metaKey : event.ctrlKey) || event.shiftKey || event.altKey) {
+      return;
+    }
 
-      const key = event.key.toLowerCase();
+    const key = event.key.toLowerCase();
 
-      if (key === "k" || key === "f") {
-        event.preventDefault();
-        onToggle();
-
-        return;
-      }
-
-      if (key === "n") {
-        event.preventDefault();
-        onNew();
-
-        return;
-      }
-
-      const place = Number(event.key);
-      const bot = Number.isInteger(place) && place >= 1 ? byRecent(bots)[place - 1] : undefined;
-
-      if (bot === undefined) {
-        return;
-      }
-
+    if (key === "k" || key === "f") {
       event.preventDefault();
-      void navigate({ to: "/bots/$botId", params: { botId: bot.id } });
-      onBotOpened();
-    };
+      onToggle();
 
-    window.addEventListener("keydown", onKeyDown);
+      return;
+    }
 
-    return () => window.removeEventListener("keydown", onKeyDown);
+    if (key === "n") {
+      event.preventDefault();
+      onNew();
+
+      return;
+    }
+
+    const place = Number(event.key);
+    const bot = Number.isInteger(place) && place >= 1 ? byRecent(bots)[place - 1] : undefined;
+
+    if (bot === undefined) {
+      return;
+    }
+
+    event.preventDefault();
+    void navigate({ to: "/bots/$botId", params: { botId: bot.id } });
+    onBotOpened();
+  });
+
+  useMountEffect(() => {
+    const listener = (event: KeyboardEvent) => onKeyDown(event);
+    window.addEventListener("keydown", listener);
+
+    return () => window.removeEventListener("keydown", listener);
   });
 }
 
 /**
- * Asks the server for thread messages that match the query once the typing pauses. The last
- * results stay until the new ones arrive, so the list does not flicker.
+ * Asks the server for thread messages that match the query once the typing pauses. Each query
+ * mounts it again, so the answer to an older query does not arrive.
  */
-function useMessageHits(query: string) {
-  const [hits, setHits] = useState<ReadonlyArray<MessageHit>>([]);
-  const searchable = query.length >= THREAD_QUERY_MIN;
-
-  useEffect(() => {
-    if (!searchable) {
-      return;
-    }
-
+function MessageSearch({
+  query,
+  onFound,
+}: {
+  query: string;
+  onFound: (hits: ReadonlyArray<MessageHit>) => void;
+}) {
+  useMountEffect(() => {
     let current = true;
     const timer = setTimeout(
       () =>
         void client.searchMessages(query, THREAD_HITS).then(
-          (found) => current && setHits(found),
+          (found) => current && onFound(found),
           () => undefined,
         ),
       THREAD_SEARCH_DELAY_MS,
@@ -241,9 +242,9 @@ function useMessageHits(query: string) {
       current = false;
       clearTimeout(timer);
     };
-  }, [query]);
+  });
 
-  return searchable ? hits : [];
+  return null;
 }
 
 /** Picks the line of a message that holds the match, as plain text, and cuts its start so the match stays in view. */
@@ -283,23 +284,21 @@ function Highlight({ text, query }: { text: string; query: string }) {
 
 /** Grows and shrinks with the results, up to a height from which they scroll. */
 function ResultsArea({ children }: { children: ReactNode }) {
-  const content = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState<number>();
 
-  useLayoutEffect(() => {
-    const element = content.current!;
+  const observeContent = (element: HTMLDivElement) => {
     const observer = new ResizeObserver(() => setHeight(element.offsetHeight));
     observer.observe(element);
 
     return () => observer.disconnect();
-  }, []);
+  };
 
   return (
     <div
       className="max-h-[470px] overflow-y-auto [scrollbar-width:none] transition-[height] duration-180 ease-out motion-reduce:transition-none"
       style={{ height }}
     >
-      <div ref={content}>{children}</div>
+      <div ref={observeContent}>{children}</div>
     </div>
   );
 }
@@ -420,7 +419,9 @@ function SearchPanel({
   const matches = (text: string | undefined) =>
     text !== undefined && text.toLowerCase().includes(needle);
   const botsById = new Map(bots.map((bot) => [bot.id, bot]));
-  const hits = useMessageHits(needle);
+  // The last results stay until the new ones arrive, so the list does not flicker.
+  const [hits, setHits] = useState<ReadonlyArray<MessageHit>>([]);
+  const searchable = needle.length >= THREAD_QUERY_MIN;
 
   const botItems: ReadonlyArray<SearchItem> = byRecent(bots)
     .filter((bot) => needle === "" || matches(bot.name) || matches(projectOf(bot)))
@@ -431,7 +432,7 @@ function SearchPanel({
       shortcut: needle === "" && index < SHORTCUT_COUNT ? index + 1 : undefined,
     }));
 
-  const messageItems: ReadonlyArray<SearchItem> = hits.flatMap((hit) => {
+  const messageItems: ReadonlyArray<SearchItem> = (searchable ? hits : []).flatMap((hit) => {
     const bot = botsById.get(hit.botId);
 
     return bot === undefined ? [] : [{ kind: "message", id: `message-${hit.messageId}`, hit, bot }];
@@ -487,6 +488,7 @@ function SearchPanel({
         />
         <kbd className={KBD}>esc</kbd>
       </div>
+      {searchable && <MessageSearch key={needle} query={needle} onFound={setHits} />}
       <ResultsArea>
         {empty && (
           <div className="flex flex-col items-center gap-3 pt-4 pb-4">

@@ -1,5 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { createFileRoute, Navigate } from "@tanstack/react-router";
 
 import { useMediaQuery } from "@/hooks/use-media-query";
 
@@ -15,21 +14,14 @@ const WIDE_WINDOW = "(min-width: 48rem)";
 /** Opens a bot. A phone has no sidebar, so there the home page is the bot list. */
 function Home() {
   const wide = useMediaQuery(WIDE_WINDOW);
-  const navigate = useNavigate();
   const firstBot = useStore(client.bots)[0]?.id;
-
-  useEffect(() => {
-    if (wide && firstBot !== undefined) {
-      void navigate({ to: "/bots/$botId", params: { botId: firstBot }, replace: true });
-    }
-  }, [wide, firstBot, navigate]);
 
   if (!wide) {
     return <BotList />;
   }
 
   if (firstBot !== undefined) {
-    return null;
+    return <Navigate to="/bots/$botId" params={{ botId: firstBot }} replace />;
   }
 
   return (

@@ -10,7 +10,7 @@ import {
   PlusIcon,
   Trash2Icon,
 } from "lucide-react";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 
 import {
   AlertDialog,
@@ -41,6 +41,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useMountEffect } from "@/hooks/use-mount-effect";
 
 import { client, useStore } from "../client.ts";
 import { knownNames, type KnownNames } from "../references.ts";
@@ -304,11 +305,11 @@ function RoutineRow({
   const [shown, setShown] = useState(false);
 
   // The row mounts closed and opens on the next frame, so a new routine eases in.
-  useEffect(() => {
+  useMountEffect(() => {
     const frame = requestAnimationFrame(() => setShown(true));
 
     return () => cancelAnimationFrame(frame);
-  }, []);
+  });
 
   // The next run comes first, so the narrow pane cuts off the rule and not the next run.
   const rule = ruleOf(schedule.cron);

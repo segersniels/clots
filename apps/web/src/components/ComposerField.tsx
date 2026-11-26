@@ -18,7 +18,9 @@ import {
 } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { BoxIcon } from "lucide-react";
-import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
+import { useImperativeHandle, useState, type Ref } from "react";
+
+import { useMountEffect } from "@/hooks/use-mount-effect";
 
 import { client, useStore } from "../client.ts";
 import {
@@ -291,33 +293,19 @@ export function ComposerField({
     ? matchItems(pickerSource, query.query).slice(0, MAX_LISTED_ITEMS)
     : [];
 
-  // The editor keeps its first handlers, so they read the current ones through these refs.
-  const latest = useRef({
-    onTextChange,
-    onEnter,
-    onSubmit,
-    onFiles,
-    onBlur,
-    onEscape,
-    placeholder,
-    handleKey: (_event: KeyboardEvent): boolean => false,
-  });
-  latest.current = {
-    onTextChange,
-    onEnter,
-    onSubmit,
-    onFiles,
-    onBlur,
-    onEscape,
-    placeholder,
-    handleKey: (event) => handleKey(event),
-  };
-
+  // The editor takes the handlers and attributes of each render, but keeps its first extensions.
   const editor = useEditor({
     extensions: [
       FORMATS,
       Markdown,
-      Placeholder.configure({ placeholder: () => latest.current.placeholder }),
+      // The placeholder can change, so it reads the current one from the attributes.
+      Placeholder.configure({
+        placeholder: ({ editor: current }) => {
+          const { attributes } = current.options.editorProps;
+
+          return typeof attributes === "object" ? (attributes["data-placeholder"] ?? "") : "";
+        },
+      }),
       ReferenceNode,
     ],
     content: toContent(initialText, known),
@@ -327,33 +315,32 @@ export function ComposerField({
       attributes: {
         "aria-label": label,
         "aria-multiline": "true",
+        "data-placeholder": placeholder,
         role: "textbox",
         class:
           "px-2.5 py-1.5 text-sm wrap-break-word whitespace-pre-wrap outline-none [&_code]:rounded-sm [&_code]:bg-muted [&_code]:px-1 [&_code]:font-mono [&_code]:text-[0.9em] [&_li_p]:my-0 [&_ol]:list-decimal [&_ol]:pl-5 [&_pre]:my-1 [&_pre]:rounded-lg [&_pre]:bg-muted [&_pre]:p-2 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_strong]:font-semibold [&_:is(h1,h2,h3,h4,h5,h6)]:font-semibold [&_hr]:my-2 [&_hr]:border-border [&_ul]:list-disc [&_ul]:pl-5 [&_blockquote]:border-l-2 [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground [&_p.is-editor-empty:first-child]:before:pointer-events-none [&_p.is-editor-empty:first-child]:before:float-left [&_p.is-editor-empty:first-child]:before:h-0 [&_p.is-editor-empty:first-child]:before:text-muted-foreground [&_p.is-editor-empty:first-child]:before:content-[attr(data-placeholder)]",
       },
-      handleKeyDown: (_view, event) => latest.current.handleKey(event),
+      handleKeyDown: (_view, event) => handleKey(event),
       handlePaste: (_view, event) => {
         const files = event.clipboardData?.files;
-        const { onFiles: takeFiles } = latest.current;
 
-        if (takeFiles === undefined || files === undefined || files.length === 0) {
+        if (onFiles === undefined || files === undefined || files.length === 0) {
           return false;
         }
 
-        takeFiles(files);
+        onFiles(files);
 
         return true;
       },
       handleDrop: (_view, event) => {
         const files = event.dataTransfer?.files;
-        const { onFiles: takeFiles } = latest.current;
 
-        if (takeFiles === undefined || files === undefined || files.length === 0) {
+        if (onFiles === undefined || files === undefined || files.length === 0) {
           return false;
         }
 
         event.preventDefault();
-        takeFiles(files);
+        onFiles(files);
 
         return true;
       },
@@ -364,35 +351,18 @@ export function ComposerField({
       }
     },
     onUpdate: ({ editor: updated }) => {
-      latest.current.onTextChange(updated.getMarkdown());
+      onTextChange(updated.getMarkdown());
       setQuery(queryAt(updated));
       setActiveItem(0);
     },
     onSelectionUpdate: ({ editor: updated }) => setQuery(queryAt(updated)),
-    onBlur: () => latest.current.onBlur?.(),
+    onBlur: () => onBlur?.(),
   });
 
   // Skills load after the field opens, so a known reference in the first text becomes a chip once they are there.
   const knownKey = [...skills.map((skill) => skill.name), ...otherBots.map((bot) => bot.name)].join(
     "\n",
   );
-
-  useEffect(() => {
-    if (editor === null) {
-      return;
-    }
-
-    // The field is focused when it opens. A caret inside the text means the operator edits it, so the text stays as it is.
-    const atEnd = editor.state.selection.to === editor.state.doc.content.size - 1;
-    if (editor.isFocused && !atEnd) {
-      return;
-    }
-
-    editor.commands.setContent(toContent(editor.getMarkdown(), known), { emitUpdate: false });
-    if (editor.isFocused) {
-      editor.commands.focus("end");
-    }
-  }, [editor, knownKey]);
 
   useImperativeHandle(ref, () => ({
     clear: () => editor?.commands.clearContent(true),
@@ -417,7 +387,7 @@ export function ComposerField({
   };
 
   /** Handles the keys of the picker, and Enter to send. Returns `true` for a key that it used. */
-  const handleKey = (event: KeyboardEvent) => {
+  const handleKey = (event: KeyboardEvent): boolean => {
     if (pickerOpen && matchingItems.length > 0) {
       if (event.key === "ArrowDown" || event.key === "ArrowUp") {
         const step = event.key === "ArrowDown" ? 1 : -1;
@@ -441,10 +411,8 @@ export function ComposerField({
       return true;
     }
 
-    const { onEscape: escape } = latest.current;
-
-    if (escape !== undefined && event.key === "Escape") {
-      escape();
+    if (onEscape !== undefined && event.key === "Escape") {
+      onEscape();
 
       return true;
     }
@@ -453,10 +421,8 @@ export function ComposerField({
       return false;
     }
 
-    const { onSubmit: submit } = latest.current;
-
-    if (submit !== undefined && (event.metaKey || event.ctrlKey)) {
-      submit();
+    if (onSubmit !== undefined && (event.metaKey || event.ctrlKey)) {
+      onSubmit();
 
       return true;
     }
@@ -486,13 +452,11 @@ export function ComposerField({
     }
 
     // Enter alone sends, in a field that sends.
-    const { onEnter: send } = latest.current;
-
-    if (send === undefined) {
+    if (onEnter === undefined) {
       return false;
     }
 
-    send();
+    onEnter();
 
     return true;
   };
@@ -510,8 +474,27 @@ export function ComposerField({
         className={pickerClassName}
       />
       <EditorContent editor={editor} className={className} />
+      {editor !== null && <KnownReferences key={knownKey} editor={editor} known={known} />}
     </>
   );
+}
+
+/** Turns the known references in the text into chips. The field keys it by the known names, so it runs again when they change. */
+function KnownReferences({ editor, known }: { editor: Editor; known: KnownNames }) {
+  useMountEffect(() => {
+    // The field is focused when it opens. A caret inside the text means the operator edits it, so the text stays as it is.
+    const atEnd = editor.state.selection.to === editor.state.doc.content.size - 1;
+    if (editor.isFocused && !atEnd) {
+      return;
+    }
+
+    editor.commands.setContent(toContent(editor.getMarkdown(), known), { emitUpdate: false });
+    if (editor.isFocused) {
+      editor.commands.focus("end");
+    }
+  });
+
+  return null;
 }
 
 /** Builds the text that the picker shows when nothing matches. A new bot lists its skills a moment after it opens. */

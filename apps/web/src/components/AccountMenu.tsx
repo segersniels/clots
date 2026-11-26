@@ -10,10 +10,11 @@ import {
   SunIcon,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { client } from "@/client.ts";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useMountEffect } from "@/hooks/use-mount-effect";
 import { currentTheme, setTheme, type Theme } from "@/lib/color-scheme.ts";
 import { formatReset } from "@/time.ts";
 import { Collapse } from "./Collapse.tsx";
@@ -84,23 +85,28 @@ const highestOf = (usage: ReadonlyArray<UsageWindow> | null | undefined) =>
     undefined,
   );
 
-/** Keeps the server's account and usage, and asks again each minute while the client is connected. */
-function useAccount(connected: boolean) {
-  const [account, setAccount] = useState<Account>();
-  const refresh = () => void client.getAccount().then(setAccount, () => undefined);
+/** Asks the server for its account and usage when it mounts, and again each minute while `poll` is set. */
+function AccountRequest({
+  poll,
+  onAccount,
+}: {
+  poll: boolean;
+  onAccount: (account: Account) => void;
+}) {
+  useMountEffect(() => {
+    const request = () => void client.getAccount().then(onAccount, () => undefined);
+    request();
 
-  useEffect(() => {
-    if (!connected) {
+    if (!poll) {
       return;
     }
 
-    refresh();
-    const timer = setInterval(refresh, CHECK_INTERVAL_MS);
+    const timer = setInterval(request, CHECK_INTERVAL_MS);
 
     return () => clearInterval(timer);
-  }, [connected]);
+  });
 
-  return { account, refresh };
+  return null;
 }
 
 /** Takes the initials of a name ("Ada Lovelace" gives "AL"), or the first letter of the email without a name. */
@@ -303,18 +309,15 @@ export function AccountMenu({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const { account, refresh } = useAccount(connected);
+  const [account, setAccount] = useState<Account>();
   const highest = highestOf(account?.usage);
-
-  // The menu shows fresh numbers on each open, however it opens.
-  useEffect(() => {
-    if (open && connected) {
-      refresh();
-    }
-  }, [open]);
 
   return (
     <div className="flex min-w-0 items-center gap-2">
+      {/* The client asks again each minute while it is connected. */}
+      {connected && <AccountRequest poll onAccount={setAccount} />}
+      {/* The menu shows fresh numbers on each open, however it opens. */}
+      {connected && open && <AccountRequest poll={false} onAccount={setAccount} />}
       <Popover open={open} onOpenChange={onOpenChange}>
         <PopoverTrigger
           render={
