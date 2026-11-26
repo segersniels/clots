@@ -47,6 +47,7 @@ import { z } from "zod";
 import { ClotsConfig } from "../config.ts";
 import { HOST_TIME_ZONE, nextRunAt, ScheduleRepository } from "../schedules/ScheduleRepository.ts";
 import { BotRepository, type BotChanges, type StoredBot } from "./BotRepository.ts";
+import { botTempDirectory, removeOldSessionFolders } from "./TempFolder.ts";
 import { isRunning, readPages } from "../browser/BotChrome.ts";
 import {
   botChrome,
@@ -1599,6 +1600,16 @@ export class BotSessions extends Context.Service<
           yield* closeBrowser(bot);
         });
 
+      // A session that ended while the server was down left its folder behind.
+      yield* repository.list.pipe(
+        Effect.map((bots) => {
+          for (const bot of bots) {
+            removeOldSessionFolders(bot, bot.sdkSessionId);
+          }
+        }),
+        Effect.forkIn(scope),
+      );
+
       // Each Chrome holds hundreds of MB, so a bot's browser stays open only while it is in use.
       yield* repository.list.pipe(
         Effect.flatMap((bots) => Effect.forEach(bots, closeIdleBrowser, { discard: true })),
@@ -1614,6 +1625,12 @@ export class BotSessions extends Context.Service<
         Effect.gen(function* () {
           if (message.type === "system" && message.subtype === "init") {
             yield* repository.setSdkSessionId(botId, message.session_id);
+
+            // A new session leaves the files of the old one behind, and nothing reads them again.
+            const bot = yield* repository.find(botId);
+            if (bot !== undefined) {
+              removeOldSessionFolders(bot, message.session_id);
+            }
 
             // The list of skills is not part of the init message, so the session is asked for it.
             const session = runtime.session;
@@ -1898,6 +1915,8 @@ export class BotSessions extends Context.Service<
               env: {
                 ...claudeOptions.env,
                 ...makeBrowserEnvironment(bot),
+                // The default /tmp is memory on many Linux hosts, and all bots share it.
+                CLAUDE_CODE_TMPDIR: botTempDirectory(bot),
                 // Claude Code loads CLAUDE.md from an additional directory only with this variable.
                 CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD: "1",
               },
