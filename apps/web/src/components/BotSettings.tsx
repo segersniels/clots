@@ -156,7 +156,7 @@ export function BotInstructions({ bot }: { bot: BotSummary }) {
       <section className="flex flex-col gap-1">
         <h2 className={PANE_LABEL}>Instructions</h2>
         {/* The block matches the field of a bot that is no clone, so the text lines up when the operator switches between them. */}
-        <p className="rounded-xl bg-muted/60 px-2.5 py-1.5 text-sm wrap-break-word whitespace-pre-wrap">
+        <p className="rounded-xl bg-muted/60 px-3.5 py-3 text-sm wrap-break-word whitespace-pre-wrap">
           {bot.instructions}
         </p>
       </section>
@@ -176,7 +176,7 @@ export function BotInstructions({ bot }: { bot: BotSummary }) {
           onTextChange={setInstructions}
           onBlur={saveInstructions}
           autoFocus={false}
-          className={`${CHIP_FIELD_CLASSES} min-h-13 ${flashing ? "ring-2 ring-attention/50" : ""}`}
+          className={`${CHIP_FIELD_CLASSES} min-h-13 [&_.ProseMirror]:px-3.5 [&_.ProseMirror]:py-3 ${flashing ? "ring-2 ring-attention/50" : ""}`}
           pickerClassName={CHIP_PICKER_CLASSES}
         />
       </div>
