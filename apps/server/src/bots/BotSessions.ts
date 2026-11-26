@@ -47,8 +47,14 @@ import { z } from "zod";
 import { ClotsConfig } from "../config.ts";
 import { HOST_TIME_ZONE, nextRunAt, ScheduleRepository } from "../schedules/ScheduleRepository.ts";
 import { BotRepository, type BotChanges, type StoredBot } from "./BotRepository.ts";
-import { readPages } from "../browser/BotChrome.ts";
-import { botChrome, closeBrowser, makeBrowserEnvironment } from "../browser/BrowserEnvironment.ts";
+import { isRunning, readPages } from "../browser/BotChrome.ts";
+import {
+  botChrome,
+  closeBrowser,
+  devToolsPort,
+  isBrowserIdle,
+  makeBrowserEnvironment,
+} from "../browser/BrowserEnvironment.ts";
 import { copyLogin, findLoginSources, siteOf } from "../browser/Logins.ts";
 import {
   botPlugins,
@@ -279,6 +285,10 @@ interface BotRuntime {
   viewers: number;
   /** Whether the operator pressed Stop during the running turn. The SDK ends that turn as a failure. */
   stopping: boolean;
+  /** The open take-over windows and browser previews of the bot, on any device. */
+  browserWatchers: number;
+  /** The last moment that the bot or a client used the browser. An idle browser closes. */
+  browserUsedAt: number;
 }
 
 /** The sentences that tell the operator why a turn ended early, by the subtype of the SDK result. */
@@ -327,7 +337,7 @@ const systemPromptFor = (bot: StoredBot) =>
       : `You work on the project "${bot.projectName}". Its directory, ${bot.projectDirectory}, is your current directory.`,
     // Without this, a bot inspects its directories before it answers a plain greeting.
     "Answer a message directly. Read files or run commands only when the task needs them.",
-    "You have a browser: use the `agent-browser` CLI through Bash. Run `agent-browser skills get core` before the first use.",
+    "You have a browser: use the `agent-browser` CLI through Bash. Run `agent-browser skills get core` before the first use. Your browser closes after 30 idle minutes, so the pages you opened can be gone: open them again.",
     "Your browser session and profile are already set in the environment. Do not pass `--session` or `--profile`, or the operator cannot see your browser.",
     `When a page needs the operator (a login, a captcha, a payment), call the ${HANDOFF_TOOL} tool and wait.`,
     bot.parentName === null
@@ -418,6 +428,8 @@ export class BotSessions extends Context.Service<
     events(botId: BotId): PubSub.PubSub<ThreadEvent>;
     /** Counts the operator as a viewer of the bot's conversation until the scope closes. */
     view(botId: BotId): Effect.Effect<void, never, Scope.Scope>;
+    /** Counts a client as a watcher of the bot's browser until the scope closes. A watched browser stays open. */
+    watchBrowser(botId: BotId): Effect.Effect<void, never, Scope.Scope>;
     /** Fires when the status of a bot changes. */
     readonly statusChanges: PubSub.PubSub<void>;
     /** Fires when the skills of a bot change. */
@@ -470,6 +482,8 @@ export class BotSessions extends Context.Service<
           restart: null,
           viewers: 0,
           stopping: false,
+          browserWatchers: 0,
+          browserUsedAt: Date.now(),
         };
         runtimes.set(botId, runtime);
 
@@ -483,6 +497,8 @@ export class BotSessions extends Context.Service<
       const setLive = (runtime: BotRuntime, patch: Partial<ThreadLiveState>) => {
         const previousStatus = runtime.live.status;
         runtime.live = { ...runtime.live, ...patch };
+        // The live state changes only while the bot works, so its last change is when the bot stopped.
+        runtime.browserUsedAt = Date.now();
         publish(runtime, { _tag: "Live", state: runtime.live });
 
         if (runtime.live.status !== previousStatus) {
@@ -711,6 +727,9 @@ export class BotSessions extends Context.Service<
             }),
           );
         }
+
+        // The copy starts the source's Chrome, which the idle timer must not close under it.
+        runtimeFor(source.id).browserUsedAt = Date.now();
 
         return Effect.tryPromise({
           try: () => copyLogin(from, to, url),
@@ -1546,6 +1565,37 @@ export class BotSessions extends Context.Service<
         Effect.forkIn(scope),
       );
 
+      /** Closes the bot's browser when nobody used it for the idle time. The next agent-browser command starts it again. */
+      const closeIdleBrowser = (bot: StoredBot) =>
+        Effect.gen(function* () {
+          const runtime = runtimeFor(bot.id);
+          const idle = isBrowserIdle(
+            runtime.live,
+            runtime.browserWatchers,
+            runtime.browserUsedAt,
+            Date.now(),
+          );
+
+          if (!idle) {
+            return;
+          }
+
+          const running = yield* Effect.promise(() => isRunning(devToolsPort(bot)));
+          if (!running) {
+            return;
+          }
+
+          yield* closeBrowser(bot);
+        });
+
+      // Each Chrome holds hundreds of MB, so a bot's browser stays open only while it is in use.
+      yield* repository.list.pipe(
+        Effect.flatMap((bots) => Effect.forEach(bots, closeIdleBrowser, { discard: true })),
+        Effect.andThen(Effect.sleep("1 minute")),
+        Effect.forever,
+        Effect.forkIn(scope),
+      );
+
       const hasOldSkills = (session: NonNullable<BotRuntime["session"]>) =>
         botSkillsSignature(session.startedAs) !== session.skills;
 
@@ -2150,6 +2200,16 @@ export class BotSessions extends Context.Service<
           Effect.acquireRelease(
             Effect.sync(() => void (runtimeFor(botId).viewers += 1)),
             () => Effect.sync(() => void (runtimeFor(botId).viewers -= 1)),
+          ),
+        watchBrowser: (botId) =>
+          Effect.acquireRelease(
+            Effect.sync(() => void (runtimeFor(botId).browserWatchers += 1)),
+            () =>
+              Effect.sync(() => {
+                const runtime = runtimeFor(botId);
+                runtime.browserWatchers -= 1;
+                runtime.browserUsedAt = Date.now();
+              }),
           ),
 
         send,

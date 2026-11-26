@@ -3,6 +3,7 @@ import { Effect } from "effect";
 import { HttpRouter, HttpServerResponse } from "effect/http";
 
 import { BotRepository } from "../bots/BotRepository.ts";
+import { BotSessions } from "../bots/BotSessions.ts";
 import { readPages } from "./BotChrome.ts";
 import { devToolsPort } from "./BrowserEnvironment.ts";
 
@@ -27,6 +28,7 @@ export const BrowserProxyLayer = HttpRouter.add(
   `${BROWSER_STREAM_PATH}/:botId`,
   Effect.fn(function* (request) {
     const bots = yield* BotRepository;
+    const sessions = yield* BotSessions;
     const { botId } = yield* HttpRouter.params;
     const bot = yield* bots.find(botId as BotId);
     if (bot === undefined) {
@@ -34,6 +36,7 @@ export const BrowserProxyLayer = HttpRouter.add(
     }
 
     const socket = yield* request.upgrade;
+    yield* sessions.watchBrowser(bot.id);
     const writer = yield* socket.writer;
     const reader = yield* socket.reader;
     const services = yield* Effect.context();

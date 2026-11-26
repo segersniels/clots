@@ -1,4 +1,4 @@
-import type { BrowserAction } from "@clots/contracts";
+import type { BrowserAction, ThreadLiveState } from "@clots/contracts";
 import { Effect } from "effect";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -148,6 +148,27 @@ export const closeBrowser = (bot: StoredBot) =>
     await detaching.exited;
     await closeChrome(devToolsPort(bot), browserProfile(bot));
   }).pipe(Effect.timeout("15 seconds"), Effect.ignore);
+
+/** How long a bot's browser stays open without use. Each Chrome holds hundreds of MB. */
+export const BROWSER_IDLE_MS = 30 * 60 * 1000;
+
+/**
+ * Checks whether a bot's browser was not used for the idle time. A turn, a background task, a
+ * handoff or login request that waits for the operator, and a client that watches the browser all
+ * use it. `usedAt` is the last moment that one of them stopped.
+ */
+export const isBrowserIdle = (
+  live: ThreadLiveState,
+  watchers: number,
+  usedAt: number,
+  now: number,
+) =>
+  live.status === "idle" &&
+  live.tasks.length === 0 &&
+  live.handoff === null &&
+  live.loginRequest === null &&
+  watchers === 0 &&
+  now - usedAt >= BROWSER_IDLE_MS;
 
 /** Builds the agent-browser arguments of a take-over action. The tab actions are operations of its `tab` command. */
 const commandFor = (action: BrowserAction, target: string | undefined) => {
