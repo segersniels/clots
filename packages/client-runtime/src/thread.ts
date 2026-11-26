@@ -52,3 +52,20 @@ export const applyThreadEvent = (state: ThreadState, event: ThreadUpdate): Threa
     lastSequence: event.message.sequence,
   };
 };
+
+/**
+ * Finds the messages that the operator sent and the server has not stored yet. The stored copy has
+ * the id of the sent message, so it takes the sent message's place in the render in which it arrives.
+ */
+export const unconfirmedMessages = <T extends { readonly id: string }>(
+  sent: ReadonlyArray<T>,
+  messages: ReadonlyArray<Message>,
+): ReadonlyArray<T> => {
+  if (sent.length === 0) {
+    return sent;
+  }
+
+  const stored = new Set(messages.map((message) => message.id));
+
+  return sent.filter((message) => !stored.has(message.id));
+};

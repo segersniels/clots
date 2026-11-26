@@ -256,9 +256,9 @@ export const HandlersLayer = ClotsRpcs.toLayer(
           }),
         ),
 
-      SendMessage: ({ botId, text, attachments }) =>
+      SendMessage: ({ botId, messageId, text, attachments }) =>
         requireBot(botId).pipe(
-          Effect.flatMap((bot) => sessions.send(bot, "user", text, attachments)),
+          Effect.flatMap((bot) => sessions.send(bot, "user", text, attachments, messageId)),
         ),
 
       InterruptBot: ({ botId }) =>

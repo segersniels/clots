@@ -69,6 +69,45 @@ test("messages get rising sequences per bot, and the cursor skips what a client 
   expect(afterFirst.map((message) => [message.sequence, message.text])).toEqual([[2, "two"]]);
 });
 
+test("a message keeps the id that the client made for it", async () => {
+  const id = crypto.randomUUID();
+  const [stored, replayed] = await run(
+    Effect.gen(function* () {
+      const bots = yield* BotRepository;
+      const scout = yield* bots.create(newScout);
+      const stored = yield* bots.appendMessage(scout.id, "user", "hi", [], [], id);
+
+      return [stored, yield* bots.messagesAfter(scout.id, 0)] as const;
+    }),
+  );
+
+  expect(stored?.id).toBe(id);
+  expect(replayed.map((message) => message.id)).toEqual([id]);
+});
+
+test("a message id that exists already stores nothing, also in the thread of another bot", async () => {
+  const id = crypto.randomUUID();
+  const [again, inOtherThread, scoutMessages, atlasMessages] = await run(
+    Effect.gen(function* () {
+      const bots = yield* BotRepository;
+      const scout = yield* bots.create(newScout);
+      const atlas = yield* bots.create(newAtlas);
+      yield* bots.appendMessage(scout.id, "user", "hi", [], [], id);
+
+      return [
+        yield* bots.appendMessage(scout.id, "user", "hi", [], [], id),
+        yield* bots.appendMessage(atlas.id, "user", "hi", [], [], id),
+        yield* bots.messagesAfter(scout.id, 0),
+        yield* bots.messagesAfter(atlas.id, 0),
+      ] as const;
+    }),
+  );
+
+  expect([again, inOtherThread]).toEqual([undefined, undefined]);
+  expect(scoutMessages.map((message) => message.id)).toEqual([id]);
+  expect(atlasMessages).toEqual([]);
+});
+
 test("the message search finds word starts in conversation messages only, and forgets a deleted bot", async () => {
   const [found, afterDelete] = await run(
     Effect.gen(function* () {

@@ -244,8 +244,14 @@ export class ClotsRpcs extends RpcGroup.make(
   }),
   /** Counts the operator as a viewer of the bot's conversation while the stream is open. A bot turns unread only while nobody views it. */
   Rpc.make("ViewBot", { payload: { botId: BotId }, error: BotNotFound, stream: true }),
+  /** Stores the operator's message under `messageId`, which the client makes, so it can match the stored copy to the one it shows while sending. */
   Rpc.make("SendMessage", {
-    payload: { botId: BotId, text: Schema.String, attachments: Schema.Array(Upload) },
+    payload: {
+      botId: BotId,
+      messageId: Schema.String.check(Schema.isUUID()),
+      text: Schema.String,
+      attachments: Schema.Array(Upload),
+    },
     error: BotNotFound,
   }),
   Rpc.make("InterruptBot", { payload: { botId: BotId }, error: BotNotFound }),

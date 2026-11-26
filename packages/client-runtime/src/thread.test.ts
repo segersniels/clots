@@ -1,7 +1,7 @@
 import type { BotId, Message } from "@clots/contracts";
 import { expect, test } from "bun:test";
 
-import { applyThreadEvent, emptyThread } from "./thread.ts";
+import { applyThreadEvent, emptyThread, unconfirmedMessages } from "./thread.ts";
 
 const message = (sequence: number, role: Message["role"], text: string): Message => ({
   id: `m${sequence}`,
@@ -54,4 +54,18 @@ test("the first live state of a subscription ends its replay, and later messages
   expect(applyThreadEvent(later, { _tag: "Subscribed" }).replayedThrough).toBe(
     Number.POSITIVE_INFINITY,
   );
+});
+
+test("a sent message shows until the server's copy with its id arrives, and the rest keep their order", () => {
+  const sent = [{ id: "m2" }, { id: "s1" }, { id: "s2" }];
+  const thread = [message(1, "assistant", "hi"), message(2, "user", "first")];
+
+  expect(unconfirmedMessages(sent, thread)).toEqual([{ id: "s1" }, { id: "s2" }]);
+  expect(unconfirmedMessages(sent, [])).toEqual(sent);
+});
+
+test("a stored message with the same text as a sent one does not confirm it", () => {
+  const sent = [{ id: "s1", text: "first" }];
+
+  expect(unconfirmedMessages(sent, [message(2, "user", "first")])).toEqual(sent);
 });

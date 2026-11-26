@@ -1,9 +1,11 @@
 import { Character } from "@clots/character";
+import { unconfirmedMessages } from "@clots/client-runtime";
 import type {
   ApprovalDecision,
   BotId,
   BotSummary,
   LoginRequest,
+  Message as ThreadMessage,
   MessageRole,
   PendingApproval,
   TraceStep,
@@ -51,6 +53,7 @@ import {
 import { useMountEffect } from "@/hooks/use-mount-effect";
 
 import { client, useStore } from "../client.ts";
+import { releasePreview, sentMessages, type SentMessage } from "../sent-messages.ts";
 import { readCachedThread, saveCachedThread } from "../thread-cache.ts";
 import { formatAgo, formatClock, formatDuration } from "../time.ts";
 import { Composer } from "./Composer.tsx";
@@ -90,6 +93,23 @@ const SENDER_LABELS: Partial<Record<MessageRole, string>> = {
   routine: "Routine",
   bot: "Bot message",
 };
+
+/** Shows a sent message as a thread message, after the stored ones, until the server's copy takes its place. */
+const toThreadMessage = (sent: SentMessage): ThreadMessage => ({
+  id: sent.id,
+  botId: sent.botId,
+  sequence: Number.POSITIVE_INFINITY,
+  role: "user",
+  text: sent.text,
+  attachments: sent.files.map((file, index) => ({
+    id: String(index),
+    name: file.name,
+    mediaType: file.mediaType,
+    size: file.size,
+  })),
+  steps: [],
+  createdAt: sent.createdAt,
+});
 
 /** Shows something that the bot says or asks, on the bot's side of the thread. */
 function FromBot({ children }: { children: ReactNode }) {
@@ -346,6 +366,11 @@ export function Chat({
   // After the app starts again, the thread shows its last messages from before, until the server sends the history.
   const [cached] = useState(() => (thread.synced ? null : readCachedThread(botId)));
   const messages = thread.synced || cached === null ? thread.messages : cached;
+  const sentHere = useStore(sentMessages).filter((sent) => sent.botId === botId);
+  const unconfirmed = unconfirmedMessages(sentHere, messages);
+  const sendingIds = new Set(unconfirmed.map((sent) => sent.id));
+  // The sent messages that the server has not stored yet follow its messages, so the sync and the cache never see them.
+  const shownMessages = [...messages, ...unconfirmed.map(toThreadMessage)];
   // The messages that the thread shows first stay still. Only later ones that arrive live ease in.
   const [shownThrough, setShownThrough] = useState(
     thread.synced ? thread.lastSequence : (cached?.at(-1)?.sequence ?? null),
@@ -360,7 +385,7 @@ export function Chat({
   const { live } = thread;
   const composer = useRef<{ focus(): void }>(null);
   // A thread without messages asks for the instructions. The first message fades it out.
-  const empty = thread.synced && messages.length === 0;
+  const empty = thread.synced && shownMessages.length === 0;
   const [emptyShown, setEmptyShown] = useState(false);
   if (empty && !emptyShown) {
     setEmptyShown(true);
@@ -465,10 +490,10 @@ export function Chat({
             className="[mask-image:linear-gradient(to_bottom,transparent,black_4rem)]"
           >
             <MessageScrollerContent className="gap-1.5 px-4 pt-16 pb-3">
-              {messages.slice(firstShown).map((message, offset) => {
+              {shownMessages.slice(firstShown).map((message, offset) => {
                 // The full history still decides the time labels and the spacing at the first shown message.
                 const index = firstShown + offset;
-                const previous = messages[index - 1];
+                const previous = shownMessages[index - 1];
                 const showsTime =
                   previous === undefined ||
                   message.createdAt - previous.createdAt > TIME_LABEL_GAP_MS;
@@ -478,6 +503,8 @@ export function Chat({
                   previous !== undefined &&
                   (previous.role === "assistant" || previous.role === "trace") !== fromBot;
                 const enter = entrance(message.sequence);
+                const sending = sendingIds.has(message.id);
+                const sent = sentHere.find((candidate) => candidate.id === message.id);
 
                 // A compaction or a settings change is no message but a divider: the bot works differently after it.
                 if (message.role === "compact" || message.role === "settings") {
@@ -533,14 +560,23 @@ export function Chat({
                         <Markdown>{message.text}</Markdown>
                       </FromBot>
                     ) : (
-                      <Message align="end">
+                      // A message that the server has not stored yet shows quieter.
+                      <Message
+                        align="end"
+                        className={`transition-opacity duration-200 ease-out ${sending ? "opacity-60" : ""}`}
+                      >
                         <MessageContent>
                           {SENDER_LABELS[message.role] !== undefined && (
                             <MessageHeader className="justify-end">
                               {SENDER_LABELS[message.role]}
                             </MessageHeader>
                           )}
-                          <MessageAttachments message={message} />
+                          <MessageAttachments
+                            message={message}
+                            previews={sent?.files.map((file) => file.previewUrl) ?? []}
+                            sending={sending}
+                            onPreviewLoaded={(fileIndex) => releasePreview(message.id, fileIndex)}
+                          />
                           {/* A message can be files only. */}
                           {message.text !== "" && (
                             <Bubble

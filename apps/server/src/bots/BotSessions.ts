@@ -40,7 +40,7 @@ import {
 } from "@clots/contracts";
 import { Cause, Context, Deferred, Effect, Layer, PubSub, Queue, Scope, Stream } from "effect";
 import { spawn } from "node:child_process";
-import { copyFileSync, mkdirSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, extname, join } from "node:path";
 import { z } from "zod";
 
@@ -360,12 +360,16 @@ const textOf = (blocks: ReadonlyArray<{ type: string; text?: string }>) =>
 export class BotSessions extends Context.Service<
   BotSessions,
   {
-    /** Stores a prompt and gives it to the bot. Starts or resumes the bot's session when none runs. */
+    /**
+     * Stores a prompt and gives it to the bot. Starts or resumes the bot's session when none runs.
+     * `messageId` is the id that the operator's client made for the message.
+     */
     send(
       bot: StoredBot,
       role: Exclude<MessageRole, "assistant">,
       text: string,
       uploads?: ReadonlyArray<Upload>,
+      messageId?: string,
     ): Effect.Effect<void>;
     interrupt(botId: BotId): Effect.Effect<void>;
     /** Stops one background task. The session then reports the shorter task list. */
@@ -523,12 +527,19 @@ export class BotSessions extends Context.Service<
         text: string,
         attachments: ReadonlyArray<Attachment> = [],
         steps: ReadonlyArray<TraceStep> = [],
+        messageId?: string,
       ) =>
-        repository.appendMessage(botId, role, text, attachments, steps).pipe(
+        repository.appendMessage(botId, role, text, attachments, steps, messageId).pipe(
           Effect.map((message) => {
+            if (message === undefined) {
+              return false;
+            }
+
             publish(runtime, { _tag: "Message", message });
             // The bot list shows the last message.
             PubSub.publishUnsafe(statusChanges, undefined);
+
+            return true;
           }),
         );
 
@@ -2033,18 +2044,31 @@ export class BotSessions extends Context.Service<
         role: Exclude<MessageRole, "assistant">,
         text: string,
         uploads: ReadonlyArray<Upload> = [],
+        messageId?: string,
       ) =>
         Effect.gen(function* () {
           const runtime = runtimeFor(bot.id);
-          runtime.lastPromptFrom = role;
           const saved = saveUploads(bot, uploads);
-          yield* record(
+          const recorded = yield* record(
             runtime,
             bot.id,
             role,
             text,
             saved.map((file) => file.attachment),
+            [],
+            messageId,
           );
+
+          // The client sends a message again when it lost the answer, but the bot must get it only once.
+          if (!recorded) {
+            for (const file of saved) {
+              rmSync(file.path);
+            }
+
+            return;
+          }
+
+          runtime.lastPromptFrom = role;
           setLive(runtime, { status: statusWhileRunning(runtime) });
 
           // The bot sees an image at once. For each file it also gets the path, so it can read or use the file.

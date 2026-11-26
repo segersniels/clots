@@ -75,7 +75,13 @@ export interface ClotsClient {
   /** Deletes a project. Its bots move to no project. */
   deleteProject(projectId: string): Promise<void>;
   setBotProject(botId: BotId, projectId: string | null): Promise<void>;
-  sendMessage(botId: BotId, text: string, attachments?: ReadonlyArray<Upload>): Promise<void>;
+  /** Sends the operator's message. `messageId` is the id that the stored copy gets, so the thread can match it to the message it shows while sending. */
+  sendMessage(
+    botId: BotId,
+    messageId: string,
+    text: string,
+    attachments?: ReadonlyArray<Upload>,
+  ): Promise<void>;
   interruptBot(botId: BotId): Promise<void>;
   stopTask(botId: BotId, taskId: string): Promise<void>;
   resolveApproval(botId: BotId, approvalId: string, decision: ApprovalDecision): Promise<void>;
@@ -315,8 +321,8 @@ export const makeClotsClient = (origin: string): ClotsClient => {
       ),
     duplicateBot: (botId) => call((rpc) => rpc.DuplicateBot({ botId })),
     deleteBot: (botId) => call((rpc) => rpc.DeleteBot({ botId })),
-    sendMessage: (botId, text, attachments = []) =>
-      call((rpc) => rpc.SendMessage({ botId, text, attachments })),
+    sendMessage: (botId, messageId, text, attachments = []) =>
+      call((rpc) => rpc.SendMessage({ botId, messageId, text, attachments })),
     interruptBot: (botId) => call((rpc) => rpc.InterruptBot({ botId })),
     stopTask: (botId, taskId) => call((rpc) => rpc.StopTask({ botId, taskId })),
     resolveApproval: (botId, approvalId, decision) =>

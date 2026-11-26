@@ -25,6 +25,7 @@ import { useMountEffect } from "@/hooks/use-mount-effect";
 
 import { client } from "../client.ts";
 import { drafts, saveDraft } from "../drafts.ts";
+import { addSentMessage, confirmSentMessage, dropSentMessage } from "../sent-messages.ts";
 import { Collapse } from "./Collapse.tsx";
 import { ComposerField, type ComposerFieldHandle } from "./ComposerField.tsx";
 
@@ -37,6 +38,15 @@ interface DraftFile {
 
 /** The files that wait in the composer of each bot. A file cannot go in storage, so it stays until the page reloads. */
 const draftFiles = new Map<BotId, ReadonlyArray<DraftFile>>();
+
+/** The last send to each bot. The next send waits for it, so the server stores fast sends in the order that the operator sent them. */
+const lastSends = new Map<BotId, Promise<unknown>>();
+
+/**
+ * The id of a failed send whose text and files are back in the composer. A resend keeps the id, so the
+ * server ignores it when the first send reached it after all. An edit of the draft drops the id.
+ */
+const failedSendIds = new Map<BotId, string>();
 
 /** Formats a file size, for example "2.4 MB". */
 export const formatSize = (bytes: number) =>
@@ -97,11 +107,13 @@ export function Composer({
 
   /** Takes the text that the operator types. A send changes the files before it renders, so the kept files are the current ones. */
   const changeText = (text: string) => {
+    failedSendIds.delete(botId);
     setDraft(text);
     keepDraft(text, draftFiles.get(botId) ?? []);
   };
 
   const changeFiles = (next: ReadonlyArray<DraftFile>) => {
+    failedSendIds.delete(botId);
     setFiles(next);
     keepDraft(draft, next);
   };
@@ -138,31 +150,54 @@ export function Composer({
 
     const text = draft.trim();
     const sending = files;
+    const messageId = failedSendIds.get(botId) ?? crypto.randomUUID();
+    failedSendIds.delete(botId);
     field.current?.clear();
     setFiles([]);
     keepDraft("", []);
     setTooLarge(false);
 
+    // The thread shows the message at once. The id lets the server's copy take its place.
+    addSentMessage({
+      id: messageId,
+      botId,
+      text,
+      createdAt: Date.now(),
+      files: sending.map(({ file, previewUrl }) => ({
+        name: file.name,
+        mediaType: file.type || "application/octet-stream",
+        size: file.size,
+        previewUrl,
+      })),
+      stored: false,
+    });
+
+    const uploads = Promise.all(sending.map((file) => toUpload(file.file)));
+    const previousSend = lastSends.get(botId) ?? Promise.resolve();
+    const request = previousSend.then(async () =>
+      client.sendMessage(botId, messageId, text, await uploads),
+    );
+    lastSends.set(
+      botId,
+      request.catch(() => undefined),
+    );
+
     try {
-      await client.sendMessage(
-        botId,
-        text,
-        await Promise.all(sending.map((file) => toUpload(file.file))),
-      );
+      await request;
     } catch {
-      // A failed send keeps the message and its files, so the operator can send it again.
+      // A failed send takes the message out of the thread and keeps it with its files, so the operator can send it again.
+      dropSentMessage(messageId);
       setFiles(sending);
       keepDraft(text, sending);
       field.current?.setText(text);
+      // The text change above drops the id, so the id is kept only after it.
+      failedSendIds.set(botId, messageId);
 
       return;
     }
 
-    for (const file of sending) {
-      if (file.previewUrl !== undefined) {
-        URL.revokeObjectURL(file.previewUrl);
-      }
-    }
+    // The sent message now owns the image previews. It lets them go when the server's images show.
+    confirmSentMessage(botId, messageId);
   };
 
   const dropFiles = (event: DragEvent) => {

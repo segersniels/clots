@@ -102,13 +102,16 @@ export class BotRepository extends Context.Service<
     setProject(botId: BotId, projectId: string | null): Effect.Effect<void>;
     /** Puts the given bots in this order. Bots that the list leaves out keep their place. */
     reorder(botIds: ReadonlyArray<BotId>): Effect.Effect<void>;
+    /** Stores a message at the end of the bot's thread. Gives `undefined` when a message with the id exists already. */
     appendMessage(
       botId: BotId,
       role: MessageRole,
       text: string,
       attachments?: ReadonlyArray<Attachment>,
       steps?: ReadonlyArray<TraceStep>,
-    ): Effect.Effect<Message>;
+      /** The id that the client made for the message. Without one, the server makes it. */
+      id?: string,
+    ): Effect.Effect<Message | undefined>;
     messagesAfter(botId: BotId, afterSequence: number): Effect.Effect<ReadonlyArray<Message>>;
     /** Finds the messages of every thread that hold each word of the query as a word or the start of one, best match first. */
     searchMessages(query: string, limit: number): Effect.Effect<ReadonlyArray<MessageHit>>;
@@ -299,18 +302,21 @@ export class BotRepository extends Context.Service<
         text: string,
         attachments: ReadonlyArray<Attachment> = [],
         steps: ReadonlyArray<TraceStep> = [],
+        id: string = crypto.randomUUID(),
       ) =>
         sql<MessageRow>`
           INSERT INTO messages (id, thread_id, sequence, role, text, attachments, steps, created_at)
           SELECT
-            ${crypto.randomUUID()}, threads.id,
+            ${id}, threads.id,
             COALESCE((SELECT MAX(sequence) FROM messages WHERE thread_id = threads.id), 0) + 1,
             ${role}, ${text}, ${JSON.stringify(attachments)}, ${JSON.stringify(steps)}, ${Date.now()}
           FROM threads
           WHERE threads.bot_id = ${botId}
+          ON CONFLICT (id) DO NOTHING
           RETURNING id, ${botId} AS botId, sequence, role, text, attachments, steps, created_at AS createdAt
         `.pipe(
-          Effect.map((rows) => toMessage(rows[0]!)),
+          // A resend of a message that the server already has inserts no row.
+          Effect.map((rows) => (rows[0] === undefined ? undefined : toMessage(rows[0]))),
           Effect.orDie,
         );
 
