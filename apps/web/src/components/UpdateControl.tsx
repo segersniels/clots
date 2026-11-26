@@ -1,3 +1,4 @@
+import { Progress as ProgressPrimitive } from "@base-ui/react/progress";
 import { Character } from "@clots/character";
 import {
   isNewerVersion,
@@ -13,7 +14,6 @@ import {
   LaptopIcon,
   RotateCwIcon,
   ServerIcon,
-  XIcon,
 } from "lucide-react";
 import {
   useEffect,
@@ -26,33 +26,29 @@ import {
 
 import { client, useStore } from "@/client.ts";
 import { Button } from "@/components/ui/button";
-import {
-  Item,
-  ItemActions,
-  ItemContent,
-  ItemDescription,
-  ItemMedia,
-  ItemTitle,
-} from "@/components/ui/item";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ProgressIndicator, ProgressTrack } from "@/components/ui/progress";
 import { Spinner } from "@/components/ui/spinner";
 
 /** How often a client asks the server again for the latest release. The desktop app checks itself as often. */
 const CHECK_INTERVAL_MS = 15 * 60_000;
 
-/** How long the done pill stays before it goes. */
+/** How long a finished server row stays before it goes. */
 const DONE_MS = 4000;
 
 /** How long the pill says "Up to date" after the operator asked and nothing was new. */
 const UP_TO_DATE_MS = 2000;
 
-/** How long the restart fill takes to slow down near its end. */
+/** How long the server's bar takes to slow down near its end. */
 const FILL_MS = 14_000;
 
-/** How long the fill takes to follow a new download percentage. */
+/** Where the server's bar stops while the client waits for the server to come back. */
+const CREEP_END_PERCENT = 92;
+
+/** How long the app's bar takes to follow a new download percentage. */
 const PERCENT_FILL_MS = 300;
 
-/** How long the fill takes to finish once the server is back, before the pill says that the update is done. */
+/** How long the server's bar takes to fill up once the server is back. */
 const FILL_FINISH_MS = 200;
 
 /** The pill's left and right padding together, which its width adds to the width of its label. */
@@ -280,57 +276,165 @@ function BotsNote({
   );
 }
 
-/** The server's part of the popover: versions, the bots that a restart interrupts, and the actions. */
-function ServerItem({ updates, failed }: { updates: Updates; failed: string | undefined }) {
+/**
+ * Draws the progress bar under a row. Without a real `percent`, the bar slows down and stops short
+ * of the end, and it finishes when `finished` turns true.
+ */
+function UpdateProgress({ percent, finished = false }: { percent?: number; finished?: boolean }) {
+  const [creep, setCreep] = useState(0);
+
+  // The creep starts on the next frame, so the bar grows from the start.
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setCreep(CREEP_END_PERCENT));
+
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
+  let value = finished ? 100 : creep;
+  let duration = finished ? FILL_FINISH_MS : FILL_MS;
+  let easing = finished ? "var(--ease-out)" : "cubic-bezier(0.16, 1, 0.3, 1)";
+
+  if (percent !== undefined) {
+    value = percent;
+    duration = PERCENT_FILL_MS;
+    easing = "var(--ease-out)";
+  }
+
+  return (
+    <ProgressPrimitive.Root value={value} aria-label="Update progress">
+      <ProgressTrack className="bg-foreground/10">
+        <ProgressIndicator
+          className={cn(
+            "rounded-full bg-attention transition-[width] motion-reduce:transition-none",
+            percent === undefined && !finished && "motion-reduce:w-3/5!",
+          )}
+          style={{ transitionDuration: `${duration}ms`, transitionTimingFunction: easing }}
+        />
+      </ProgressTrack>
+    </ProgressPrimitive.Root>
+  );
+}
+
+/** Gives a row button the same hover step in dark as in light, so its fill shows on the muted row. */
+const ROW_BUTTON = "dark:hover:bg-muted";
+
+/** Shows the step of a running update in the place of the row's button. */
+function RowStatus({ icon, children }: { icon: ReactNode; children: ReactNode }) {
+  return (
+    <span className="flex h-7 items-center gap-1.5 px-2.5 text-[0.8rem] text-muted-foreground tabular-nums [&_svg]:size-3.5">
+      {icon}
+      {children}
+    </span>
+  );
+}
+
+/** Lays out one update in the popover: its icon, name and version, its action, and a line under the text. */
+function UpdateRow({
+  icon,
+  name,
+  version,
+  action,
+  under,
+}: {
+  icon: ReactNode;
+  name: string;
+  version: string;
+  action: ReactNode;
+  under?: ReactNode;
+}) {
+  return (
+    <div className="grid grid-cols-[18px_minmax(0,1fr)_auto] items-center gap-x-2.5 rounded-lg bg-muted/60 py-2 pr-2 pl-2.5">
+      <span className="text-muted-foreground [&_svg]:size-4">{icon}</span>
+      <p className="truncate text-sm font-medium">
+        {name}
+        <span className="ml-1.5 text-[0.8125rem] font-normal text-muted-foreground tabular-nums">
+          {version}
+        </span>
+      </p>
+      {action}
+      {under && <div className="col-span-2 col-start-2 mt-1.5 flex flex-col gap-1.5">{under}</div>}
+    </div>
+  );
+}
+
+/** The server's row: the bots that a restart interrupts, the action, and the progress of the update. */
+function ServerRow({ updates }: { updates: Updates }) {
   const bots = useStore(client.bots);
-  const working = bots.filter((bot) => bot.status === "working");
-  const waiting = bots.filter((bot) => bot.status === "waiting");
-  const { info } = updates;
+  const { info, phase } = updates;
 
   if (info?.latest === undefined) {
     return null;
   }
 
-  return (
-    <Item className="flex-nowrap items-start px-1 py-1.5">
-      <ItemMedia variant="icon" className="mt-0.5 text-muted-foreground">
-        <ServerIcon />
-      </ItemMedia>
-      <ItemContent className="min-w-0 gap-1.5">
-        <ItemTitle>clots server</ItemTitle>
-        <ItemDescription className="tabular-nums">
-          {info.current} → {info.latest.version}
-        </ItemDescription>
-        {working.length > 0 && failed === undefined && (
+  const working = bots.filter((bot) => bot.status === "working");
+  const waiting = bots.filter((bot) => bot.status === "waiting");
+  let action: ReactNode;
+  let under: ReactNode;
+
+  // The bar keeps its place in each running step, so it creeps on from download to restart and fills up at the end.
+  if (phase.name === "failed") {
+    action = (
+      <Button
+        variant="ghost"
+        size="sm"
+        className={ROW_BUTTON}
+        onClick={() => void updates.updateServer()}
+      >
+        Try again
+        <RotateCwIcon />
+      </Button>
+    );
+    under = <p className="text-xs text-muted-foreground">{phase.message}</p>;
+  } else if (phase.name === "done") {
+    action = <RowStatus icon={<CheckIcon />}>Updated</RowStatus>;
+    under = <UpdateProgress finished />;
+  } else if (phase.name === "downloading" || phase.name === "restarting") {
+    action = (
+      <RowStatus icon={<Spinner />}>
+        {phase.name === "downloading" ? "Downloading" : "Restarting"}
+      </RowStatus>
+    );
+    under = <UpdateProgress />;
+  } else {
+    action = (
+      <Button
+        variant="ghost"
+        size="sm"
+        className={ROW_BUTTON}
+        onClick={() => void updates.updateServer()}
+      >
+        Update
+        <ArrowUpIcon />
+      </Button>
+    );
+    under = (working.length > 0 || waiting.length > 0) && (
+      <>
+        {working.length > 0 && (
           <BotsNote
             bots={working}
             one="is working. It stops and picks up again after the restart, about 10 s."
             many="bots are working. They stop and pick up again after the restart, about 10 s."
           />
         )}
-        {waiting.length > 0 && failed === undefined && (
+        {waiting.length > 0 && (
           <BotsNote
             bots={waiting}
             one="waits for you. The restart cancels its request."
             many="bots wait for you. The restart cancels their requests."
           />
         )}
-        {failed !== undefined && <p className="text-xs text-muted-foreground">{failed}</p>}
-        <ItemActions className="mt-1 flex-wrap">
-          <Button size="sm" onClick={() => void updates.updateServer()}>
-            {failed === undefined ? "Update" : "Try again"}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            render={<a href={info.latest.url} target="_blank" rel="noreferrer" />}
-          >
-            What's new
-            <ArrowUpRightIcon />
-          </Button>
-        </ItemActions>
-      </ItemContent>
-    </Item>
+      </>
+    );
+  }
+
+  return (
+    <UpdateRow
+      icon={<ServerIcon />}
+      name="Server"
+      version={info.latest.version}
+      action={action}
+      under={under}
+    />
   );
 }
 
@@ -354,38 +458,6 @@ const describeAppFailure = (message: string): { text: string; detail?: string } 
   return { text: "The download did not finish.", detail: message };
 };
 
-/** The app's one button: Update, then Restart after the pill showed the download. An app that cannot update itself links to the release. */
-function AppAction({ info, app }: { info: UpdateInfo | undefined; app: AppUpdateState }) {
-  const bridge = window.clotsApp;
-
-  if (app.status === "ready") {
-    return (
-      <Button size="sm" onClick={() => void bridge?.installUpdate?.()}>
-        Restart
-      </Button>
-    );
-  }
-
-  if (app.status === "available" || app.status === "failed") {
-    return (
-      <Button size="sm" onClick={() => void bridge?.downloadUpdate?.()}>
-        {app.status === "failed" ? "Try again" : "Update"}
-      </Button>
-    );
-  }
-
-  return (
-    <Button
-      variant="secondary"
-      size="sm"
-      render={<a href={info?.latest?.url} target="_blank" rel="noreferrer" />}
-    >
-      Download
-      <ArrowUpRightIcon />
-    </Button>
-  );
-}
-
 /** Says why the app's download failed. */
 function AppFailure({ message }: { message: string }) {
   const { text, detail } = describeAppFailure(message);
@@ -394,7 +466,7 @@ function AppFailure({ message }: { message: string }) {
     <>
       <p className="text-xs text-muted-foreground">{text}</p>
       {detail !== undefined && (
-        <pre className="rounded-lg bg-muted/60 px-2.5 py-2 font-mono text-xs wrap-anywhere whitespace-pre-wrap text-muted-foreground">
+        <pre className="font-mono text-xs wrap-anywhere whitespace-pre-wrap text-muted-foreground">
           {detail}
         </pre>
       )}
@@ -402,9 +474,12 @@ function AppFailure({ message }: { message: string }) {
   );
 }
 
-/** The app's part of the popover. */
-function AppItem({ info, app }: { info: UpdateInfo | undefined; app: AppUpdateState }) {
+/** The app's row. An app that cannot update itself links to the release. */
+function AppRow({ info, app }: { info: UpdateInfo | undefined; app: AppUpdateState }) {
+  const bridge = window.clotsApp;
   let version = info?.latest?.version;
+  let action: ReactNode;
+  let under: ReactNode;
 
   if (app.status === "current") {
     return null;
@@ -418,39 +493,78 @@ function AppItem({ info, app }: { info: UpdateInfo | undefined; app: AppUpdateSt
     return null;
   }
 
+  if (app.status === "downloading") {
+    action = <RowStatus icon={<Spinner />}>{Math.round(app.percent)}%</RowStatus>;
+    under = <UpdateProgress percent={app.percent} />;
+  } else if (app.status === "ready") {
+    action = (
+      <Button
+        variant="ghost"
+        size="sm"
+        className={ROW_BUTTON}
+        onClick={() => void bridge?.installUpdate?.()}
+      >
+        Restart
+        <RotateCwIcon />
+      </Button>
+    );
+  } else if (app.status === "failed") {
+    action = (
+      <Button
+        variant="ghost"
+        size="sm"
+        className={ROW_BUTTON}
+        onClick={() => void bridge?.downloadUpdate?.()}
+      >
+        Try again
+        <RotateCwIcon />
+      </Button>
+    );
+    under = <AppFailure message={app.message} />;
+  } else if (app.status === "available") {
+    action = (
+      <Button
+        variant="ghost"
+        size="sm"
+        className={ROW_BUTTON}
+        onClick={() => void bridge?.downloadUpdate?.()}
+      >
+        Update
+        <ArrowUpIcon />
+      </Button>
+    );
+  } else {
+    action = (
+      <Button
+        variant="ghost"
+        size="sm"
+        className={ROW_BUTTON}
+        render={<a href={info?.latest?.url} target="_blank" rel="noreferrer" />}
+      >
+        Download
+        <ArrowUpRightIcon />
+      </Button>
+    );
+  }
+
   return (
-    <Item className="flex-nowrap items-start px-1 py-1.5">
-      <ItemMedia variant="icon" className="mt-0.5 text-muted-foreground">
-        <LaptopIcon />
-      </ItemMedia>
-      <ItemContent className="min-w-0 gap-1.5">
-        <ItemTitle>Clots app</ItemTitle>
-        <ItemDescription className="tabular-nums">
-          {DESKTOP_VERSION} → {version}
-        </ItemDescription>
-        {app.status === "failed" && <AppFailure message={app.message} />}
-        {/* The local server runs as its own service, so the app's restart does not touch the bots. */}
-        {app.status === "ready" && (
-          <p className="text-xs text-muted-foreground">
-            Downloaded. Clots restarts to finish. Your bots keep working.
-          </p>
-        )}
-        <ItemActions className="mt-1 flex-wrap">
-          <AppAction info={info} app={app} />
-        </ItemActions>
-      </ItemContent>
-    </Item>
+    <UpdateRow icon={<LaptopIcon />} name="App" version={version} action={action} under={under} />
   );
 }
 
-type PillView =
-  "available" | "checking" | "current" | "downloading" | "restarting" | "done" | "failed" | "ready";
+type PillView = "available" | "running" | "checking" | "current";
 
 /** The look of each pill: its dot, its label, and whether a click opens the popover. */
 const PILL: Record<PillView, { dot: string; icon: ReactNode; label: string; opens: boolean }> = {
   available: {
     dot: "bg-attention text-white",
     icon: <ArrowUpIcon className="size-3" strokeWidth={2.75} />,
+    label: "Update",
+    opens: true,
+  },
+  running: {
+    dot: "bg-muted",
+    icon: <Spinner className="size-3" />,
     label: "Update",
     opens: true,
   },
@@ -466,105 +580,38 @@ const PILL: Record<PillView, { dot: string; icon: ReactNode; label: string; open
     label: "Up to date",
     opens: false,
   },
-  downloading: {
-    dot: "bg-muted",
-    icon: <Spinner className="size-3" />,
-    label: "Downloading…",
-    opens: false,
-  },
-  restarting: {
-    dot: "bg-muted",
-    icon: <Spinner className="size-3" />,
-    label: "Restarting…",
-    opens: false,
-  },
-  done: {
-    dot: "bg-emerald-500 text-white dark:bg-emerald-400",
-    icon: <CheckIcon className="size-3" strokeWidth={3} />,
-    label: "Updated",
-    opens: false,
-  },
-  failed: {
-    dot: "bg-destructive text-white",
-    icon: <XIcon className="size-3" strokeWidth={3} />,
-    label: "Update failed",
-    opens: true,
-  },
-  ready: {
-    dot: "bg-attention text-white",
-    icon: <RotateCwIcon className="size-3" strokeWidth={2.75} />,
-    label: "Restart to update",
-    opens: true,
-  },
 };
 
-/** Picks the pill for an update phase, or none when nothing is pending. A server update in progress wins over the app's. */
+/** Picks the pill for the updates, or none when no update is left. The popover rows show the details. */
 const pillViewOf = ({ phase, app, appUpdate, serverUpdate }: Updates): PillView | undefined => {
-  if (phase.name !== "idle") {
+  if (phase.name === "checking" || phase.name === "current") {
     return phase.name;
   }
 
-  if (app.status === "downloading" || app.status === "ready" || app.status === "failed") {
-    return app.status;
+  // A finished server update keeps the spinner until its row leaves, so the pill does not flash the arrow before it goes.
+  if (
+    phase.name === "downloading" ||
+    phase.name === "restarting" ||
+    phase.name === "done" ||
+    app.status === "downloading"
+  ) {
+    return "running";
   }
 
-  return appUpdate || serverUpdate ? "available" : undefined;
+  // A failed server update keeps the pill until its row leaves the popover.
+  return phase.name === "failed" || appUpdate || serverUpdate ? "available" : undefined;
 };
 
 /**
- * Fills the pill from the left while an update runs. The app's download has a real `percent`. The
- * server's restart has none, so its fill slows down and stops short of the end, and finishes when
- * the server is back.
- */
-function RestartFill({
-  finishing,
-  gone,
-  percent,
-}: {
-  finishing: boolean;
-  gone: boolean;
-  percent: number | undefined;
-}) {
-  let gap = finishing ? "0%" : "8%";
-  let duration = finishing ? FILL_FINISH_MS : FILL_MS;
-  let easing = finishing ? "var(--ease-out)" : "cubic-bezier(0.16, 1, 0.3, 1)";
-
-  if (percent !== undefined) {
-    gap = `${100 - percent}%`;
-    duration = PERCENT_FILL_MS;
-    easing = "var(--ease-out)";
-  }
-
-  return (
-    <span
-      className={cn(
-        "absolute inset-0 rounded-full bg-attention/16 transition-[clip-path,opacity] [clip-path:inset(0_var(--fill-gap)_0_0_round_999px)] starting:[clip-path:inset(0_100%_0_0_round_999px)] motion-reduce:transition-none dark:bg-attention/24",
-        percent === undefined && "motion-reduce:[clip-path:inset(0_40%_0_0_round_999px)]",
-      )}
-      style={
-        {
-          "--fill-gap": gap,
-          opacity: gone ? 0 : 1,
-          transitionDuration: `${duration}ms`,
-          transitionTimingFunction: easing,
-        } as React.CSSProperties
-      }
-    />
-  );
-}
-
-/**
- * Shows a pending update as a pill at the end of the sidebar footer. A click opens a popover that
- * confirms a server update, because the restart interrupts running bots. Without an update, the
+ * Shows a pending update as a pill at the end of the sidebar footer. A click opens a popover with
+ * a row for each update, because a server restart interrupts running bots. Without an update, the
  * pill is gone.
  */
 export function UpdatePill({ updates }: { updates: Updates }) {
   const { info, phase, app, appUpdate, serverUpdate } = updates;
   const [open, setOpen] = useState(false);
-  const [filled, setFilled] = useState(false);
-  const failed = phase.name === "failed" ? phase.message : undefined;
   const view = pillViewOf(updates);
-  const shown = useRef<{ view: PillView; filled: boolean }>({ view: "available", filled: false });
+  const shown = useRef<PillView>("available");
   const [gone, setGone] = useState(view === undefined);
   const label = useRef<HTMLSpanElement>(null);
   const [labelWidth, setLabelWidth] = useState<number>();
@@ -574,25 +621,10 @@ export function UpdatePill({ updates }: { updates: Updates }) {
     setGone(false);
   }
 
-  // A started update closes the popover. The pill shows its progress.
-  useEffect(() => {
-    if (phase.name === "downloading" || app.status === "downloading") {
-      setOpen(false);
-    }
-  }, [phase.name, app.status]);
-
-  // The fill finishes first, then the pill says that the update is done.
-  useEffect(() => {
-    setFilled(false);
-
-    if (phase.name !== "done") {
-      return;
-    }
-
-    const timer = setTimeout(() => setFilled(true), FILL_FINISH_MS);
-
-    return () => clearTimeout(timer);
-  }, [phase.name]);
+  // The popover leaves with the last update. A manual check has nothing to show in it.
+  if (open && (view === undefined || !PILL[view].opens)) {
+    setOpen(false);
+  }
 
   // The pill sits at the end of the line, so a snapping width would make its left edge jump. It follows its label instead.
   useLayoutEffect(() => {
@@ -615,24 +647,18 @@ export function UpdatePill({ updates }: { updates: Updates }) {
 
   // A closing pill keeps its last look, so it fades out as it was.
   if (view !== undefined) {
-    shown.current = { view, filled };
+    shown.current = view;
   }
 
-  const look =
-    PILL[
-      shown.current.view === "done" && !shown.current.filled ? "restarting" : shown.current.view
-    ];
-  const filling = ["downloading", "restarting", "done", "ready"].includes(shown.current.view);
-  const percent =
-    shown.current.view === "downloading" && app.status === "downloading"
-      ? Math.round(app.percent)
-      : undefined;
-  const ready = shown.current.view === "ready";
+  const look = PILL[shown.current];
+  const serverShown =
+    serverUpdate || ["downloading", "restarting", "done", "failed"].includes(phase.name);
   let heading = "Update available";
 
-  if (failed !== undefined || app.status === "failed") {
+  // The heading follows the rows on screen, so a finished server row still counts until it leaves.
+  if (phase.name === "failed" || app.status === "failed") {
     heading = "Update failed";
-  } else if (serverUpdate && appUpdate) {
+  } else if (serverShown && appUpdate) {
     heading = "2 updates";
   } else if (app.status === "ready") {
     heading = "Ready to restart";
@@ -657,7 +683,7 @@ export function UpdatePill({ updates }: { updates: Updates }) {
               type="button"
               disabled={!look.opens}
               title={
-                shown.current.view === "available"
+                shown.current === "available"
                   ? `Update clots to ${info?.latest?.version}`
                   : undefined
               }
@@ -666,14 +692,6 @@ export function UpdatePill({ updates }: { updates: Updates }) {
             />
           }
         >
-          {/* A finished download keeps its full fill and fades it out, as a finished server update does. */}
-          {filling && (
-            <RestartFill
-              finishing={shown.current.view === "done"}
-              gone={shown.current.filled || ready}
-              percent={ready ? 100 : percent}
-            />
-          )}
           <span ref={label} className="relative flex shrink-0">
             <span
               key={look.label}
@@ -688,17 +706,6 @@ export function UpdatePill({ updates }: { updates: Updates }) {
                 {look.icon}
               </span>
               {look.label}
-              {shown.current.view === "available" && (
-                <span className="font-normal text-muted-foreground tabular-nums">
-                  {serverUpdate && appUpdate ? "2 updates" : info?.latest?.version}
-                </span>
-              )}
-              {percent !== undefined && (
-                <span className="font-normal text-muted-foreground tabular-nums">{percent}%</span>
-              )}
-              {shown.current.view === "failed" && (
-                <span className="font-normal text-muted-foreground">Details</span>
-              )}
             </span>
           </span>
         </PopoverTrigger>
@@ -708,13 +715,26 @@ export function UpdatePill({ updates }: { updates: Updates }) {
           align="end"
           sideOffset={8}
           initialFocus={(openType) => openType === "keyboard"}
-          className="w-fit max-w-72 min-w-44 gap-1 rounded-xl p-2 shadow-lg"
+          className="rounded-xl shadow-lg"
         >
-          <p className="px-1 pt-0.5 text-xs text-muted-foreground">{heading}</p>
-          {(serverUpdate || failed !== undefined) && (
-            <ServerItem updates={updates} failed={failed} />
-          )}
-          {appUpdate && <AppItem info={info} app={updates.app} />}
+          <div className="flex items-center justify-between gap-2 px-1 text-[0.8125rem]">
+            <p className="text-muted-foreground">{heading}</p>
+            {info?.latest !== undefined && (
+              <a
+                href={info.latest.url}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-1 rounded-sm font-medium text-foreground outline-none hover:underline focus-visible:ring-1 focus-visible:ring-ring/40"
+              >
+                What's new
+                <ArrowUpRightIcon className="size-3" />
+              </a>
+            )}
+          </div>
+          <div className="flex flex-col gap-1">
+            {serverShown && <ServerRow updates={updates} />}
+            {appUpdate && <AppRow info={info} app={app} />}
+          </div>
         </PopoverContent>
       </Popover>
     </div>
