@@ -350,20 +350,17 @@ export class BotSessions extends Context.Service<
     deleteBot(bot: StoredBot): Effect.Effect<void>;
     /**
      * Makes a routine of a bot. With "clone", a clone of the bot runs it in its own thread, under the
-     * bot. A clone has no routines of its own.
+     * bot, from the first run on. A clone has no routines of its own.
      */
     createRoutine(
       bot: StoredBot,
-      routine: { cron: string; prompt: string; place: RoutinePlace; title?: string },
-    ): Effect.Effect<
-      { routine: Schedule; thread: StoredBot },
-      InvalidCron | TooManyClones | CloneIsReadOnly
-    >;
-    /** Sends a routine's prompt to the bot that runs it. A routine whose clone is gone gets a new clone. */
+      routine: { cron: string; prompt: string; place: RoutinePlace },
+    ): Effect.Effect<Schedule, InvalidCron | TooManyClones | CloneIsReadOnly>;
+    /** Sends a routine's prompt to the bot that runs it. A routine without its clone gets a new clone. */
     runRoutine(owner: StoredBot, routine: Schedule): Effect.Effect<void>;
     /**
-     * Moves a routine to the bot's own conversation or to a new clone. A clone that ran the routine
-     * stays, with its thread.
+     * Moves a routine to the bot's own conversation or to a clone, which the next run makes. A clone
+     * that ran the routine stays, with its thread.
      */
     moveRoutine(
       owner: StoredBot,
@@ -587,12 +584,7 @@ export class BotSessions extends Context.Service<
 
       const createRoutine = (
         self: StoredBot,
-        {
-          cron,
-          prompt,
-          place,
-          title = `${self.name} routine`,
-        }: { cron: string; prompt: string; place: RoutinePlace; title?: string },
+        { cron, prompt, place }: { cron: string; prompt: string; place: RoutinePlace },
       ) =>
         Effect.gen(function* () {
           const next = nextRunAt(cron, Date.now());
@@ -605,20 +597,11 @@ export class BotSessions extends Context.Service<
             return yield* new CloneIsReadOnly({ botId: self.id });
           }
 
-          if (place === "here") {
-            const routine = yield* schedules.create(self.id, cron, prompt, next);
-
-            return { routine, thread: self };
-          }
-
-          if (clonesMadeBy(yield* repository.list, self) >= MAX_CLONES) {
+          if (place === "clone" && clonesMadeBy(yield* repository.list, self) >= MAX_CLONES) {
             return yield* new TooManyClones({ max: MAX_CLONES });
           }
 
-          const thread = yield* makeRunner(self, title);
-          const routine = yield* schedules.create(self.id, cron, prompt, next, thread.id);
-
-          return { routine, thread };
+          return yield* schedules.create(self.id, cron, prompt, next, place);
         });
 
       const runRoutine = (owner: StoredBot, routine: Schedule) =>
@@ -630,7 +613,7 @@ export class BotSessions extends Context.Service<
           const current =
             routine.runnerId === null ? undefined : yield* repository.find(routine.runnerId);
 
-          // The operator may have deleted the clone. The routine still belongs to its owner, so a new clone runs it.
+          // The clone comes with the first run. The operator may also have deleted it, and then a new clone runs the routine.
           let runner = current;
           if (runner?.clonedFrom !== owner.id) {
             runner = yield* makeRunner(owner, `${owner.name} routine`);
@@ -646,16 +629,11 @@ export class BotSessions extends Context.Service<
             return;
           }
 
-          if (place === "here") {
-            return yield* schedules.setPlace(routine.id, "here", null);
-          }
-
-          if (clonesMadeBy(yield* repository.list, owner) >= MAX_CLONES) {
+          if (place === "clone" && clonesMadeBy(yield* repository.list, owner) >= MAX_CLONES) {
             return yield* new TooManyClones({ max: MAX_CLONES });
           }
 
-          const runner = yield* makeRunner(owner, `${owner.name} routine`);
-          yield* schedules.setPlace(routine.id, "clone", runner.id);
+          yield* schedules.setPlace(routine.id, place, null);
         });
 
       const deleteRoutine = (routine: Schedule) =>
@@ -932,7 +910,7 @@ export class BotSessions extends Context.Service<
             ),
             tool(
               "create_routine",
-              `Make a clots routine: a prompt that clots sends on a schedule, such as a morning brief every day at 9:00. Use it for recurring work that must keep running across restarts. For a short check within this session, such as every 5 minutes for the next hour, use CronCreate or Monitor instead. A routine runs "here", in this conversation (the default), or in a "clone": a bot under you with your instructions, so its runs do not fill this conversation, and that can read your notes and thread. Unless the operator already said where, ask them before you make it. The operator can pause or delete a routine in the details pane of the bot that runs it.`,
+              `Make a clots routine: a prompt that clots sends on a schedule, such as a morning brief every day at 9:00. Use it for recurring work that must keep running across restarts. For a short check within this session, such as every 5 minutes for the next hour, use CronCreate or Monitor instead. A routine runs "here", in this conversation (the default), or in a "clone": a bot under you with your instructions, which the first run makes, so its runs do not fill this conversation, and that can read your notes and thread. Unless the operator already said where, ask them before you make it. The operator can pause or delete a routine in the details pane of the bot that runs it.`,
               {
                 cron: z
                   .string()
@@ -948,27 +926,16 @@ export class BotSessions extends Context.Service<
                   .enum(["here", "clone"])
                   .optional()
                   .describe('"here", this conversation (the default), or "clone".'),
-                title: z
-                  .string()
-                  .optional()
-                  .describe(
-                    "A short name for the clone, such as Morning brief. Only a clone uses it.",
-                  ),
               },
-              async ({ cron, prompt, where = "here", title }) => {
+              async ({ cron, prompt, where = "here" }) => {
                 const result = await Effect.runPromise(
-                  createRoutine(self, {
-                    cron,
-                    prompt,
-                    place: where,
-                    ...(title === undefined ? {} : { title }),
-                  }).pipe(
-                    Effect.map(({ routine, thread }) => {
+                  createRoutine(self, { cron, prompt, place: where }).pipe(
+                    Effect.map((routine) => {
                       const firstRun = `The first run is ${new Date(routine.nextRunAt).toLocaleString()} (${HOST_TIME_ZONE}).`;
 
-                      return thread.id === self.id
+                      return routine.place === "here"
                         ? `Made routine ${routine.id} in this thread. ${firstRun}`
-                        : `Made routine ${routine.id}. It runs in its own thread, @${thread.name}, under you. ${firstRun}`;
+                        : `Made routine ${routine.id}. Its first run makes a clone under you, which runs it in its own thread. ${firstRun}`;
                     }),
                     Effect.catchTags({
                       InvalidCron: () =>

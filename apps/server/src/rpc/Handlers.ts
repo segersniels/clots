@@ -349,7 +349,6 @@ export const HandlersLayer = ClotsRpcs.toLayer(
       CreateSchedule: ({ botId, cron, prompt, place }) =>
         requireBot(botId).pipe(
           Effect.flatMap((bot) => sessions.createRoutine(bot, { cron, prompt, place })),
-          Effect.map(({ routine }) => routine),
         ),
 
       UpdateSchedule: ({ id, cron, prompt, place }) =>

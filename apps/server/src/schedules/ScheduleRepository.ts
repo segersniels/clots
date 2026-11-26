@@ -29,13 +29,13 @@ export class ScheduleRepository extends Context.Service<
     find(id: string): Effect.Effect<Schedule | undefined>;
     /** Lists the schedules whose run time passed, including the paused ones. */
     due(now: number): Effect.Effect<ReadonlyArray<Schedule>>;
-    /** Adds a routine of a bot. With a runner, the routine runs in that clone of the bot. */
+    /** Adds a routine of a bot. A routine with place "clone" gets its clone at its first run. */
     create(
       botId: BotId,
       cron: string,
       prompt: string,
       nextRunAt: number,
-      runnerId?: BotId,
+      place: RoutinePlace,
     ): Effect.Effect<Schedule>;
     /** Changes what a routine sends and when. Its paused state stays. */
     update(id: string, cron: string, prompt: string, nextRunAt: number): Effect.Effect<void>;
@@ -90,12 +90,12 @@ export class ScheduleRepository extends Context.Service<
             Effect.orDie,
           ),
 
-        create: (botId, cron, prompt, nextRunAt, runnerId) => {
+        create: (botId, cron, prompt, nextRunAt, place) => {
           const schedule: Schedule = {
             id: crypto.randomUUID(),
             botId,
-            place: runnerId === undefined ? "here" : "clone",
-            runnerId: runnerId ?? null,
+            place,
+            runnerId: null,
             cron,
             prompt,
             paused: false,

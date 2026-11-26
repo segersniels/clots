@@ -28,7 +28,7 @@ test("an edited routine gets its new schedule and prompt, and stays paused", asy
     Effect.gen(function* () {
       const schedules = yield* ScheduleRepository;
       const botId = "bot" as BotId;
-      const created = yield* schedules.create(botId, "0 9 * * *", "Morning briefing", 1);
+      const created = yield* schedules.create(botId, "0 9 * * *", "Morning briefing", 1, "here");
       yield* schedules.setPaused(created.id, true);
       yield* schedules.update(created.id, "0 18 * * 1-5", "/commit the day", 2);
 
