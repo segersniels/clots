@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useState, useSyncExternalStore, type ReactNode } from "react";
 
 import { loadHighlighter } from "@/lib/highlighter";
 
@@ -11,31 +11,29 @@ const loadedHighlighters = new Map<string, Highlighter>();
 export function useHighlightedCode(value: string, language: string) {
   // A trailing newline would render as an extra empty line.
   const code = value.endsWith("\n") ? value.slice(0, -1) : value;
-  const subscribe = useCallback(
-    (onLoaded: () => void) => {
-      let cancelled = false;
+  const subscribe = (onLoaded: () => void) => {
+    let cancelled = false;
 
-      if (!loadedHighlighters.has(language)) {
-        loadHighlighter(language)
-          .then((next) => {
-            // Two blocks can load one language at once. The first highlighter stays, so neither block highlights again.
-            if (!loadedHighlighters.has(language)) {
-              loadedHighlighters.set(language, next);
-            }
+    if (!loadedHighlighters.has(language)) {
+      loadHighlighter(language)
+        .then((next) => {
+          // Two blocks can load one language at once. The first highlighter stays, so neither block highlights again.
+          if (!loadedHighlighters.has(language)) {
+            loadedHighlighters.set(language, next);
+          }
 
-            if (!cancelled) {
-              onLoaded();
-            }
-          })
-          .catch(() => {});
-      }
+          if (!cancelled) {
+            onLoaded();
+          }
+        })
+        .catch(() => {});
+    }
 
-      return () => {
-        cancelled = true;
-      };
-    },
-    [language],
-  );
+    return () => {
+      cancelled = true;
+    };
+  };
+
   const highlighter = useSyncExternalStore(
     subscribe,
     () => loadedHighlighters.get(language) ?? null,
@@ -78,11 +76,9 @@ export function useHighlightedCode(value: string, language: string) {
   // The last line is still being written, so it is tokenized on every render.
   const tail = code.slice(end);
 
-  return useMemo(() => {
-    if (!highlighter) {
-      return code.split("\n");
-    }
+  if (!highlighter) {
+    return code.split("\n");
+  }
 
-    return [...next.lines, highlighter.highlight(tail, next.state).lines[0]];
-  }, [code, highlighter, next, tail]);
+  return [...next.lines, highlighter.highlight(tail, next.state).lines[0]];
 }

@@ -67,6 +67,11 @@
                 "name": "react",
                 "importNames": ["useEffect", "useLayoutEffect"],
                 "message": "Derive the value, handle the event, use a key, or use useMountEffect for external sync on mount."
+              },
+              {
+                "name": "react",
+                "importNames": ["useMemo", "useCallback", "memo"],
+                "message": "The React Compiler memoizes components and hooks, so write the plain value or function."
               }
             ]
           }

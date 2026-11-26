@@ -23,7 +23,7 @@ import {
   WrenchIcon,
   type LucideIcon,
 } from "lucide-react";
-import { useCallback, useEffectEvent, useRef, useState, type ReactNode } from "react";
+import { useEffectEvent, useRef, useState, type ReactNode } from "react";
 
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Button } from "@/components/ui/button";
@@ -387,8 +387,7 @@ export function Chat({
     return store.subscribe(save);
   });
 
-  // A stable callback, so that one visit to the top loads one page and not one per render.
-  const showOlder = useCallback(() => setShownCount((count) => count + MESSAGES_PER_PAGE), []);
+  const showOlder = () => setShownCount((count) => count + MESSAGES_PER_PAGE);
   const [highlightedId, setHighlightedId] = useState<string>();
 
   const jumpIndex =
