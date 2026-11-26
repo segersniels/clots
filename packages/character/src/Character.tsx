@@ -8,7 +8,7 @@ import {
   type Gaze,
   type MotionProps,
 } from "./CharacterMotion.ts";
-import { animate } from "./frameLoop.ts";
+import { animate, wake } from "./frameLoop.ts";
 import {
   COLOR_HEX,
   MAX_LOBES,
@@ -68,6 +68,11 @@ export function Character({
   useEffect(() => {
     props.current = { shape, mood, gaze, fitted, hops };
   });
+
+  // Without focus, the loop stops while every character is idle, so a new mood has to start it.
+  useEffect(() => {
+    wake();
+  }, [mood]);
 
   useEffect(() => {
     const motion = new CharacterMotion(svg.current!, () => props.current);

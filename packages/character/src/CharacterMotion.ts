@@ -168,9 +168,16 @@ export class CharacterMotion implements Animated {
     }
   }
 
-  draw(now: number) {
+  /** Checks whether the character still has to draw: it is not idle, or it has not settled yet. */
+  moves() {
+    return this.props().mood !== "idle" || !this.atRest;
+  }
+
+  draw(now: number, focused: boolean) {
     const { shape, mood, gaze, hops } = this.props();
     const reduced = prefersReducedMotion();
+    // An idle character without focus goes straight to its resting pose and stays there.
+    const still = reduced || (!focused && mood === "idle");
     const t = now / 1000 + this.phase;
 
     if (shape !== this.shape) {
@@ -186,7 +193,7 @@ export class CharacterMotion implements Animated {
 
     // A working or waiting character breathes in its own motion below.
     const breathesIdle = mood === "idle" && !reduced;
-    if (breathesIdle && this.idleBreath.playState !== "running") {
+    if (breathesIdle && focused && this.idleBreath.playState !== "running") {
       this.idleBreath.play();
     }
 
@@ -202,7 +209,7 @@ export class CharacterMotion implements Animated {
       now - this.morphStart >= MORPH_MS &&
       now - this.hopStart >= HOP_MS &&
       now - this.blinkStart >= BLINK_MS &&
-      now <= this.nextBlink &&
+      (still || now <= this.nextBlink) &&
       Math.hypot(target.x - this.gaze.x, target.y - this.gaze.y) < GAZE_REST;
 
     if (settled && this.atRest) {
@@ -259,7 +266,7 @@ export class CharacterMotion implements Animated {
     this.sheen.setAttribute("ry", String(lightR * 0.11));
     this.sheen.setAttribute("transform", `rotate(-35 ${sheenX} ${sheenY})`);
 
-    this.drawEyes(now, eyeX, eyeY, eyeGap, target, reduced, mood);
+    this.drawEyes(now, eyeX, eyeY, eyeGap, target, still, mood);
   }
 
   private startMorph(shape: CharacterShape, now: number, reduced: boolean) {
@@ -392,14 +399,14 @@ export class CharacterMotion implements Animated {
     y: number,
     gap: number,
     target: Gaze,
-    reduced: boolean,
+    still: boolean,
     mood: CharacterMood,
   ) {
-    const ease = reduced ? 1 : 0.14;
+    const ease = still ? 1 : 0.14;
     this.gaze.x += (target.x - this.gaze.x) * ease;
     this.gaze.y += (target.y - this.gaze.y) * ease;
 
-    if (!reduced && now > this.nextBlink) {
+    if (!still && now > this.nextBlink) {
       this.blinkStart = now;
       this.nextBlink = now + 2400 + Math.random() * 4200;
     }
