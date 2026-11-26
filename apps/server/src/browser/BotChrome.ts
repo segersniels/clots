@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { runtimePaths } from "../paths.ts";
@@ -77,6 +78,20 @@ const runsProfile = async (port: number, profile: string) => {
 };
 
 /**
+ * Checks whether Chrome restores the last session of a profile. It does so only after a clean
+ * close, such as the idle close. After a crash or a kill, it opens a new tab page instead.
+ */
+const restoresSession = (profile: string) => {
+  try {
+    const preferences = JSON.parse(readFileSync(join(profile, "Default", "Preferences"), "utf8"));
+
+    return preferences.profile?.exit_type === "Normal";
+  } catch {
+    return false;
+  }
+};
+
+/**
  * Starts the bot's Chrome when it does not run yet. It runs headless, because the server has no
  * screen, and clots starts it without the automation switch that agent-browser sets, so sites see a
  * normal browser. It runs apart from the server, so a server restart keeps the bot's open pages.
@@ -105,7 +120,10 @@ export const ensureChrome = async ({ executable, port, profile, userAgent }: Bot
       "--force-device-scale-factor=2",
       `--window-size=${SCREEN_SIZE.width},${SCREEN_SIZE.height}`,
       ...(userAgent === undefined ? [] : [`--user-agent=${userAgent}`]),
-      "about:blank",
+      // A browser that closed when idle gets its tabs and its session cookies back.
+      "--restore-last-session",
+      // A start page would add a tab to the restored ones.
+      ...(restoresSession(profile) ? [] : ["about:blank"]),
     ],
     {
       detached: true,

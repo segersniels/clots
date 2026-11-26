@@ -337,7 +337,7 @@ const systemPromptFor = (bot: StoredBot) =>
       : `You work on the project "${bot.projectName}". Its directory, ${bot.projectDirectory}, is your current directory.`,
     // Without this, a bot inspects its directories before it answers a plain greeting.
     "Answer a message directly. Read files or run commands only when the task needs them.",
-    "You have a browser: use the `agent-browser` CLI through Bash. Run `agent-browser skills get core` before the first use. Your browser closes after 30 idle minutes, so the pages you opened can be gone: open them again.",
+    "You have a browser: use the `agent-browser` CLI through Bash. Run `agent-browser skills get core` before the first use. Your browser closes after 30 idle minutes. The next command reopens its tabs, which reload: check which tab is active.",
     "Your browser session and profile are already set in the environment. Do not pass `--session` or `--profile`, or the operator cannot see your browser.",
     `When a page needs the operator (a login, a captcha, a payment), call the ${HANDOFF_TOOL} tool and wait.`,
     bot.parentName === null
