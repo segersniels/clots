@@ -28,8 +28,8 @@ const RING = { outer: 7, inner: 3.5 };
 const EYE_COLOR = "#141416";
 
 /**
- * Draws a clot: round lobes that melt together, with a face. It breathes and blinks, follows the
- * pointer with its eyes, morphs when its shape changes and shows its mood with motion.
+ * Draws a clot: round lobes that melt together, with a face. It breathes and blinks, morphs when
+ * its shape changes and shows its mood with motion.
  */
 export function Character({
   shape,
@@ -47,7 +47,7 @@ export function Character({
   size?: number;
   /** Draws a ring in the current text color that follows the outline. Leave it out where nothing selects. */
   selected?: boolean;
-  /** Makes the eyes look at a point instead of at the pointer. */
+  /** Makes the eyes look at a point. Without it, an idle character looks straight ahead. */
   gaze?: Gaze | undefined;
   /** Counts the hops that the character was asked for, such as one for each save. Each new count makes it hop once. */
   hops?: number;

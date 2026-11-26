@@ -1,4 +1,4 @@
-import { pointer, prefersReducedMotion, type Animated } from "./frameLoop.ts";
+import { prefersReducedMotion, type Animated } from "./frameLoop.ts";
 import {
   MAX_LOBES,
   NO_FIT,
@@ -106,7 +106,6 @@ export class CharacterMotion implements Animated {
   private blinkStart = -Infinity;
   private nextBlink = performance.now() + 1200 + Math.random() * 3000;
   private gaze = { x: 0, y: 0 };
-  private center: { x: number; y: number } | undefined;
   private atRest = false;
   private readonly idleBreath: Animation;
 
@@ -152,16 +151,21 @@ export class CharacterMotion implements Animated {
     this.idleBreath.cancel();
   }
 
-  measure() {
-    const { mood, gaze } = this.props();
-
-    // Only an idle character without a set gaze follows the pointer, so only it needs its position.
-    if (mood !== "idle" || gaze !== undefined || !pointer.seen) {
-      return;
+  /** Pauses the idle breath where it is, so it continues from the same pose and does not jump. */
+  pause() {
+    if (this.idleBreath.playState === "running") {
+      this.idleBreath.pause();
     }
+  }
 
-    const box = this.svg.getBoundingClientRect();
-    this.center = { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+  /** Takes the shape and hops that changed while the window had no focus. They show at once and do not replay. */
+  resume() {
+    const { shape, hops } = this.props();
+    this.hops = hops;
+
+    if (shape !== this.shape) {
+      this.startMorph(shape, performance.now(), true);
+    }
   }
 
   draw(now: number) {
@@ -186,7 +190,8 @@ export class CharacterMotion implements Animated {
       this.idleBreath.play();
     }
 
-    if (!breathesIdle && this.idleBreath.playState === "running") {
+    // A paused breath still holds its squash, so a mood change while the window had no focus also ends it.
+    if (!breathesIdle && this.idleBreath.playState !== "idle") {
       this.idleBreath.cancel();
     }
 
@@ -378,16 +383,7 @@ export class CharacterMotion implements Animated {
       return { x: Math.cos(t * 2.4) * 2.6, y: Math.sin(t * 2.4) * 2.2 };
     }
 
-    if (this.center === undefined) {
-      return { x: 0, y: 0 };
-    }
-
-    const dx = pointer.x - this.center.x;
-    const dy = pointer.y - this.center.y;
-    const distance = Math.hypot(dx, dy) || 1;
-    const reach = Math.min(1, distance / 220);
-
-    return { x: (dx / distance) * EYE_REACH.x * reach, y: (dy / distance) * EYE_REACH.y * reach };
+    return { x: 0, y: 0 };
   }
 
   private drawEyes(
