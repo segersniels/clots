@@ -3,12 +3,7 @@ import { BotIcon, LoaderCircleIcon, SquareIcon, TerminalIcon } from "lucide-reac
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useMountEffect } from "@/hooks/use-mount-effect";
 
 import { client, useStore } from "../client.ts";
@@ -45,8 +40,8 @@ function RemoveEndedRows({ onFaded }: { onFaded: () => void }) {
 }
 
 /**
- * Shows the bot's work in the background as a pill in the thread header. Its menu lists each task,
- * and picking a row stops that task. Without tasks, the pill fades out. A narrow header keeps only
+ * Shows the bot's work in the background as a pill in the thread header. Its popover lists each task,
+ * and the stop button of a row stops that task. Without tasks, the pill fades out. A narrow header keeps only
  * the number, so the name stays centered.
  */
 export function BackgroundTasks({ botId }: { botId: BotId }) {
@@ -66,7 +61,7 @@ export function BackgroundTasks({ botId }: { botId: BotId }) {
     }
   }
 
-  // The menu has nothing left to show once the last task ends.
+  // The popover has nothing left to show once the last task ends.
   if (open && tasks.length === 0) {
     setOpen(false);
   }
@@ -90,8 +85,8 @@ export function BackgroundTasks({ botId }: { botId: BotId }) {
           onFaded={() => setRows((current) => current.filter((row) => !row.leaving))}
         />
       )}
-      <DropdownMenu open={open} onOpenChange={setOpen}>
-        <DropdownMenuTrigger
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger
           render={
             <Button
               variant="secondary"
@@ -104,33 +99,43 @@ export function BackgroundTasks({ botId }: { botId: BotId }) {
             {count}
             <span className="hidden @min-[7.5rem]:inline"> running</span>
           </span>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" collisionPadding={8} className="max-h-53.5 w-80">
+        </PopoverTrigger>
+        {/* Only a keyboard open moves focus to the first stop button, so a click shows no focus ring. */}
+        <PopoverContent
+          align="end"
+          collisionPadding={8}
+          initialFocus={(openType) => openType === "keyboard"}
+          className="max-h-53.5 w-80 gap-0 overflow-y-auto p-1"
+        >
           {rows.map(({ task, leaving }) => (
-            <DropdownMenuItem
+            <div
               key={task.id}
-              aria-label={`Stop ${task.description}`}
-              closeOnClick={false}
-              disabled={leaving || stopping.has(task.id)}
-              className={`py-1 pr-1 transition-opacity duration-150 starting:opacity-0 motion-reduce:transition-none ${leaving ? "opacity-0" : ""}`}
-              onClick={() => {
-                setStopping((current) => new Set(current).add(task.id));
-                void client.stopTask(botId, task.id);
-              }}
+              className={`flex items-center gap-1.5 rounded-md py-1 pr-1 pl-1.5 text-sm transition-opacity duration-150 starting:opacity-0 motion-reduce:transition-none ${leaving ? "opacity-0" : ""}`}
             >
               {task.kind === "agent" ? (
-                <BotIcon className="text-muted-foreground" />
+                <BotIcon className="size-4 text-muted-foreground" />
               ) : (
-                <TerminalIcon className="text-muted-foreground" />
+                <TerminalIcon className="size-4 text-muted-foreground" />
               )}
               <span className="min-w-0 flex-1 truncate">{task.description}</span>
-              <span className="flex size-5 items-center justify-center rounded-sm text-muted-foreground group-focus/dropdown-menu-item:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_8%)] group-focus/dropdown-menu-item:text-foreground">
+              {/* The ghost variant has its own dark hover, so the highlight is repeated for dark. */}
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                aria-label={`Stop ${task.description}`}
+                disabled={leaving || stopping.has(task.id)}
+                className="size-5 rounded-sm text-muted-foreground hover:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_8%)] hover:text-foreground focus-visible:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_8%)] focus-visible:text-foreground dark:hover:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_8%)]"
+                onClick={() => {
+                  setStopping((current) => new Set(current).add(task.id));
+                  void client.stopTask(botId, task.id);
+                }}
+              >
                 <SquareIcon className="size-2.5 fill-current" />
-              </span>
-            </DropdownMenuItem>
+              </Button>
+            </div>
           ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
+        </PopoverContent>
+      </Popover>
     </>
   );
 }
