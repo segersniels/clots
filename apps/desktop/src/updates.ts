@@ -1,5 +1,5 @@
 import type { AppUpdateState } from "@clots/contracts";
-import { app } from "electron";
+import { app, powerMonitor } from "electron";
 import { autoUpdater } from "electron-updater";
 import { execFile } from "node:child_process";
 import { resolve } from "node:path";
@@ -36,8 +36,8 @@ const hasDeveloperIdSignature = async () => {
 export const updateState = () => state;
 
 /**
- * Starts the updater of a signed app. It asks GitHub for a new release now and every 15 minutes, and
- * reports each state change. The download waits for the operator's click.
+ * Starts the updater of a signed app. It asks GitHub for a new release now, every 15 minutes and
+ * after each wake, and reports each state change. The download waits for the operator's click.
  */
 export const startUpdates = async (onChange: (state: AppUpdateState) => void) => {
   if (!app.isPackaged || process.platform !== "darwin" || !(await hasDeveloperIdSignature())) {
@@ -65,6 +65,8 @@ export const startUpdates = async (onChange: (state: AppUpdateState) => void) =>
   setState({ status: "current" });
   void check();
   setInterval(() => void check(), CHECK_INTERVAL_MS);
+  // The interval pauses while the Mac sleeps, so a wake checks at once.
+  powerMonitor.on("resume", () => void check());
 };
 
 /** Asks GitHub for a new release. A failed check, for example without a network, keeps the last state. */
