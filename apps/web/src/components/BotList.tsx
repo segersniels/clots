@@ -357,13 +357,14 @@ function CloneGroup({ clones }: { clones: ReadonlyArray<BotSummary> }) {
   const expanded = open || clones.some((clone) => clone.id === openBotId);
   const working = clones.filter((clone) => clone.status !== "idle").length;
 
+  // The line keeps the same 4 px from the bot row above it as the rows keep from each other.
   return (
-    <div>
+    <div className="pt-1">
       <button
         type="button"
         aria-expanded={expanded}
         onClick={() => setOpen(!expanded)}
-        className="flex w-full items-center gap-1.5 rounded-lg py-1 pr-2.5 pl-[3.25rem] text-[0.8125rem] text-muted-foreground transition-colors duration-150 hover:bg-sidebar-accent"
+        className="flex w-full items-center gap-1.5 rounded-lg py-1 pr-2.5 pl-14 text-[0.8125rem] text-muted-foreground transition-colors duration-150 hover:bg-sidebar-accent"
       >
         <ChevronDownIcon
           className={`size-3.5 transition-[rotate] duration-200 ease-out motion-reduce:transition-none ${expanded ? "" : "-rotate-90"}`}
