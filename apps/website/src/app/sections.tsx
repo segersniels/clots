@@ -269,7 +269,7 @@ export function Sections({ download }: { download: React.ReactNode }) {
         </ol>
       </Section>
 
-      <Section title="A bot with a computer of its own">
+      <Section title="What each bot can do">
         <div className="grid grid-cols-6 gap-3">
           {ABILITIES.map((ability, index) => (
             // The first row holds three tiles and the second row two wider ones.
