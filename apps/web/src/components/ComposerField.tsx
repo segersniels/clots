@@ -102,15 +102,14 @@ const ReferenceNode = Node.create({
 
 /**
  * The formats that the field writes as markdown. Typing their markdown, such as `**`, a backtick or
- * `1. ` or `> `, formats the text at once. Headings and links stay off: a prompt rarely needs them.
+ * `1. ` or `> `, formats the text at once. Headings stay on, because the editor drops the whole
+ * text when the parser makes a node that it lacks, such as a `##` heading in the instructions of a
+ * template. Links stay off: they would turn a bare URL into `[url](url)`.
  */
 const FORMATS = StarterKit.configure({
   dropcursor: false,
   gapcursor: false,
-  heading: false,
-  horizontalRule: false,
   link: false,
-  strike: false,
   trailingNode: false,
   underline: false,
 });
@@ -330,7 +329,7 @@ export function ComposerField({
         "aria-multiline": "true",
         role: "textbox",
         class:
-          "px-2.5 py-1.5 text-sm wrap-break-word whitespace-pre-wrap outline-none [&_code]:rounded-sm [&_code]:bg-muted [&_code]:px-1 [&_code]:font-mono [&_code]:text-[0.9em] [&_li_p]:my-0 [&_ol]:list-decimal [&_ol]:pl-5 [&_pre]:my-1 [&_pre]:rounded-lg [&_pre]:bg-muted [&_pre]:p-2 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_strong]:font-semibold [&_ul]:list-disc [&_ul]:pl-5 [&_blockquote]:border-l-2 [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground [&_p.is-editor-empty:first-child]:before:pointer-events-none [&_p.is-editor-empty:first-child]:before:float-left [&_p.is-editor-empty:first-child]:before:h-0 [&_p.is-editor-empty:first-child]:before:text-muted-foreground [&_p.is-editor-empty:first-child]:before:content-[attr(data-placeholder)]",
+          "px-2.5 py-1.5 text-sm wrap-break-word whitespace-pre-wrap outline-none [&_code]:rounded-sm [&_code]:bg-muted [&_code]:px-1 [&_code]:font-mono [&_code]:text-[0.9em] [&_li_p]:my-0 [&_ol]:list-decimal [&_ol]:pl-5 [&_pre]:my-1 [&_pre]:rounded-lg [&_pre]:bg-muted [&_pre]:p-2 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_strong]:font-semibold [&_:is(h1,h2,h3,h4,h5,h6)]:font-semibold [&_hr]:my-2 [&_hr]:border-border [&_ul]:list-disc [&_ul]:pl-5 [&_blockquote]:border-l-2 [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground [&_p.is-editor-empty:first-child]:before:pointer-events-none [&_p.is-editor-empty:first-child]:before:float-left [&_p.is-editor-empty:first-child]:before:h-0 [&_p.is-editor-empty:first-child]:before:text-muted-foreground [&_p.is-editor-empty:first-child]:before:content-[attr(data-placeholder)]",
       },
       handleKeyDown: (_view, event) => latest.current.handleKey(event),
       handlePaste: (_view, event) => {
