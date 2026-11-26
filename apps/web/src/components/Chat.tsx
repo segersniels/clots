@@ -14,6 +14,7 @@ import type {
 import {
   AppWindowIcon,
   ArrowRightIcon,
+  BrainIcon,
   CheckIcon,
   CircleAlertIcon,
   FilePenIcon,
@@ -139,13 +140,24 @@ function Steps({
   running: boolean;
   runningKind?: TraceStepKind | undefined;
 }) {
-  const RunningIcon = runningKind === undefined ? undefined : STEP_ICONS[runningKind];
+  let RunningIcon: LucideIcon | undefined;
+  if (runningKind !== undefined) {
+    RunningIcon = STEP_ICONS[runningKind];
+  } else if (running) {
+    // A running trace without a running step means that the bot thinks.
+    RunningIcon = BrainIcon;
+  }
 
   // Before the first tool call, such as while the bot thinks, there is nothing to open.
   if (steps.length === 0) {
     return (
       <Trace>
         <TraceLine {...(running ? { status: "running" as const } : {})}>
+          {RunningIcon && (
+            <TraceIcon>
+              <RunningIcon />
+            </TraceIcon>
+          )}
           <TraceTitle>{title}</TraceTitle>
         </TraceLine>
       </Trace>
