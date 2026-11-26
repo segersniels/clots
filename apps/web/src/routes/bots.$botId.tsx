@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useMediaQuery } from "@/hooks/use-media-query";
-import { usePageVisible } from "@/hooks/use-page-visible";
 import { saveLastBot } from "@/lib/last-bot";
 import { readPaneOpen, readPaneWidth, savePaneOpen, savePaneWidth } from "@/lib/pane-width";
 
@@ -53,7 +52,6 @@ function BotPage() {
   const bot = bots.find((candidate) => candidate.id === botId);
   const wide = useMediaQuery(WIDE_WINDOW);
   const reduceMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
-  const visible = usePageVisible();
   const details = usePanelRef();
   // The pane opens as the operator left it. On a narrow window it would cover the chat, so it starts closed there.
   const [detailsOpen, setDetailsOpen] = useState(() => wide && readPaneOpen(DETAILS_OPEN_KEY));
@@ -64,13 +62,27 @@ function BotPage() {
   // A ref, so that a drag does not render the whole page on each move.
   const detailsWidth = useRef(readPaneWidth(DETAILS_WIDTH_KEY, DEFAULT_DETAILS_WIDTH));
 
-  // To open a bot is to read it, and so is coming back to the window that shows it.
+  // To open a bot is to read it.
   useEffect(() => {
     saveLastBot(botId);
-    if (visible) {
+    void client.setBotUnread(botId, false);
+  }, [botId]);
+
+  const status = bot?.status;
+  const unread = bot?.unread === true;
+  const previousStatus = useRef(status);
+
+  /**
+   * A turn that ends in the open conversation is read, even when the server missed the view and marked
+   * the bot. A bot that the operator marks unread keeps the mark, because its status does not change.
+   */
+  useEffect(() => {
+    const turnEnded = previousStatus.current !== "idle" && status === "idle";
+    previousStatus.current = status;
+    if (turnEnded && unread) {
       void client.setBotUnread(botId, false);
     }
-  }, [botId, visible]);
+  }, [botId, status, unread]);
 
   // The bot is gone, for example deleted on another device, so the app forgets it and goes home.
   const missing = bots.length > 0 && bot === undefined;

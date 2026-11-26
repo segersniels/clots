@@ -48,7 +48,6 @@ import {
   TraceLine,
   TraceTitle,
 } from "@/components/ui/trace";
-import { usePageVisible } from "@/hooks/use-page-visible";
 
 import { client, useStore } from "../client.ts";
 import { readCachedThread, saveCachedThread } from "../thread-cache.ts";
@@ -321,9 +320,8 @@ export function Chat({
   /** Reports that the thread scrolled to `jumpTo`, so the page can forget it. */
   onJumped?: () => void;
 }) {
-  // The operator reads a bot only while its conversation is on screen. A hidden window stops the view, so the bot can turn unread.
-  const visible = usePageVisible();
-  useEffect(() => (visible ? client.viewBot(botId) : undefined), [botId, visible]);
+  // The open conversation is read, even while the window is in the background, so the bot does not turn unread.
+  useEffect(() => client.viewBot(botId), [botId]);
   const thread = useStore(client.thread(botId));
   // After the app starts again, the thread shows its last messages from before, until the server sends the history.
   const [cached] = useState(() => (thread.synced ? null : readCachedThread(botId)));
