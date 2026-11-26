@@ -28,6 +28,7 @@ import type {
   ThreadEvent,
   ThreadLiveState,
   TraceStep,
+  TraceStepKind,
   Upload,
 } from "@clots/contracts";
 import {
@@ -197,6 +198,31 @@ const stepTitle = (
   }
 
   return `Using ${shownToolName(toolName)}`;
+};
+
+/** The kinds of the tools whose kind follows from their name alone. */
+const TOOL_KINDS: Readonly<Record<string, TraceStepKind>> = {
+  Bash: "command",
+  BashOutput: "command",
+  Read: "read",
+  Write: "edit",
+  Edit: "edit",
+  MultiEdit: "edit",
+  NotebookEdit: "edit",
+  Grep: "search",
+  Glob: "search",
+  WebSearch: "web",
+  WebFetch: "web",
+  send_bot_message: "message",
+};
+
+/** Finds the kind of a tool call. A command that drives the bot's browser counts as a browser step. */
+const stepKind = (toolName: string, input: Readonly<Record<string, unknown>> = {}) => {
+  if (typeof input.command === "string" && /^\s*agent-browser\b/.test(input.command)) {
+    return "browser";
+  }
+
+  return TOOL_KINDS[shownToolName(toolName)] ?? "tool";
 };
 
 /** The image files that the thread shows when a bot opens one with Read, by extension. */
@@ -1674,6 +1700,7 @@ export class BotSessions extends Context.Service<
                 id: event.content_block.id,
                 title: `Using ${shownToolName(event.content_block.name)}`,
                 status: "running" as const,
+                kind: stepKind(event.content_block.name),
               };
               setLive(runtime, { steps: [...runtime.live.steps, step] });
             }
@@ -1702,18 +1729,19 @@ export class BotSessions extends Context.Service<
                 ? yield* findBot(input.bot)
                 : undefined;
             const title = stepTitle(block.name, input, messagedBot?.name);
+            const kind = stepKind(block.name, input);
 
             // A transcript has no stream events, so after a restart the step starts here.
             if (!runtime.live.steps.some((step) => step.id === block.id)) {
               setLive(runtime, {
-                steps: [...runtime.live.steps, { id: block.id, title, status: "running" }],
+                steps: [...runtime.live.steps, { id: block.id, title, kind, status: "running" }],
               });
 
               continue;
             }
 
             const steps = runtime.live.steps.map((step) =>
-              step.id === block.id ? { ...step, title } : step,
+              step.id === block.id ? { ...step, title, kind } : step,
             );
             setLive(runtime, { steps });
           }

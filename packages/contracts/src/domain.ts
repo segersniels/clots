@@ -107,11 +107,26 @@ export const Upload = Schema.Struct({
 });
 export type Upload = typeof Upload.Type;
 
+/** The kind of action that a step does, which the thread shows as its icon. */
+export const TraceStepKind = Schema.Literals([
+  "command",
+  "read",
+  "edit",
+  "search",
+  "web",
+  "browser",
+  "message",
+  "tool",
+]);
+export type TraceStepKind = typeof TraceStepKind.Type;
+
 /** One tool call of the running turn, as the thread shows it. */
 export const TraceStep = Schema.Struct({
   id: Schema.String,
   title: Schema.String,
   status: Schema.Literals(["running", "done"]),
+  /** The steps of older traces have no kind. */
+  kind: Schema.optional(TraceStepKind),
 });
 export type TraceStep = typeof TraceStep.Type;
 

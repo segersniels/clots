@@ -7,13 +7,21 @@ import type {
   MessageRole,
   PendingApproval,
   TraceStep,
+  TraceStepKind,
 } from "@clots/contracts";
 import {
+  AppWindowIcon,
   ArrowRightIcon,
   CheckIcon,
   CircleAlertIcon,
-  CircleCheckIcon,
-  LoaderCircleIcon,
+  FilePenIcon,
+  FileTextIcon,
+  GlobeIcon,
+  MessageSquareIcon,
+  SearchIcon,
+  TerminalIcon,
+  WrenchIcon,
+  type LucideIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
@@ -64,6 +72,18 @@ export const BUBBLE = "rounded-[1.1rem] px-3.5 py-2 text-sm leading-normal";
  */
 const ENTER =
   "transition-[opacity,translate] duration-200 ease-out starting:translate-y-2 starting:opacity-0 motion-reduce:starting:translate-y-0";
+
+/** The icon of each kind of step. A step without a kind, such as one of an older trace, shows the wrench. */
+const STEP_ICONS: Readonly<Record<TraceStepKind, LucideIcon>> = {
+  command: TerminalIcon,
+  read: FileTextIcon,
+  edit: FilePenIcon,
+  search: SearchIcon,
+  web: GlobeIcon,
+  browser: AppWindowIcon,
+  message: MessageSquareIcon,
+  tool: WrenchIcon,
+};
 
 /** The label above a message on the operator's side that the operator did not type. */
 const SENDER_LABELS: Partial<Record<MessageRole, string>> = {
@@ -118,22 +138,23 @@ function Steps({
         </TraceCollapsibleTrigger>
         <TraceCollapsibleContent keepMounted>
           <Trace>
-            {steps.map((step) => (
-              <TraceLine
-                key={step.id}
-                {...(step.status === "running" ? { status: "running" as const } : {})}
-                className={ENTER}
-              >
-                <TraceIcon>
-                  {step.status === "running" ? (
-                    <LoaderCircleIcon className="animate-spin motion-reduce:animate-none" />
-                  ) : (
-                    <CircleCheckIcon />
-                  )}
-                </TraceIcon>
-                <TraceTitle>{step.title}</TraceTitle>
-              </TraceLine>
-            ))}
+            {steps.map((step) => {
+              const StepIcon = STEP_ICONS[step.kind ?? "tool"];
+
+              // The shimmer of a running title shows the status, so the icon shows the action.
+              return (
+                <TraceLine
+                  key={step.id}
+                  {...(step.status === "running" ? { status: "running" as const } : {})}
+                  className={ENTER}
+                >
+                  <TraceIcon>
+                    <StepIcon />
+                  </TraceIcon>
+                  <TraceTitle>{step.title}</TraceTitle>
+                </TraceLine>
+              );
+            })}
           </Trace>
         </TraceCollapsibleContent>
       </TraceCollapsible>
