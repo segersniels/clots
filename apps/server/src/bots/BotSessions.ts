@@ -47,7 +47,13 @@ import { z } from "zod";
 import { ClotsConfig } from "../config.ts";
 import { HOST_TIME_ZONE, nextRunAt, ScheduleRepository } from "../schedules/ScheduleRepository.ts";
 import { BotRepository, type BotChanges, type StoredBot } from "./BotRepository.ts";
-import { botTempDirectory, removeOldSessionFolders } from "./TempFolder.ts";
+import {
+  botTempDirectory,
+  cleanupLine,
+  decideWarning,
+  measureSessionFolder,
+  removeOldSessionFolders,
+} from "./TempFolder.ts";
 import { isRunning, readPages } from "../browser/BotChrome.ts";
 import {
   botChrome,
@@ -290,6 +296,12 @@ interface BotRuntime {
   browserWatchers: number;
   /** The last moment that the bot or a client used the browser. An idle browser closes. */
   browserUsedAt: number;
+  /** Whether `du` measures the bot's session folder now. One measurement runs at a time. */
+  measuringTempFiles: boolean;
+  /** The line that asks the bot to clean up its session folder. It goes with the next prompt only. */
+  cleanupNote: string | null;
+  /** The smallest size in KB of the session folder since the last warning, or `null` below the limit. */
+  warnedKb: number | null;
 }
 
 /** The sentences that tell the operator why a turn ended early, by the subtype of the SDK result. */
@@ -489,6 +501,9 @@ export class BotSessions extends Context.Service<
           stopping: false,
           browserWatchers: 0,
           browserUsedAt: Date.now(),
+          measuringTempFiles: false,
+          cleanupNote: null,
+          warnedKb: null,
         };
         runtimes.set(botId, runtime);
 
@@ -1731,6 +1746,29 @@ export class BotSessions extends Context.Service<
             runtime.loginHints.clear();
             setLive(runtime, { status: "idle", steps: [] });
 
+            // A session lives for days, so the files of its finished jobs pile up in its folder.
+            const bot = yield* repository.find(botId);
+            if (bot !== undefined && !runtime.measuringTempFiles) {
+              runtime.measuringTempFiles = true;
+              yield* Effect.promise(() => measureSessionFolder(bot, message.session_id)).pipe(
+                Effect.map((folder) => {
+                  const kb = folder?.kb ?? 0;
+                  const decision = decideWarning(kb, runtime.warnedKb);
+                  runtime.warnedKb = decision.warnedKb;
+
+                  if (folder !== undefined && decision.warn) {
+                    runtime.cleanupNote = cleanupLine(folder);
+                  }
+                }),
+                Effect.ensuring(
+                  Effect.sync(() => {
+                    runtime.measuringTempFiles = false;
+                  }),
+                ),
+                Effect.forkIn(scope),
+              );
+            }
+
             return;
           }
 
@@ -2109,6 +2147,8 @@ export class BotSessions extends Context.Service<
               "\n\n(This is one of your clots routines firing on its schedule. Do the task now. Do not create, list or change routines unless the task asks.)",
           };
           const origin = origins[role] ?? "";
+          const cleanup = runtime.cleanupNote === null ? "" : `\n\n${runtime.cleanupNote}`;
+          runtime.cleanupNote = null;
 
           yield* deliver(bot, runtime, {
             type: "user",
@@ -2116,7 +2156,10 @@ export class BotSessions extends Context.Service<
               role: "user",
               content: [
                 ...images,
-                { type: "text", text: `${toOwnSkills(bot, text)}${paths}${note}${origin}`.trim() },
+                {
+                  type: "text",
+                  text: `${toOwnSkills(bot, text)}${paths}${note}${origin}${cleanup}`.trim(),
+                },
               ],
             },
             parent_tool_use_id: null,
