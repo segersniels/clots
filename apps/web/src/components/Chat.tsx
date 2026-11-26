@@ -105,17 +105,21 @@ function FromBot({ children }: { children: ReactNode }) {
 
 /**
  * Shows the tool calls of the bot as one closed summary line, which opens into the steps. The line
- * shimmers while a step runs.
+ * shimmers while a step runs, and shows the icon of that step, which keeps it when it finishes.
  */
 function Steps({
   steps,
   title,
   running,
+  runningKind,
 }: {
   steps: ReadonlyArray<TraceStep>;
   title: string;
   running: boolean;
+  runningKind?: TraceStepKind | undefined;
 }) {
+  const RunningIcon = runningKind === undefined ? undefined : STEP_ICONS[runningKind];
+
   // Before the first tool call, such as while the bot thinks, there is nothing to open.
   if (steps.length === 0) {
     return (
@@ -132,6 +136,11 @@ function Steps({
       <TraceCollapsible>
         <TraceCollapsibleTrigger>
           <TraceLine {...(running ? { status: "running" as const } : {})}>
+            {RunningIcon && (
+              <TraceIcon>
+                <RunningIcon />
+              </TraceIcon>
+            )}
             <TraceTitle>{title}</TraceTitle>
           </TraceLine>
         </TraceCollapsibleTrigger>
@@ -549,6 +558,7 @@ export function Chat({
                     steps={live.steps}
                     title={runningStep?.title ?? (thinking ? "Thinking" : live.steps.at(-1)!.title)}
                     running={runningStep !== undefined || thinking}
+                    runningKind={runningStep && (runningStep.kind ?? "tool")}
                   />
                 </MessageScrollerItem>
               )}
