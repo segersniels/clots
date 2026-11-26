@@ -8,6 +8,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+import { Sections } from "./sections";
+
 /**
  * Places the live clots around the edges of the screen, in % of the screen. A `wide` clot hides on
  * a narrow screen and a `tall` clot on a low one, so none of them covers the text.
@@ -128,68 +130,78 @@ export default function Home() {
       setTimeout(() => setHops((counts) => counts.with(index, counts[index]! + 1)), index * 40),
     );
 
-  return (
-    <main className="relative grid h-dvh place-items-center overflow-hidden px-[max(20px,env(safe-area-inset-left))] py-6 text-center">
-      <div aria-hidden className="pointer-events-none absolute inset-0">
-        {CAST.map((clot, index) => (
-          <div
-            key={clot.shape}
-            className={cn(
-              "absolute -translate-1/2 animate-float motion-reduce:animate-none",
-              clot.wide && "max-[820px]:hidden",
-              clot.tall && "[@media(max-height:640px)]:hidden",
-            )}
-            style={
-              {
-                left: clot.left,
-                top: clot.top,
-                animationDelay: clot.delay,
-                "--tilt": clot.tilt,
-              } as React.CSSProperties
-            }
-          >
-            <Character
-              shape={clot.shape}
-              color={clot.color}
-              mood={clot.mood}
-              size={clot.size}
-              hops={hops[index]!}
-            />
-          </div>
-        ))}
-      </div>
-
-      <div className="relative z-1 max-w-[760px]">
-        <h1 className="text-[clamp(44px,8vw,96px)] leading-[0.98] font-semibold tracking-[-0.035em] text-balance">
-          Bots that never stop working
-        </h1>
-        <p className="mx-auto mt-[26px] max-w-[33rem] text-[clamp(17px,2vw,20px)] leading-normal text-pretty text-muted-foreground">
-          Claude bots with their own instructions, memory, browser and routines. Run them on a
-          machine that stays on, and they keep going while you are away.
-        </p>
-        <Button
-          nativeButton={false}
-          render={<a href={DOWNLOAD_URL} />}
-          onPointerEnter={hopAll}
-          className="mt-9 h-[54px] gap-2.5 rounded-full pr-[26px] pl-[22px] text-base transition-[opacity,scale] hover:bg-primary hover:opacity-90 focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-attention"
+  const downloadLinks = (
+    <>
+      <Button
+        nativeButton={false}
+        render={<a href={DOWNLOAD_URL} />}
+        onPointerEnter={hopAll}
+        className="mt-9 h-[54px] gap-2.5 rounded-full pr-[26px] pl-[22px] text-base transition-[opacity,scale] hover:bg-primary hover:opacity-90 focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-attention"
+      >
+        <Download className="size-[19px]" />
+        Download for macOS
+      </Button>
+      <div>
+        <a
+          href={REPOSITORY_URL}
+          className="mt-[18px] inline-flex items-center gap-2 rounded-full text-[15px] text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-attention"
         >
-          <Download className="size-[19px]" />
-          Download for macOS
-        </Button>
-        <div>
-          <a
-            href={REPOSITORY_URL}
-            className="mt-[18px] inline-flex items-center gap-2 rounded-full text-[15px] text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-attention"
-          >
-            <GitHubIcon />
-            Open source on GitHub
-            <ArrowUpRight className="size-[13px]" />
-          </a>
-        </div>
-        <p className="mt-3.5 text-[13px] text-muted-foreground opacity-80">
-          Needs Claude Code with a Claude subscription
-        </p>
+          <GitHubIcon />
+          Open source on GitHub
+          <ArrowUpRight className="size-[13px]" />
+        </a>
       </div>
+    </>
+  );
+
+  return (
+    <main>
+      <section className="relative grid h-dvh place-items-center overflow-hidden px-[max(20px,env(safe-area-inset-left))] py-6 text-center">
+        <div aria-hidden className="pointer-events-none absolute inset-0">
+          {CAST.map((clot, index) => (
+            <div
+              key={clot.shape}
+              className={cn(
+                "absolute -translate-1/2 animate-float motion-reduce:animate-none",
+                clot.wide && "max-[820px]:hidden",
+                clot.tall && "[@media(max-height:640px)]:hidden",
+              )}
+              style={
+                {
+                  left: clot.left,
+                  top: clot.top,
+                  animationDelay: clot.delay,
+                  "--tilt": clot.tilt,
+                } as React.CSSProperties
+              }
+            >
+              <Character
+                shape={clot.shape}
+                color={clot.color}
+                mood={clot.mood}
+                size={clot.size}
+                hops={hops[index]!}
+              />
+            </div>
+          ))}
+        </div>
+
+        <div className="relative z-1 max-w-[760px]">
+          <h1 className="text-[clamp(44px,8vw,96px)] leading-[0.98] font-semibold tracking-[-0.035em] text-balance">
+            Bots that never stop working
+          </h1>
+          <p className="mx-auto mt-[26px] max-w-[33rem] text-[clamp(17px,2vw,20px)] leading-normal text-pretty text-muted-foreground">
+            Claude bots with their own instructions, memory, browser and routines. Run them on a
+            machine that stays on, and they keep going while you are away.
+          </p>
+          {downloadLinks}
+          <p className="mt-3.5 text-[13px] text-muted-foreground opacity-80">
+            Needs Claude Code with a Claude subscription
+          </p>
+        </div>
+      </section>
+
+      <Sections download={downloadLinks} />
     </main>
   );
 }
