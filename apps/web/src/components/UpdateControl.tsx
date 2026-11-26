@@ -327,7 +327,7 @@ const ROW_BUTTON = "dark:hover:bg-muted";
 /** Shows the step of a running update in the place of the row's button. */
 function RowStatus({ icon, children }: { icon: ReactNode; children: ReactNode }) {
   return (
-    <span className="flex h-7 items-center gap-1.5 px-2.5 text-[0.8rem] text-muted-foreground tabular-nums [&_svg]:size-3.5">
+    <span className="flex h-7 items-center gap-1.5 px-2.5 text-[0.8rem] text-muted-foreground tabular-nums *:size-3.5">
       {icon}
       {children}
     </span>
