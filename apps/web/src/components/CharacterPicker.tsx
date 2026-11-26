@@ -40,7 +40,8 @@ export function CharacterPicker({
               shape={option}
               color={color}
               selected={option === shape}
-              className={`${compact ? "size-[38px]" : "size-9"} text-foreground`}
+              size={compact ? 38 : 36}
+              className="text-foreground"
             />
           </Button>
         ))}

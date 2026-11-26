@@ -54,7 +54,7 @@ export function Character({
   className?: string;
 }) {
   const id = useId().replace(/[^\w-]/g, "");
-  const svg = useRef<SVGSVGElement>(null);
+  const box = useRef<HTMLSpanElement>(null);
   // Without a selection ring, the art can fill its box.
   const fitted = selected === undefined;
   const props = useRef<MotionProps>({ shape, mood, gaze, fitted, hops });
@@ -69,13 +69,13 @@ export function Character({
     props.current = { shape, mood, gaze, fitted, hops };
   });
 
-  // Without focus, the loop stops while every character is idle, so a new mood has to start it.
+  // The loop stops while no character moves, so a change that the motion has to show starts it.
   useEffect(() => {
     wake();
-  }, [mood]);
+  }, [mood, shape, hops, gaze?.x, gaze?.y]);
 
   useEffect(() => {
-    const motion = new CharacterMotion(svg.current!, () => props.current);
+    const motion = new CharacterMotion(box.current!, () => props.current);
     const stop = animate(motion);
 
     return () => {
@@ -92,93 +92,98 @@ export function Character({
     });
 
   return (
-    <svg
-      ref={svg}
-      viewBox="0 0 100 100"
-      width={size}
-      height={size}
-      overflow="visible"
+    // The browser moves an HTML box without drawing it again. It cannot do that for an SVG element on a high-density screen, so the breath moves this box.
+    <span
+      ref={box}
       aria-hidden
       className={className}
-      style={{ flexShrink: 0 }}
+      style={{ display: "inline-flex", flexShrink: 0 }}
     >
-      <defs>
-        {/* Blurs the lobes together and cuts the blur off sharp, so they melt like liquid. */}
-        <filter
-          id={`${id}-goo`}
-          x="-40%"
-          y="-40%"
-          width="180%"
-          height="180%"
-          colorInterpolationFilters="sRGB"
-        >
-          <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur" />
-          <feColorMatrix data-goo="" in="blur" mode="matrix" values={gooMatrix(24)} result="goo" />
-          <feComposite in="SourceGraphic" in2="goo" operator="atop" />
-        </filter>
-
-        {selected !== undefined && (
-          <mask
-            id={`${id}-ring`}
-            maskUnits="userSpaceOnUse"
-            x="-20"
-            y="-20"
-            width="140"
-            height="140"
+      <svg viewBox="0 0 100 100" width={size} height={size} overflow="visible">
+        <defs>
+          {/* Blurs the lobes together and cuts the blur off sharp, so they melt like liquid. */}
+          <filter
+            id={`${id}-goo`}
+            x="-40%"
+            y="-40%"
+            width="180%"
+            height="180%"
+            colorInterpolationFilters="sRGB"
           >
-            <g data-grow={RING.outer} filter={`url(#${id}-goo)`} fill="white">
-              {circles(RING.outer)}
-            </g>
-            <g data-grow={RING.inner} filter={`url(#${id}-goo)`} fill="black">
-              {circles(RING.inner)}
-            </g>
-          </mask>
-        )}
-      </defs>
+            <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur" />
+            <feColorMatrix
+              data-goo=""
+              in="blur"
+              mode="matrix"
+              values={gooMatrix(24)}
+              result="goo"
+            />
+            <feComposite in="SourceGraphic" in2="goo" operator="atop" />
+          </filter>
 
-      <g
-        data-root=""
-        transform={`translate(50 50) scale(${fit.scale}) translate(${-fit.x} ${-fit.y})`}
-      >
-        {selected !== undefined && (
-          <rect
-            x="-20"
-            y="-20"
-            width="140"
-            height="140"
-            fill="currentColor"
-            mask={`url(#${id}-ring)`}
-            style={{ opacity: selected ? 1 : 0, transition: "opacity 200ms ease-out" }}
-          />
-        )}
+          {selected !== undefined && (
+            <mask
+              id={`${id}-ring`}
+              maskUnits="userSpaceOnUse"
+              x="-20"
+              y="-20"
+              width="140"
+              height="140"
+            >
+              <g data-grow={RING.outer} filter={`url(#${id}-goo)`} fill="white">
+                {circles(RING.outer)}
+              </g>
+              <g data-grow={RING.inner} filter={`url(#${id}-goo)`} fill="black">
+                {circles(RING.inner)}
+              </g>
+            </mask>
+          )}
+        </defs>
 
         <g
-          data-grow="0"
-          filter={`url(#${id}-goo)`}
-          style={{ fill: COLOR_HEX[color], transition: "fill 350ms ease-out" }}
+          data-root=""
+          transform={`translate(50 50) scale(${fit.scale}) translate(${-fit.x} ${-fit.y})`}
         >
-          {circles(0)}
-        </g>
+          {selected !== undefined && (
+            <rect
+              x="-20"
+              y="-20"
+              width="140"
+              height="140"
+              fill="currentColor"
+              mask={`url(#${id}-ring)`}
+              style={{ opacity: selected ? 1 : 0, transition: "opacity 200ms ease-out" }}
+            />
+          )}
 
-        <ellipse data-sheen="" fill="white" opacity="0.2" />
+          <g
+            data-grow="0"
+            filter={`url(#${id}-goo)`}
+            style={{ fill: COLOR_HEX[color], transition: "fill 350ms ease-out" }}
+          >
+            {circles(0)}
+          </g>
 
-        <g fill={EYE_COLOR}>
-          <ellipse
-            data-eye=""
-            cx={eyeX - eyeGap / 2}
-            cy={eyeY}
-            rx={(eyeGap / 12) * 4.3}
-            ry={(eyeGap / 12) * 5.4}
-          />
-          <ellipse
-            data-eye=""
-            cx={eyeX + eyeGap / 2}
-            cy={eyeY}
-            rx={(eyeGap / 12) * 4.3}
-            ry={(eyeGap / 12) * 5.4}
-          />
+          <ellipse data-sheen="" fill="white" opacity="0.2" />
+
+          <g fill={EYE_COLOR}>
+            <ellipse
+              data-eye=""
+              cx={eyeX - eyeGap / 2}
+              cy={eyeY}
+              rx={(eyeGap / 12) * 4.3}
+              ry={(eyeGap / 12) * 5.4}
+            />
+            <ellipse
+              data-eye=""
+              cx={eyeX + eyeGap / 2}
+              cy={eyeY}
+              rx={(eyeGap / 12) * 4.3}
+              ry={(eyeGap / 12) * 5.4}
+            />
+          </g>
         </g>
-      </g>
-    </svg>
+      </svg>
+    </span>
   );
 }

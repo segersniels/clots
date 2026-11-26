@@ -110,9 +110,10 @@ export class CharacterMotion implements Animated {
   private readonly idleBreath: Animation;
 
   constructor(
-    private readonly svg: SVGSVGElement,
+    box: HTMLElement,
     private readonly props: () => MotionProps,
   ) {
+    const svg = box.querySelector("svg")!;
     this.layers = [...svg.querySelectorAll<SVGGElement>("g[data-grow]")].map((group) => ({
       grow: Number(group.dataset.grow),
       circles: [...group.querySelectorAll("circle")],
@@ -134,9 +135,9 @@ export class CharacterMotion implements Animated {
     this.fromFit = this.toFit = this.fitOf(this.shape);
 
     // The character breathes from the ground. The hint keeps the body on its own layer, so a breath does not paint it again.
-    svg.style.transformOrigin = "50% 100%";
-    svg.style.willChange = "transform";
-    this.idleBreath = svg.animate(IDLE_BREATH, {
+    box.style.transformOrigin = "50% 100%";
+    box.style.willChange = "transform";
+    this.idleBreath = box.animate(IDLE_BREATH, {
       duration: IDLE_BREATH_MS,
       direction: "alternate",
       iterations: Infinity,
@@ -171,6 +172,11 @@ export class CharacterMotion implements Animated {
   /** Checks whether the character still has to draw: it is not idle, or it has not settled yet. */
   moves() {
     return this.props().mood !== "idle" || !this.atRest;
+  }
+
+  /** Tells when a resting character blinks next. With reduced motion, it never moves by itself. */
+  nextMove() {
+    return prefersReducedMotion() ? Infinity : this.nextBlink;
   }
 
   draw(now: number, focused: boolean) {
