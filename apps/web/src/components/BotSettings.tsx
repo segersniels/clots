@@ -1,6 +1,6 @@
 import { Character } from "@clots/character";
 import type { BotId, BotSummary } from "@clots/contracts";
-import { useRef, useState } from "react";
+import { useEffectEvent, useRef, useState } from "react";
 
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -9,7 +9,6 @@ import { useMountEffect } from "@/hooks/use-mount-effect";
 import { client } from "../client.ts";
 import { CharacterPicker } from "./CharacterPicker.tsx";
 import { ComposerField, type ComposerFieldHandle } from "./ComposerField.tsx";
-import { OnMount } from "./OnMount.tsx";
 
 /** The look of a form field with skill and bot chips: the filled surface of the details pane. Each use adds its height. */
 export const CHIP_FIELD_CLASSES =
@@ -105,11 +104,25 @@ export function BotInstructions({ bot }: { bot: BotSummary }) {
     }
   };
 
-  const syncField = () => {
-    if (bot.instructions !== instructions.trim()) {
-      field.current?.setText(bot.instructions);
+  const syncField = useEffectEvent((saved: string) => {
+    if (saved !== instructions.trim()) {
+      field.current?.setText(saved);
     }
-  };
+  });
+
+  // The instructions can change in another place, such as the thread of a new bot.
+  useMountEffect(() => {
+    let lastSaved = bot.instructions;
+
+    return client.bots.subscribe(() => {
+      const saved = client.bots.get().find((candidate) => candidate.id === bot.id)?.instructions;
+
+      if (saved !== undefined && saved !== lastSaved) {
+        lastSaved = saved;
+        syncField(saved);
+      }
+    });
+  });
 
   useMountEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -153,8 +166,6 @@ export function BotInstructions({ bot }: { bot: BotSummary }) {
   return (
     <section className="flex flex-col gap-1">
       <h2 className={PANE_LABEL}>Instructions</h2>
-      {/* The instructions can change in another place, such as the thread of a new bot. */}
-      <OnMount key={bot.instructions} run={syncField} />
       <div className="relative">
         <ComposerField
           ref={field}

@@ -18,7 +18,6 @@ import { useMountEffect } from "@/hooks/use-mount-effect";
 
 import { client } from "../client.ts";
 import { formatAgo } from "../time.ts";
-import { Timeout } from "./OnMount.tsx";
 
 /** Tells the operator what a copied login can do to the other bot. */
 export const LOGIN_RISK = "Both bots then share one session. Some sites sign one of them out.";
@@ -96,10 +95,20 @@ export function LoginBar({
 
     try {
       await client.copyLogin(botId, from.botId, address);
-      setPhase({ kind: "done", from });
     } catch {
       setPhase({ kind: "failed", from });
+
+      return;
     }
+
+    const done: Phase = { kind: "done", from };
+    setPhase(done);
+
+    // The bar goes back to the offer, unless the operator hid it first.
+    setTimeout(() => {
+      setPhase((current) => (current === done ? { kind: "offer" } : current));
+      setChecks((count) => count + 1);
+    }, DONE_MS);
   };
 
   const hide = () => {
@@ -249,15 +258,6 @@ export function LoginBar({
           botId={botId}
           address={address}
           onFound={(sources) => setFound({ lookup, sources })}
-        />
-      )}
-      {phase.kind === "done" && (
-        <Timeout
-          ms={DONE_MS}
-          onEnd={() => {
-            setPhase({ kind: "offer" });
-            setChecks((count) => count + 1);
-          }}
         />
       )}
       {shown.previous !== null && (

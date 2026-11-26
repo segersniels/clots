@@ -4,11 +4,11 @@ import { BoxIcon, ChevronDownIcon } from "lucide-react";
 import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
+import { useMountEffect } from "@/hooks/use-mount-effect";
 
 import type { BotTemplate } from "../templates.ts";
 import { Collapse } from "./Collapse.tsx";
 import { ROW } from "./SearchDialog.tsx";
-import { OnMount } from "./OnMount.tsx";
 
 /** How long the page waits before its character hops, so the hop starts once the page has slid in. */
 const HOP_DELAY_MS = 120;
@@ -61,6 +61,13 @@ function TemplateText({ text }: { text: string }) {
   return <div className="grid gap-1.5 text-left text-[13px] leading-[1.55]">{blocks}</div>;
 }
 
+/** Runs when a view shows. Its view mounts it while the view is active, and a new key runs it again. */
+function OnShow({ run }: { run: () => void | (() => void) }) {
+  useMountEffect(run);
+
+  return null;
+}
+
 /**
  * Lists the templates, one row each. The pointer and the arrow keys move one highlight, and Enter
  * or a click opens the template's page.
@@ -100,7 +107,7 @@ export function TemplateList({
 
   return (
     <div className="flex h-full flex-col">
-      {active && <OnMount run={focusList} />}
+      {active && <OnShow run={focusList} />}
       <p className="mt-1 mb-2.5 text-[13px] text-muted-foreground">
         Start from a ready-made bot. You can change everything later.
       </p>
@@ -200,7 +207,7 @@ export function TemplatePage({
 
   return (
     <div className="flex h-full flex-col">
-      {active && <OnMount key={template.id} run={startPage} />}
+      {active && <OnShow key={template.id} run={startPage} />}
       <div
         ref={body}
         className="min-h-0 flex-1 overflow-y-auto px-6 pt-11 pb-4 [mask-image:linear-gradient(transparent_36px,#000_60px,#000_calc(100%-24px),transparent)] [scrollbar-width:none]"

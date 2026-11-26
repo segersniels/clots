@@ -59,7 +59,6 @@ import { EmptyThread } from "./EmptyThread.tsx";
 import { LOGIN_RISK } from "./LoginBar.tsx";
 import { MessageAttachments } from "./MessageAttachments.tsx";
 import { knownNames } from "../references.ts";
-import { OnMount, Timeout } from "./OnMount.tsx";
 
 /** A new time label shows when this much time passed since the previous message. */
 const TIME_LABEL_GAP_MS = 30 * 60 * 1000;
@@ -286,7 +285,14 @@ function OlderMessagesLoader({ hasOlder, onLoad }: { hasOlder: boolean; onLoad: 
     return null;
   }
 
-  return <OnMount run={onLoad} />;
+  return <LoadOlderMessages onLoad={onLoad} />;
+}
+
+/** Loads one page of older messages when it mounts. */
+function LoadOlderMessages({ onLoad }: { onLoad: () => void }) {
+  useMountEffect(onLoad);
+
+  return null;
 }
 
 /** How long a message that the search opened keeps the mark that tints its bubble. It matches the fade in the styles. */
@@ -446,15 +452,12 @@ export function Chat({
               messageId={jumpTo}
               onScrolled={() => {
                 setHighlightedId(jumpTo);
+                setTimeout(
+                  () => setHighlightedId((current) => (current === jumpTo ? undefined : current)),
+                  JUMP_HIGHLIGHT_MS,
+                );
                 onJumped?.();
               }}
-            />
-          )}
-          {highlightedId !== undefined && (
-            <Timeout
-              ms={JUMP_HIGHLIGHT_MS}
-              key={`highlight-${highlightedId}`}
-              onEnd={() => setHighlightedId(undefined)}
             />
           )}
           {/* The thread runs under the floating header and fades out there. The top padding clears the header. */}

@@ -24,7 +24,6 @@ import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui
 import { Spinner } from "@/components/ui/spinner";
 
 import { ProgressLine } from "./UpdateControl.tsx";
-import { Timeout } from "./OnMount.tsx";
 
 /** One tab of the bot's browser, as the stream lists it. */
 export interface BrowserTab {
@@ -322,6 +321,7 @@ export function AddressBar({
   const copy = async () => {
     await navigator.clipboard.writeText(address);
     setCopied(true);
+    setTimeout(() => setCopied(false), COPIED_MS);
   };
 
   const finish = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -340,7 +340,6 @@ export function AddressBar({
         typed === null ? "bg-muted/60" : "bg-popover ring-2 ring-attention"
       }`}
     >
-      {copied && <Timeout ms={COPIED_MS} onEnd={() => setCopied(false)} />}
       <LockIcon
         className={`size-3.5 shrink-0 text-muted-foreground ${secure ? "" : "invisible"}`}
       />

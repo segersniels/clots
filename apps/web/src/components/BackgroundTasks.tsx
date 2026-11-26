@@ -9,9 +9,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useMountEffect } from "@/hooks/use-mount-effect";
 
 import { client, useStore } from "../client.ts";
-import { Timeout } from "./OnMount.tsx";
 
 /** How long a row or the pill takes to fade out. */
 const FADE_MS = 150;
@@ -32,6 +32,17 @@ const mergeRows = (rows: ReadonlyArray<Row>, tasks: ReadonlyArray<BackgroundTask
     .filter((task) => !rows.some((row) => row.task.id === task.id))
     .map((task) => ({ task, leaving: false })),
 ];
+
+/** Removes the rows whose task ended once their fade is over. It mounts again for each new set of ending rows, so each gets its full fade. */
+function RemoveEndedRows({ onFaded }: { onFaded: () => void }) {
+  useMountEffect(() => {
+    const timer = setTimeout(onFaded, FADE_MS);
+
+    return () => clearTimeout(timer);
+  });
+
+  return null;
+}
 
 /**
  * Shows the bot's work in the background as a pill in the thread header. Its menu lists each task,
@@ -74,10 +85,9 @@ export function BackgroundTasks({ botId }: { botId: BotId }) {
     <>
       {/* A row whose task ended goes once its fade is over. */}
       {leavingIds !== "" && (
-        <Timeout
-          ms={FADE_MS}
+        <RemoveEndedRows
           key={leavingIds}
-          onEnd={() => setRows((current) => current.filter((row) => !row.leaving))}
+          onFaded={() => setRows((current) => current.filter((row) => !row.leaving))}
         />
       )}
       <DropdownMenu open={open} onOpenChange={setOpen}>
