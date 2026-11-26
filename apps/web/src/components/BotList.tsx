@@ -333,11 +333,16 @@ function BotRow({ bot }: { bot: BotSummary }) {
                   dotShown ? "scale-100 opacity-100" : "scale-50 opacity-0"
                 }`}
               />
-              <LoaderCircleIcon
-                className={`col-start-1 row-start-1 size-3 shrink-0 animate-spin text-foreground transition-[scale,opacity] duration-200 ease-out motion-reduce:animate-none motion-reduce:scale-100 ${
-                  spinnerShown ? "scale-100 opacity-100" : "scale-50 opacity-0"
+              {/* The turn runs on a box around the icon, so the browser does not draw the page again on every frame. A hidden spinner does not turn. */}
+              <span
+                className={`col-start-1 row-start-1 inline-flex size-3 shrink-0 text-foreground transition-[scale,opacity] duration-200 ease-out motion-reduce:scale-100 ${
+                  spinnerShown
+                    ? "scale-100 animate-spin opacity-100 motion-reduce:animate-none"
+                    : "scale-50 opacity-0"
                 }`}
-              />
+              >
+                <LoaderCircleIcon className="size-full" />
+              </span>
             </span>
           </span>
         </span>

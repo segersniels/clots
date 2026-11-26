@@ -94,7 +94,10 @@ export function BackgroundTasks({ botId }: { botId: BotId }) {
             />
           }
         >
-          <LoaderCircleIcon className="size-4 animate-spin motion-reduce:animate-none" />
+          {/* The turn runs on a box around the icon, so the browser does not draw the page again on every frame. */}
+          <span className="inline-flex size-4 shrink-0 animate-spin motion-reduce:animate-none">
+            <LoaderCircleIcon className="size-full" />
+          </span>
           <span>
             {count}
             <span className="hidden @min-[7.5rem]:inline"> running</span>
