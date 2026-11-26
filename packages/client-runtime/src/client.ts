@@ -20,6 +20,7 @@ import {
   type BotSkill,
 } from "@clots/contracts";
 import {
+  Cause,
   Context,
   Effect,
   Fiber,
@@ -98,6 +99,8 @@ export interface ClotsClient {
   getUpdateInfo(): Promise<UpdateInfo>;
   getAccount(): Promise<Account>;
   searchMessages(query: string, limit: number): Promise<ReadonlyArray<MessageHit>>;
+  /** Starts every open server stream again from where it is. A stream can stop without an error, for example after the computer sleeps. */
+  resubscribe(): void;
   /** Installs the latest release on the server, which then restarts. */
   updateServer(): Promise<void>;
   dispose(): Promise<void>;
@@ -139,6 +142,9 @@ export const makeClotsClient = (origin: string): ClotsClient => {
   const call = <A, E>(use: (rpc: RpcService) => Effect.Effect<A, E>) =>
     runtime.runPromise(Effect.flatMap(Effect.service(Rpc), use));
 
+  /** Holds a restart for each stream that a view observes now. */
+  const openStreams = new Set<() => void>();
+
   /**
    * Makes a store that a server stream feeds while a view observes it. A dropped connection ends
    * the stream, so the store subscribes again. `subscribe` reads the current value to resume.
@@ -149,21 +155,36 @@ export const makeClotsClient = (origin: string): ClotsClient => {
     apply: (current: T, value: A) => T,
   ) => {
     const store: ReturnType<typeof makeStore<T>> = makeStore<T>(initial, (set) => {
-      const fiber = runtime.runFork(
-        Effect.service(Rpc).pipe(
-          Effect.flatMap((rpc) =>
-            Stream.suspend(() => subscribe(rpc, store.get())).pipe(
-              Stream.runForEach((value) =>
-                Effect.sync(() => set((current) => apply(current, value))),
-              ),
+      const follow = Effect.service(Rpc).pipe(
+        Effect.flatMap((rpc) =>
+          Stream.suspend(() => subscribe(rpc, store.get())).pipe(
+            Stream.runForEach((value) =>
+              Effect.sync(() => set((current) => apply(current, value))),
             ),
           ),
-          Effect.ignore,
-          Effect.repeat(RetrySchedule.spaced("1 second")),
         ),
+        // A stop or a restart interrupts the stream, and the connection state already shows a lost server. Only another failure is worth a warning.
+        Effect.tapCause((cause) =>
+          Cause.hasInterruptsOnly(cause) || connection.get() !== "connected"
+            ? Effect.void
+            : Effect.logWarning("A server stream failed. It subscribes again.", cause),
+        ),
+        Effect.ignore,
+        Effect.repeat(RetrySchedule.spaced("1 second")),
       );
+      let fiber = runtime.runFork(follow);
 
-      return () => void runtime.runFork(Fiber.interrupt(fiber));
+      /** Restarts the stream. The old stream ends before the new one starts, so an old event cannot arrive after a new one. */
+      const restart = () => {
+        const previous = fiber;
+        fiber = runtime.runFork(Fiber.interrupt(previous).pipe(Effect.andThen(follow)));
+      };
+      openStreams.add(restart);
+
+      return () => {
+        openStreams.delete(restart);
+        void runtime.runFork(Fiber.interrupt(fiber));
+      };
     });
 
     return store;
@@ -314,6 +335,11 @@ export const makeClotsClient = (origin: string): ClotsClient => {
     getUpdateInfo: () => call((rpc) => rpc.GetUpdateInfo()),
     getAccount: () => call((rpc) => rpc.GetAccount()),
     searchMessages: (query, limit) => call((rpc) => rpc.SearchMessages({ query, limit })),
+    resubscribe: () => {
+      for (const restart of openStreams) {
+        restart();
+      }
+    },
     updateServer: () => call((rpc) => rpc.UpdateServer()),
     dispose: () => runtime.dispose(),
   };
