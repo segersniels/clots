@@ -99,7 +99,8 @@ export function Character({
       className={className}
       style={{ display: "inline-flex", flexShrink: 0 }}
     >
-      <svg viewBox="0 0 100 100" width={size} height={size} overflow="visible">
+      {/* The size is an inline style, so a parent rule for icons, such as the button's `size-4` for an svg, cannot shrink the art. */}
+      <svg viewBox="0 0 100 100" overflow="visible" style={{ width: size, height: size }}>
         <defs>
           {/* Blurs the lobes together and cuts the blur off sharp, so they melt like liquid. */}
           <filter
