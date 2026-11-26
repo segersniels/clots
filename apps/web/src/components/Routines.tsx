@@ -507,7 +507,10 @@ export function Routines({ bot }: { bot: BotSummary }) {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={() => remove(confirmingDelete!.id)}>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => confirmingDelete !== null && remove(confirmingDelete.id)}
+            >
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
