@@ -380,13 +380,13 @@ function CloneGroup({ clones }: { clones: ReadonlyArray<BotSummary> }) {
     <div className="relative pt-1 pb-2">
       <span
         aria-hidden
-        className={`pointer-events-none absolute ${parentOpen ? "top-1 h-2.5" : "-top-2.5 h-6"} left-[27.5px] w-[24.5px] rounded-bl-lg border-b border-l border-muted-foreground/70`}
+        className={`pointer-events-none absolute ${parentOpen ? "top-1 h-2.5" : "-top-2.5 h-6"} left-[27.5px] w-[24.5px] rounded-bl-lg border-b border-l border-muted-foreground`}
       />
       <button
         type="button"
         aria-expanded={expanded}
         onClick={() => setExpanded(!expanded)}
-        className="flex w-full items-center gap-1.5 h-5 rounded-lg py-0 pr-2.5 pl-14 text-[0.8125rem] text-muted-foreground/70 transition-colors duration-150 hover:text-foreground"
+        className="flex w-full items-center gap-1.5 h-5 rounded-lg py-0 pr-2.5 pl-14 text-[0.8125rem] text-muted-foreground transition-colors duration-150 hover:text-foreground"
       >
         <ChevronDownIcon
           className={`size-3.5 transition-[rotate] duration-200 ease-out motion-reduce:transition-none ${expanded ? "" : "-rotate-90"}`}
