@@ -23,6 +23,9 @@ const COMMANDS_WITHOUT_PAGE = new Set([
 /** The JPEG quality of the picture of a still page. The stream itself uses a lower quality, so motion costs less data. */
 const SHARP_PICTURE_QUALITY = 90;
 
+/** The time that Chrome gets to take the picture of a still page. */
+const SHARP_PICTURE_TIMEOUT_MS = 2000;
+
 /** The size of each bot's browser screen, which the take-over window restores. */
 export const SCREEN_SIZE = { width: 1280, height: 800 };
 
@@ -232,10 +235,16 @@ export const takeSharpPicture = (port: number, targetId: string) =>
       );
     socket.onmessage = (event) => {
       const picture: string | undefined = JSON.parse(String(event.data)).result?.data;
-      socket.close();
       resolve(picture === undefined ? undefined : Buffer.from(picture, "base64"));
+      socket.close();
     };
-    socket.onerror = () => resolve(undefined);
+
+    // A page that does not render never answers. The close ends the wait and frees the socket.
+    const timeout = setTimeout(() => socket.close(), SHARP_PICTURE_TIMEOUT_MS);
+    socket.onclose = () => {
+      clearTimeout(timeout);
+      resolve(undefined);
+    };
   });
 
 /**

@@ -101,10 +101,11 @@ export const BrowserProxyLayer = HttpRouter.add(
     let stillTimer: ReturnType<typeof setTimeout> | undefined;
     yield* Effect.addFinalizer(() => Effect.sync(() => clearTimeout(stillTimer)));
 
-    const sendPicture = (details: string, picture: Uint8Array) => {
-      send(details);
-      Effect.runForkWith(services)(Effect.ignore(writer.write(picture)));
-    };
+    /** Sends the details and the picture of a frame in one go, so the client always gets the details first. */
+    const sendPicture = (details: string, picture: Uint8Array) =>
+      Effect.runForkWith(services)(
+        Effect.ignore(Effect.andThen(writer.write(details), writer.write(picture))),
+      );
 
     /** Sends a sharp picture of the page that the client watches, unless the page changed in the meantime. */
     const sendSharpPicture = async () => {

@@ -131,14 +131,17 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
 
       opened.addEventListener("message", (event) => {
         if (event.data instanceof ArrayBuffer) {
-          if (details === undefined) {
+          // Each picture belongs to the details right before it. A picture without details is dropped.
+          const pictureDetails = details;
+          details = undefined;
+          if (pictureDetails === undefined) {
             return;
           }
 
           const received = URL.createObjectURL(new Blob([event.data], { type: "image/jpeg" }));
           setFrame(received);
           setLastFrame(received);
-          setPageWidth(details.metadata.deviceWidth);
+          setPageWidth(pictureDetails.metadata.deviceWidth);
 
           // The picture before this one can still be on its way to the screen, so it stays for a moment.
           const old = previous;
@@ -148,19 +151,19 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
           }
 
           // The sharp picture of a still page comes from the clots server and has no number to ack.
-          if (details.seq === undefined) {
+          if (pictureDetails.seq === undefined) {
             return;
           }
 
           // Nobody sees a hidden window, so its frames would only cross the link for nothing.
           if (document.visibilityState === "hidden") {
-            heldAck = details.seq;
+            heldAck = pictureDetails.seq;
 
             return;
           }
 
           // The ack tells the browser that this client is ready for the next frame.
-          ack(opened, details.seq);
+          ack(opened, pictureDetails.seq);
 
           return;
         }
