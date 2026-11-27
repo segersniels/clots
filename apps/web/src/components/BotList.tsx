@@ -367,21 +367,33 @@ function CloneGroup({ clones }: { clones: ReadonlyArray<BotSummary> }) {
   }
 
   const working = clones.filter((clone) => clone.status !== "idle").length;
+  const parentOpen = clones[0]?.clonedFrom === openBotId;
+  // A closed group hides the dots of its clones, so the line shows one for them.
+  const dotShown = !expanded && clones.some((clone) => clone.status === "waiting" || clone.unread);
 
-  // The line keeps the same 4 px from the bot row above it as the rows keep from each other.
+  /**
+   * The line keeps 4 px from the bot row above it, and more space below the group, so it reads as
+   * part of its bot. The connector runs from under the bot's character to the chevron. When the
+   * bot is open, the connector starts 4 px under its selected fill, so it does not cross the fill.
+   */
   return (
-    <div className="pt-1">
+    <div className="relative pt-1 pb-2">
+      <span
+        aria-hidden
+        className={`pointer-events-none absolute ${parentOpen ? "top-1 h-2.5" : "-top-2.5 h-6"} left-[27.5px] w-[24.5px] rounded-bl-lg border-b border-l border-muted-foreground/70`}
+      />
       <button
         type="button"
         aria-expanded={expanded}
         onClick={() => setExpanded(!expanded)}
-        className="flex w-full items-center gap-1.5 rounded-lg py-1 pr-2.5 pl-14 text-[0.8125rem] text-muted-foreground transition-colors duration-150 hover:bg-sidebar-accent"
+        className="flex w-full items-center gap-1.5 h-5 rounded-lg py-0 pr-2.5 pl-14 text-[0.8125rem] text-muted-foreground/70 transition-colors duration-150 hover:text-foreground"
       >
         <ChevronDownIcon
           className={`size-3.5 transition-[rotate] duration-200 ease-out motion-reduce:transition-none ${expanded ? "" : "-rotate-90"}`}
         />
         {clones.length === 1 ? "1 clone" : `${clones.length} clones`}
         {working > 0 && <span className="text-foreground/70">· {working} working</span>}
+        {dotShown && <span className="ml-auto size-2 shrink-0 rounded-full bg-attention" />}
       </button>
       <Collapse open={expanded}>
         <div className={`${BOT_ROWS} pl-4`}>
