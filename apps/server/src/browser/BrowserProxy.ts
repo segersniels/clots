@@ -105,10 +105,20 @@ export const BrowserProxyLayer = HttpRouter.add(
       upstream.addEventListener("error", () => resume(Effect.void));
     });
 
+    // The client asks for its frame rate as soon as its own socket opens, which is often before this one is.
+    const early: Array<string> = [];
+    upstream.addEventListener("open", () => early.splice(0).forEach((text) => upstream.send(text)));
+
     const forwardInput = Effect.gen(function* () {
       while (true) {
         for (const chunk of yield* reader.pull) {
-          if (typeof chunk === "string" && upstream.readyState === WebSocket.OPEN) {
+          if (typeof chunk !== "string") {
+            continue;
+          }
+
+          if (upstream.readyState === WebSocket.CONNECTING) {
+            early.push(chunk);
+          } else if (upstream.readyState === WebSocket.OPEN) {
             upstream.send(chunk);
           }
         }
