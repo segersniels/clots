@@ -408,8 +408,9 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
                       onKeyDown={(event) => sendKey("keyDown", event)}
                       onKeyUp={(event) => sendKey("keyUp", event)}
                       onPaste={pasteText}
-                      // The page fits the window by its width, or by its height when it is tall.
-                      className="block max-h-(--page-max-height) max-w-full cursor-default outline-none"
+                      // The page fits the window by its width, or by its height when it is tall. The width is set here, so a small picture grows to fill the window.
+                      className="block h-auto max-w-full cursor-default outline-none"
+                      style={{ width: `calc(var(--page-max-height) * ${frameRatio})` }}
                     />
                     <LoginBar botId={botId} botName={botName} address={address} />
                   </>
