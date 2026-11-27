@@ -412,14 +412,14 @@ export class BotSessions extends Context.Service<
     /** Sends a routine's prompt to the bot that runs it. A routine without its clone gets a new clone. */
     runRoutine(owner: StoredBot, routine: Schedule): Effect.Effect<void>;
     /**
-     * Moves a routine to the bot's own conversation or to a clone, which the next run makes. A clone
-     * that ran the routine stays, with its thread.
+     * Changes the schedule, the prompt and the place of a routine. The next run follows from the new
+     * schedule. A move to the bot's own conversation keeps the clone that ran the routine, with its thread.
      */
-    moveRoutine(
+    updateRoutine(
       owner: StoredBot,
       routine: Schedule,
-      place: RoutinePlace,
-    ): Effect.Effect<void, TooManyClones>;
+      changes: { cron: string; prompt: string; place: RoutinePlace },
+    ): Effect.Effect<void, InvalidCron | TooManyClones>;
     /** Deletes a routine, and the clone that runs it. */
     deleteRoutine(routine: Schedule): Effect.Effect<void>;
     /** Marks in the thread that the operator renamed the bot or changed its instructions. Other changes add nothing. */
@@ -705,6 +705,21 @@ export class BotSessions extends Context.Service<
           yield* schedules.setPlace(routine.id, place, null);
         });
 
+      const updateRoutine = (
+        owner: StoredBot,
+        routine: Schedule,
+        { cron, prompt, place }: { cron: string; prompt: string; place: RoutinePlace },
+      ) =>
+        Effect.gen(function* () {
+          const next = nextRunAt(cron, Date.now());
+          if (next === undefined) {
+            return yield* new InvalidCron({ cron });
+          }
+
+          yield* moveRoutine(owner, routine, place);
+          yield* schedules.update(routine.id, cron, prompt, next);
+        });
+
       const deleteRoutine = (routine: Schedule) =>
         Effect.gen(function* () {
           yield* schedules.remove(routine.id);
@@ -982,7 +997,7 @@ export class BotSessions extends Context.Service<
             ),
             tool(
               "create_routine",
-              `Make a clots routine: a prompt that clots sends on a schedule, such as a morning brief every day at 9:00. Use it for recurring work that must keep running across restarts. For a short check within this session, such as every 5 minutes for the next hour, use CronCreate or Monitor instead. A routine runs "here", in this conversation (the default), or in a "clone": a bot under you with your instructions, which the first run makes, so its runs do not fill this conversation, and that can read your notes and thread. Unless the operator already said where, ask them before you make it. The operator can pause or delete a routine in the details pane of the bot that runs it.`,
+              `Make a clots routine: a prompt that clots sends on a schedule, such as a morning brief every day at 9:00. Use it for recurring work that must keep running across restarts. For a short check within this session, such as every 5 minutes for the next hour, use CronCreate or Monitor instead. A routine runs "here", in this conversation (the default), or in a "clone": a bot under you with your instructions, which the first run makes, so its runs do not fill this conversation, and that can read your notes and thread. Unless the operator already said where, ask them before you make it. The operator can pause or delete a routine in the details pane of the bot that runs it. To change a routine, use update_routine, not delete_routine and create_routine.`,
               {
                 cron: z
                   .string()
@@ -1057,7 +1072,7 @@ export class BotSessions extends Context.Service<
             ),
             tool(
               "delete_routine",
-              "Delete one of your clots routines, for example when the operator no longer wants it. A routine with its own thread also deletes that thread.",
+              "Delete one of your clots routines, for example when the operator no longer wants it. A routine with its own thread also deletes that thread and its past runs. To change a routine, use update_routine instead.",
               { id: z.string().describe("The routine's id from list_routines.") },
               async ({ id }) => {
                 const routine = (await Effect.runPromise(schedules.list(self.id))).find(
@@ -1071,6 +1086,61 @@ export class BotSessions extends Context.Service<
                 await Effect.runPromise(deleteRoutine(routine));
 
                 return toolText(`Deleted routine ${id}.`);
+              },
+            ),
+            tool(
+              "update_routine",
+              "Change one of your clots routines in place: its schedule, its prompt, where it runs, or whether it is paused. It keeps its id, and a routine with its own thread keeps that thread and its past runs. Pass only the fields to change. To stop a routine for a while, pause it instead of deleting it.",
+              {
+                id: z.string().describe("The routine's id from list_routines."),
+                cron: z
+                  .string()
+                  .optional()
+                  .describe(
+                    `A new 5-field cron expression in the host's time zone (${HOST_TIME_ZONE}).`,
+                  ),
+                prompt: z.string().optional().describe("A new message for each run."),
+                where: z
+                  .enum(["here", "clone"])
+                  .optional()
+                  .describe('Where it runs from now on: "here", this conversation, or "clone".'),
+                paused: z
+                  .boolean()
+                  .optional()
+                  .describe("true pauses the routine, false resumes it."),
+              },
+              async ({ id, cron, prompt, where, paused }) => {
+                const routine = (await Effect.runPromise(schedules.list(self.id))).find(
+                  (each) => each.id === id && each.botId === self.id,
+                );
+
+                if (routine === undefined) {
+                  return toolText(`You have no routine ${id}. list_routines shows yours.`);
+                }
+
+                const changes = {
+                  cron: cron ?? routine.cron,
+                  prompt: prompt ?? routine.prompt,
+                  place: where ?? routine.place,
+                };
+                const result = await Effect.runPromise(
+                  updateRoutine(self, routine, changes).pipe(
+                    Effect.andThen(
+                      paused === undefined ? Effect.void : schedules.setPaused(routine.id, paused),
+                    ),
+                    Effect.as(`Changed routine ${id}.`),
+                    Effect.catchTags({
+                      InvalidCron: () =>
+                        Effect.succeed(`"${changes.cron}" is not a valid cron expression.`),
+                      TooManyClones: ({ max }) =>
+                        Effect.succeed(
+                          `You have ${max} clones and routine threads already. Delete one first, or keep where "here".`,
+                        ),
+                    }),
+                  ),
+                );
+
+                return toolText(result);
               },
             ),
             tool(
@@ -2300,7 +2370,7 @@ export class BotSessions extends Context.Service<
 
         send,
         runRoutine,
-        moveRoutine,
+        updateRoutine,
         deleteRoutine,
 
         interrupt: (botId) =>

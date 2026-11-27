@@ -2,7 +2,6 @@ import {
   BotNotFound,
   CloneIsReadOnly,
   ClotsRpcs,
-  InvalidCron,
   InvalidSkill,
   ProjectDirectoryNotFound,
   UpdateFailed,
@@ -21,7 +20,7 @@ import { BotSessions } from "../bots/BotSessions.ts";
 import { ClotsConfig } from "../config.ts";
 import { closeBrowser, navigateBrowser } from "../browser/BrowserEnvironment.ts";
 import { ProjectRepository } from "../projects/ProjectRepository.ts";
-import { nextRunAt, ScheduleRepository } from "../schedules/ScheduleRepository.ts";
+import { ScheduleRepository } from "../schedules/ScheduleRepository.ts";
 import { availableServerUpdate, installRelease, updateInfo } from "../service/Update.ts";
 
 /** The longest status line. The sidebar and the bot picker truncate it to their width, so this only caps what goes over the wire. */
@@ -353,19 +352,13 @@ export const HandlersLayer = ClotsRpcs.toLayer(
 
       UpdateSchedule: ({ id, cron, prompt, place }) =>
         Effect.gen(function* () {
-          const next = nextRunAt(cron, Date.now());
-          if (next === undefined) {
-            return yield* new InvalidCron({ cron });
-          }
-
           const routine = yield* schedules.find(id);
           const owner = routine === undefined ? undefined : yield* bots.find(routine.botId);
           if (routine === undefined || owner === undefined) {
             return;
           }
 
-          yield* sessions.moveRoutine(owner, routine, place);
-          yield* schedules.update(id, cron, prompt, next);
+          yield* sessions.updateRoutine(owner, routine, { cron, prompt, place });
         }),
 
       SetSchedulePaused: ({ id, paused }) => schedules.setPaused(id, paused),
