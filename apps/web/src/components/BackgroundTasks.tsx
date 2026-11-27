@@ -121,13 +121,12 @@ export function BackgroundTasks({ botId }: { botId: BotId }) {
                 <TerminalIcon className="size-4 text-muted-foreground" />
               )}
               <span className="min-w-0 flex-1 truncate">{task.description}</span>
-              {/* The ghost variant has its own dark hover, so the highlight is repeated for dark. */}
               <Button
-                variant="ghost"
+                variant="secondary"
                 size="icon-xs"
                 aria-label={`Stop ${task.description}`}
                 disabled={leaving || stopping.has(task.id)}
-                className="size-5 rounded-sm text-muted-foreground hover:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_8%)] hover:text-foreground focus-visible:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_8%)] focus-visible:text-foreground dark:hover:bg-[color-mix(in_oklch,var(--accent),var(--foreground)_8%)]"
+                className="rounded-full"
                 onClick={() => {
                   setStopping((current) => new Set(current).add(task.id));
                   void client.stopTask(botId, task.id);
