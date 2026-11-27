@@ -97,8 +97,28 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
   useMountEffect(() => {
     let closed = false;
     let retry: ReturnType<typeof setTimeout> | undefined;
+    // The ack of the last frame that came while the window was hidden. Without it, the browser sends no more frames.
+    let heldAck: number | undefined;
+
+    const ack = (opened: WebSocket, seq: number) =>
+      opened.send(JSON.stringify({ type: "ack", seq }));
+
+    /** Asks for the current page when the window shows again, by sending the ack it held back. */
+    const sendHeldAck = () => {
+      const opened = socket.current;
+      if (document.visibilityState === "hidden" || heldAck === undefined || opened === null) {
+        return;
+      }
+
+      if (opened.readyState === WebSocket.OPEN) {
+        ack(opened, heldAck);
+      }
+
+      heldAck = undefined;
+    };
 
     const connect = () => {
+      heldAck = undefined;
       const url = `${window.location.origin.replace(/^http/, "ws")}${BROWSER_STREAM_PATH}/${botId}`;
       const opened = new WebSocket(url);
       socket.current = opened;
@@ -138,8 +158,15 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
         setLastFrame(received);
         setPageWidth(message.metadata.deviceWidth);
 
+        // Nobody sees a hidden window, so its frames would only cross the link for nothing.
+        if (document.visibilityState === "hidden") {
+          heldAck = message.seq;
+
+          return;
+        }
+
         // The ack tells the browser that this client is ready for the next frame.
-        opened.send(JSON.stringify({ type: "ack", seq: message.seq }));
+        ack(opened, message.seq);
       });
 
       opened.addEventListener("close", () => {
@@ -154,10 +181,12 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
       });
     };
     connect();
+    document.addEventListener("visibilitychange", sendHeldAck);
 
     return () => {
       closed = true;
       clearTimeout(retry);
+      document.removeEventListener("visibilitychange", sendHeldAck);
       socket.current?.close();
     };
   });
