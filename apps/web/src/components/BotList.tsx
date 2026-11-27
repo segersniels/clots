@@ -265,7 +265,7 @@ function BotRow({ bot }: { bot: BotSummary }) {
         to="/bots/$botId"
         params={{ botId: bot.id }}
         disabled={renaming}
-        className={`flex items-center gap-2.5 rounded-xl px-2.5 py-2 transition-[color,opacity,translate] duration-200 ease-out ${
+        className={`relative z-1 flex items-center gap-2.5 rounded-xl px-2.5 py-2 transition-[color,opacity,translate] duration-200 ease-out ${
           entersLate
             ? "starting:translate-y-1 starting:opacity-0 motion-reduce:starting:translate-y-0"
             : ""
@@ -370,21 +370,12 @@ function CloneGroup({ clones }: { clones: ReadonlyArray<BotSummary> }) {
   }
 
   const working = clones.filter((clone) => clone.status !== "idle").length;
-  const parentOpen = clones[0]?.clonedFrom === openBotId;
   // A closed group hides the dots of its clones, so the line shows one for them.
   const dotShown = !expanded && clones.some(needsOperator);
 
-  /**
-   * The line keeps 4 px from the bot row above it, and more space below the group, so it reads as
-   * part of its bot. The connector runs from under the bot's character to the chevron. When the
-   * bot is open, the connector starts 4 px under its selected fill, so it does not cross the fill.
-   */
+  // The line keeps 4 px from the bot row above it, and more space below the group, so it reads as part of its bot.
   return (
-    <div className="relative pt-1 pb-2 group-last/row:pb-0">
-      <span
-        aria-hidden
-        className={`pointer-events-none absolute ${parentOpen ? "top-1 h-2.5" : "-top-2.5 h-6"} left-[27.5px] w-[24.5px] rounded-bl-lg border-b border-l border-muted-foreground`}
-      />
+    <div className="pt-1 pb-2 group-last/row:pb-0">
       <button
         type="button"
         aria-expanded={expanded}
@@ -411,6 +402,7 @@ function CloneGroup({ clones }: { clones: ReadonlyArray<BotSummary> }) {
 
 /** Makes a top-level row draggable. While the operator drags it, its place stays empty and shows where it lands. */
 function SortableRow({ bot, clones }: Row) {
+  const openBotId = useParams({ strict: false }).botId;
   const reduceMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
   const { setNodeRef, listeners, transform, transition, isDragging } = useSortable({
     id: bot.id,
@@ -425,7 +417,21 @@ function SortableRow({ bot, clones }: Row) {
       {...listeners}
       className={`group/row ${isDragging ? "rounded-xl bg-sidebar-accent/50 *:opacity-0" : ""}`}
     >
-      <BotRow bot={bot} />
+      {/**
+       * The connector runs from the center of the bot's character, which hides its start, to the
+       * middle of the clone line, 14 px under the row. Each character ends at another height, so
+       * this joins them all the same way. When the bot is open, the connector starts 4 px under its
+       * selected fill instead, so it does not cross the fill.
+       */}
+      <div className="relative">
+        <BotRow bot={bot} />
+        {clones.length > 0 && (
+          <span
+            aria-hidden
+            className={`pointer-events-none absolute ${bot.id === openBotId ? "top-[calc(100%+4px)] h-2.5" : "top-1/2 h-[calc(50%+14px)]"} left-[27.5px] w-[24.5px] rounded-bl-lg border-b border-l border-muted-foreground`}
+          />
+        )}
+      </div>
       {clones.length > 0 && <CloneGroup clones={clones} />}
     </div>
   );
