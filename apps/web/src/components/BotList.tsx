@@ -66,7 +66,7 @@ const EMPTY_HINT = "px-1 text-sm text-muted-foreground";
  * past the line, so its padding moves into a negative margin.
  */
 const GROUP_LABEL =
-  "-mx-1.5 flex h-7 w-[calc(100%+0.75rem)] items-center rounded-lg px-2.5 text-[0.8125rem]";
+  "-mx-1.5 flex h-7 w-[calc(100%+0.75rem)] items-center rounded-lg text-[0.8125rem]";
 
 /** The window width from which the sidebar shows beside the main area. It matches the Tailwind `md` breakpoint. */
 const WIDE_WINDOW = "(min-width: 48rem)";
@@ -224,6 +224,9 @@ function DraftGlance({ onGlance }: { onGlance: (glancing: boolean) => void }) {
   return null;
 }
 
+/** Checks whether a bot needs the operator, because it waits for an answer or has an unread reply. */
+const needsOperator = (bot: BotSummary) => bot.status === "waiting" || bot.unread;
+
 function BotRow({ bot }: { bot: BotSummary }) {
   const [entersLate] = useState(listHasShown);
   const [renaming, setRenaming] = useState(false);
@@ -234,7 +237,7 @@ function BotRow({ bot }: { bot: BotSummary }) {
 
   // A bot that needs the operator keeps its status line. The open bot already shows its draft in the composer.
   const showDraft = hasContent(draft) && bot.id !== openBotId && bot.status !== "waiting";
-  const dotShown = bot.status === "waiting" || bot.unread;
+  const dotShown = needsOperator(bot);
   // A bot that waits or is unread needs the operator more than a working bot, so the dot wins.
   const spinnerShown = bot.status === "working" && !dotShown;
   // An idle bot with an unread reply calls the operator, as a bot that waits for an answer does.
@@ -369,7 +372,7 @@ function CloneGroup({ clones }: { clones: ReadonlyArray<BotSummary> }) {
   const working = clones.filter((clone) => clone.status !== "idle").length;
   const parentOpen = clones[0]?.clonedFrom === openBotId;
   // A closed group hides the dots of its clones, so the line shows one for them.
-  const dotShown = !expanded && clones.some((clone) => clone.status === "waiting" || clone.unread);
+  const dotShown = !expanded && clones.some(needsOperator);
 
   /**
    * The line keeps 4 px from the bot row above it, and more space below the group, so it reads as
@@ -377,7 +380,7 @@ function CloneGroup({ clones }: { clones: ReadonlyArray<BotSummary> }) {
    * bot is open, the connector starts 4 px under its selected fill, so it does not cross the fill.
    */
   return (
-    <div className="relative pt-1 pb-2">
+    <div className="relative pt-1 pb-2 group-last/row:pb-0">
       <span
         aria-hidden
         className={`pointer-events-none absolute ${parentOpen ? "top-1 h-2.5" : "-top-2.5 h-6"} left-[27.5px] w-[24.5px] rounded-bl-lg border-b border-l border-muted-foreground`}
@@ -420,7 +423,7 @@ function SortableRow({ bot, clones }: Row) {
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), transition }}
       {...listeners}
-      className={isDragging ? "rounded-xl bg-sidebar-accent/50 *:opacity-0" : undefined}
+      className={`group/row ${isDragging ? "rounded-xl bg-sidebar-accent/50 *:opacity-0" : ""}`}
     >
       <BotRow bot={bot} />
       {clones.length > 0 && <CloneGroup clones={clones} />}
@@ -590,25 +593,33 @@ function GroupToggle({
   name,
   open,
   onToggle,
+  rows,
   title,
 }: {
   name: string;
   open: boolean;
   onToggle: () => void;
+  rows: ReadonlyArray<Row>;
   title?: string;
 }) {
+  // A closed group hides the dots of its bots, so the header shows one for them.
+  const dotShown =
+    !open && rows.some((row) => needsOperator(row.bot) || row.clones.some(needsOperator));
+
+  // The right padding puts the dot in the same column as the dots of the bot rows.
   return (
     <button
       type="button"
       aria-expanded={open}
       onClick={onToggle}
-      className={`${GROUP_LABEL} justify-between text-muted-foreground transition-colors duration-150 hover:bg-sidebar-accent`}
+      className={`${GROUP_LABEL} gap-1.5 pr-4 pl-2.5 text-muted-foreground transition-colors duration-150 hover:bg-sidebar-accent`}
       title={title}
     >
-      <span className="truncate">{name}</span>
       <ChevronDownIcon
-        className={`size-3.5 transition-[rotate] duration-200 ease-out motion-reduce:transition-none ${open ? "" : "-rotate-90"}`}
+        className={`size-3.5 shrink-0 transition-[rotate] duration-200 ease-out motion-reduce:transition-none ${open ? "" : "-rotate-90"}`}
       />
+      <span className="truncate">{name}</span>
+      {dotShown && <span className="ml-auto size-2 shrink-0 rounded-full bg-attention" />}
     </button>
   );
 }
@@ -638,7 +649,7 @@ function ProjectSection({
         renameField={renameField}
       >
         {renaming ? (
-          <div className={GROUP_LABEL}>
+          <div className={`${GROUP_LABEL} px-2.5`}>
             <RenameField
               ref={renameField}
               name={project.name}
@@ -652,6 +663,7 @@ function ProjectSection({
             name={project.name}
             open={open}
             onToggle={toggleOpen}
+            rows={rows}
             {...(project.directory === null ? {} : { title: project.directory })}
           />
         )}
@@ -792,7 +804,7 @@ export function BotList() {
 
       <DndContext {...drag.context}>
         <ScrollArea className="min-h-0 flex-1">
-          <div className="flex flex-col gap-5 px-3 pb-3">
+          <div className="flex flex-col gap-3 px-3 pb-3">
             {projects.map((project) => (
               <ProjectSection
                 key={project.id}
@@ -806,7 +818,12 @@ export function BotList() {
             <BotDropZone group={PERSONAL} highlighted={drag.highlightedGroup === PERSONAL}>
               {/* Without a project there is one plain list, so the heading would only add noise. */}
               {projects.length > 0 && (
-                <GroupToggle name="Personal" open={personalOpen} onToggle={togglePersonal} />
+                <GroupToggle
+                  name="Personal"
+                  open={personalOpen}
+                  onToggle={togglePersonal}
+                  rows={personal}
+                />
               )}
               <Collapse open={personalOpen || projects.length === 0}>
                 <div className={BOT_ROWS}>
