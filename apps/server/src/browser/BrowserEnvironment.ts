@@ -104,6 +104,8 @@ export const makeBrowserEnvironment = (bot: StoredBot): Record<string, string> =
   const shared = {
     AGENT_BROWSER_SESSION: bot.id,
     AGENT_BROWSER_STREAM_PORT: String(bot.browserStreamPort),
+    // The stream sends each frame as a JPEG picture. A lower quality than the default of 80 makes the frames smaller.
+    AGENT_BROWSER_STREAM_QUALITY: "70",
     // The warning about an old Chrome tells bots to run `agent-browser install`, which does not update the host's Chrome.
     AGENT_BROWSER_NO_VERSION_CHECK: "1",
   };
