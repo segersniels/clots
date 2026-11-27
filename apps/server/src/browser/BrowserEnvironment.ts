@@ -104,9 +104,6 @@ export const makeBrowserEnvironment = (bot: StoredBot): Record<string, string> =
   const shared = {
     AGENT_BROWSER_SESSION: bot.id,
     AGENT_BROWSER_STREAM_PORT: String(bot.browserStreamPort),
-    // The frame caps default to the CSS page size, so they must allow the 2x scale of the browser.
-    AGENT_BROWSER_STREAM_MAX_WIDTH: "2560",
-    AGENT_BROWSER_STREAM_MAX_HEIGHT: "1600",
     // The warning about an old Chrome tells bots to run `agent-browser install`, which does not update the host's Chrome.
     AGENT_BROWSER_NO_VERSION_CHECK: "1",
   };
