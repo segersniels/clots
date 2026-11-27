@@ -223,3 +223,11 @@ button:not(:disabled),
     opacity: 0;
   }
 }
+
+/*
+ * Moves the shimmer in 30 steps. Chromium repaints a background-position animation on the main
+ * thread, so a smooth shimmer repaints at every screen refresh while a bot works.
+ */
+@utility shimmer {
+  animation-timing-function: steps(30);
+}
