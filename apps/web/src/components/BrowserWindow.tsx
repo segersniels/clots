@@ -115,11 +115,22 @@ function TabName({ name }: { name: string }) {
   );
 }
 
-/** Turns what the operator typed into an address. A bare host such as `example.com` gets `https://`. */
+/**
+ * Turns what the operator typed into an address. A bare host such as `example.com` gets `https://`,
+ * and other text becomes a Google search, as in Chrome's address bar.
+ */
 function toAddress(typed: string) {
   const trimmed = typed.trim();
+  if (/^[a-z][a-z\d+.-]*:/i.test(trimmed)) {
+    return trimmed;
+  }
 
-  return /^[a-z][a-z\d+.-]*:/i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  // A host has a dot and no spaces, so anything else is a query.
+  if (/\s/.test(trimmed) || !trimmed.includes(".")) {
+    return `https://www.google.com/search?q=${encodeURIComponent(trimmed)}`;
+  }
+
+  return `https://${trimmed}`;
 }
 
 /** Shows the bot's screen as a browser window: tabs, a toolbar and the page, which takes the operator's input. */
