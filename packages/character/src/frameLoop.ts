@@ -15,11 +15,11 @@ export interface Animated {
 /** How the window shows the characters. A hidden page counts as not focused, and nothing on it moves. */
 type WindowState = "focused" | "unfocused" | "hidden";
 
-/** The time between two frames, so the characters draw at 60 fps at most, also on a 120 Hz screen. */
-const FOCUSED_FRAME_MS = 1000 / 60;
-
-/** The time between two frames while the window has no focus, so moving characters run at about 30 fps. */
-const UNFOCUSED_FRAME_MS = 1000 / 30;
+/**
+ * The time between two frames, so moving characters draw at 30 fps at most. Each frame makes the
+ * browser style, lay out and paint the page again, and a higher rate slows the other animations.
+ */
+const FRAME_MS = 1000 / 30;
 
 /** How long before a frame is due the loop asks the browser for it, so a late timer does not miss the screen refresh. */
 const FRAME_LEAD_MS = 5;
@@ -45,11 +45,6 @@ function readWindowState(): WindowState {
   }
 
   return document.hasFocus() ? "focused" : "unfocused";
-}
-
-/** Reads the shortest time between two frames for how the window shows now. */
-function frameMs() {
-  return windowState === "focused" ? FOCUSED_FRAME_MS : UNFOCUSED_FRAME_MS;
 }
 
 /**
@@ -81,7 +76,7 @@ function schedule(due: number) {
  */
 export function wake() {
   if (frame === 0 && windowState !== "hidden") {
-    schedule(lastDraw + frameMs());
+    schedule(lastDraw + FRAME_MS);
   }
 }
 
@@ -139,7 +134,7 @@ function tick(now: number) {
   }
 
   if (moving) {
-    schedule(now + frameMs());
+    schedule(now + FRAME_MS);
 
     return;
   }
