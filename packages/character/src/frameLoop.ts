@@ -119,6 +119,13 @@ function followWindow() {
  * no character moves, and starts again for the next blink.
  */
 function tick(now: number) {
+  // The browser can run a requested frame at once with the time of the last screen refresh.
+  if (now - lastDraw < FRAME_MS - FRAME_LEAD_MS) {
+    frame = requestAnimationFrame(tick);
+
+    return;
+  }
+
   const focused = windowState === "focused";
   let moving = false;
   frame = 0;
