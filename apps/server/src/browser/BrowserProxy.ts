@@ -4,16 +4,23 @@ import { HttpRouter, HttpServerResponse } from "effect/http";
 
 import { BotRepository } from "../bots/BotRepository.ts";
 import { BotSessions } from "../bots/BotSessions.ts";
-import { readPages } from "./BotChrome.ts";
+import { readPages, takeSharpPicture } from "./BotChrome.ts";
 import { devToolsPort } from "./BrowserEnvironment.ts";
 
 /** The time between two looks at the titles and addresses of the bot's pages while a client watches. */
 const PAGE_POLL_MS = 500;
 
+/** The time without a change of the page after which the client gets a sharp picture of it. */
+const STILL_PAGE_MS = 250;
+
+/** The start of a frame message of agent-browser, which puts the picture first. */
+const FRAME_START = '{"data":"';
+
 /** The tabs as agent-browser lists them, with the fields that clots takes from Chrome. */
 interface TabList {
   readonly tabs: ReadonlyArray<{
     readonly targetId: string;
+    readonly active: boolean;
     readonly title: string;
     readonly url: string;
   }>;
@@ -22,6 +29,9 @@ interface TabList {
 /**
  * Relays a bot's agent-browser stream to a client. agent-browser accepts only loopback clients, so
  * the clots server is the bridge. Frames go to the client, and input and frame acks go back.
+ *
+ * A frame goes out in two messages: its details as text, then its picture as bytes. The picture
+ * arrives here as base64 text, which is a third larger than the bytes.
  */
 export const BrowserProxyLayer = HttpRouter.add(
   "GET",
@@ -85,8 +95,58 @@ export const BrowserProxyLayer = HttpRouter.add(
       (timer) => Effect.sync(() => clearInterval(timer)),
     );
 
+    let lastPicture = "";
+    let lastDetails = "";
+    let changes = 0;
+    let stillTimer: ReturnType<typeof setTimeout> | undefined;
+    yield* Effect.addFinalizer(() => Effect.sync(() => clearTimeout(stillTimer)));
+
+    const sendPicture = (details: string, picture: Uint8Array) => {
+      send(details);
+      Effect.runForkWith(services)(Effect.ignore(writer.write(picture)));
+    };
+
+    /** Sends a sharp picture of the page that the client watches, unless the page changed in the meantime. */
+    const sendSharpPicture = async () => {
+      const page = listed?.tabs.find((tab) => tab.active);
+      if (page === undefined) {
+        return;
+      }
+
+      const changesBefore = changes;
+      const picture = await takeSharpPicture(devToolsPort(bot), page.targetId);
+      if (picture === undefined || changes !== changesBefore) {
+        return;
+      }
+
+      // The picture has no number, so the client does not ack it.
+      sendPicture(lastDetails.replace(/"seq":\d+,/, ""), picture);
+    };
+
     upstream.addEventListener("message", (event) => {
       const text = String(event.data);
+
+      if (text.startsWith(FRAME_START)) {
+        const pictureEnd = text.lastIndexOf('","metadata":');
+        const picture = text.slice(FRAME_START.length, pictureEnd);
+        const details = `{${text.slice(pictureEnd + 2)}`;
+
+        // The browser sends the same picture again and again while the page is still. The client has it, so the ack comes from here.
+        if (picture === lastPicture) {
+          upstream.send(JSON.stringify({ type: "ack", seq: JSON.parse(details).seq }));
+
+          return;
+        }
+
+        lastPicture = picture;
+        lastDetails = details;
+        changes += 1;
+        sendPicture(details, Buffer.from(picture, "base64"));
+        clearTimeout(stillTimer);
+        stillTimer = setTimeout(() => void sendSharpPicture(), STILL_PAGE_MS);
+
+        return;
+      }
 
       // A frame is base64 inside quotes, so only a tabs message can hold this text.
       if (!text.includes('"type":"tabs"')) {

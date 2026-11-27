@@ -121,10 +121,50 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
       heldAck = undefined;
       const url = `${window.location.origin.replace(/^http/, "ws")}${BROWSER_STREAM_PATH}/${botId}`;
       const opened = new WebSocket(url);
+      opened.binaryType = "arraybuffer";
       socket.current = opened;
+
+      // A frame arrives as two messages: its details as text, then its picture as bytes.
+      let details: { seq?: number; metadata: { deviceWidth: number } } | undefined;
+      let previous: string | undefined;
       opened.addEventListener("open", () => sendFrameRate(opened, takeOverNow.current));
 
       opened.addEventListener("message", (event) => {
+        if (event.data instanceof ArrayBuffer) {
+          if (details === undefined) {
+            return;
+          }
+
+          const received = URL.createObjectURL(new Blob([event.data], { type: "image/jpeg" }));
+          setFrame(received);
+          setLastFrame(received);
+          setPageWidth(details.metadata.deviceWidth);
+
+          // The picture before this one can still be on its way to the screen, so it stays for a moment.
+          const old = previous;
+          previous = received;
+          if (old !== undefined) {
+            setTimeout(() => URL.revokeObjectURL(old), 1000);
+          }
+
+          // The sharp picture of a still page comes from the clots server and has no number to ack.
+          if (details.seq === undefined) {
+            return;
+          }
+
+          // Nobody sees a hidden window, so its frames would only cross the link for nothing.
+          if (document.visibilityState === "hidden") {
+            heldAck = details.seq;
+
+            return;
+          }
+
+          // The ack tells the browser that this client is ready for the next frame.
+          ack(opened, details.seq);
+
+          return;
+        }
+
         const message = JSON.parse(String(event.data));
 
         if (message.type === "tabs") {
@@ -149,24 +189,9 @@ export function BrowserPane({ botId, botName }: { botId: BotId; botName: string 
           );
         }
 
-        if (message.type !== "frame") {
-          return;
+        if (message.type === "frame") {
+          details = message;
         }
-
-        const received = `data:image/jpeg;base64,${message.data}`;
-        setFrame(received);
-        setLastFrame(received);
-        setPageWidth(message.metadata.deviceWidth);
-
-        // Nobody sees a hidden window, so its frames would only cross the link for nothing.
-        if (document.visibilityState === "hidden") {
-          heldAck = message.seq;
-
-          return;
-        }
-
-        // The ack tells the browser that this client is ready for the next frame.
-        ack(opened, message.seq);
       });
 
       opened.addEventListener("close", () => {

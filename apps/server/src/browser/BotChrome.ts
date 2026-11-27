@@ -20,6 +20,9 @@ const COMMANDS_WITHOUT_PAGE = new Set([
   "--version",
 ]);
 
+/** The JPEG quality of the picture of a still page. The stream itself uses a lower quality, so motion costs less data. */
+const SHARP_PICTURE_QUALITY = 90;
+
 /** The size of each bot's browser screen, which the take-over window restores. */
 export const SCREEN_SIZE = { width: 1280, height: 800 };
 
@@ -210,6 +213,30 @@ export const stopLoading = async (port: number, targetId: string) => {
     socket.onerror = () => resolve();
   });
 };
+
+/**
+ * Takes a sharp picture of one page of the bot's Chrome, as JPEG bytes. The picture has all the
+ * pixels of the page, so it is larger than the frames of the stream. Returns `undefined` when the
+ * page is gone.
+ */
+export const takeSharpPicture = (port: number, targetId: string) =>
+  new Promise<Uint8Array | undefined>((resolve) => {
+    const socket = new WebSocket(`ws://127.0.0.1:${port}/devtools/page/${targetId}`);
+    socket.onopen = () =>
+      socket.send(
+        JSON.stringify({
+          id: 1,
+          method: "Page.captureScreenshot",
+          params: { format: "jpeg", quality: SHARP_PICTURE_QUALITY },
+        }),
+      );
+    socket.onmessage = (event) => {
+      const picture: string | undefined = JSON.parse(String(event.data)).result?.data;
+      socket.close();
+      resolve(picture === undefined ? undefined : Buffer.from(picture, "base64"));
+    };
+    socket.onerror = () => resolve(undefined);
+  });
 
 /**
  * Runs an agent-browser command for the bot whose Chrome the environment names. It starts that
