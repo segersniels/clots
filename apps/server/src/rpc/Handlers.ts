@@ -77,7 +77,8 @@ export const HandlersLayer = ClotsRpcs.toLayer(
         lastMessageAt: bot.lastMessageAt,
         unread: bot.unread,
         createdAt: bot.createdAt,
-        status: live.status,
+        // Work in the background, such as a subagent, keeps the bot working after its turn ends.
+        status: live.status === "idle" && live.tasks.length > 0 ? "working" : live.status,
         statusLine,
       };
     };
