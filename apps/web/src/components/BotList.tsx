@@ -354,9 +354,18 @@ function BotRow({ bot }: { bot: BotSummary }) {
 /** Shows the clones of an orchestrating bot as one closed line, which opens into their rows. */
 function CloneGroup({ clones }: { clones: ReadonlyArray<BotSummary> }) {
   const openBotId = useParams({ strict: false }).botId;
-  const [open, setOpen] = useState(false);
-  // The open bot stays in view, also when it is a clone in a closed group.
-  const expanded = open || clones.some((clone) => clone.id === openBotId);
+  const holdsOpenBot = clones.some((clone) => clone.id === openBotId);
+  const [expanded, setExpanded] = useState(holdsOpenBot);
+  const [shownBotId, setShownBotId] = useState(openBotId);
+
+  // Opening a clone, such as from search, brings its group into view. The operator can still close it.
+  if (openBotId !== shownBotId) {
+    setShownBotId(openBotId);
+    if (holdsOpenBot) {
+      setExpanded(true);
+    }
+  }
+
   const working = clones.filter((clone) => clone.status !== "idle").length;
 
   // The line keeps the same 4 px from the bot row above it as the rows keep from each other.
@@ -365,7 +374,7 @@ function CloneGroup({ clones }: { clones: ReadonlyArray<BotSummary> }) {
       <button
         type="button"
         aria-expanded={expanded}
-        onClick={() => setOpen(!expanded)}
+        onClick={() => setExpanded(!expanded)}
         className="flex w-full items-center gap-1.5 rounded-lg py-1 pr-2.5 pl-14 text-[0.8125rem] text-muted-foreground transition-colors duration-150 hover:bg-sidebar-accent"
       >
         <ChevronDownIcon
