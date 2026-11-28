@@ -6,10 +6,8 @@ import {
   ipcMain,
   Menu,
   MenuItem,
-  nativeImage,
   net,
   shell,
-  Tray,
   type IpcMainInvokeEvent,
 } from "electron";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -169,14 +167,10 @@ const showStart = async () => {
     }
 
     // The server stops with the app, so it starts with it. When it does not start, the checklist shows why.
-    serverStarting = true;
-    updateTrayMenu();
     const started = await runServer().then(
       () => true,
       () => false,
     );
-    serverStarting = false;
-    updateTrayMenu();
 
     if (!started) {
       return showSetup({ screen: "local" });
@@ -227,78 +221,14 @@ const connect = async (input: string): Promise<ConnectResult> => {
   return { ok: true };
 };
 
-/** Brings the window to the front, and opens it again when it was closed. */
-const revealWindow = () => {
-  if (window === undefined || window.isDestroyed()) {
-    return createWindow();
-  }
-
-  if (window.isMinimized()) {
+ipcMain.handle("app:reveal-window", () => {
+  if (window?.isMinimized()) {
     window.restore();
   }
 
-  window.show();
+  window?.show();
   app.focus({ steal: true });
-};
-
-ipcMain.handle("app:reveal-window", () => revealWindow());
-
-/** How often the menu bar icon checks whether the server answers. */
-const STATUS_INTERVAL_MS = 5000;
-
-/** The icon in the menu bar. The module keeps it, so the garbage collector does not remove it. */
-let tray: Tray | undefined;
-
-/** Set while the app starts its local server. */
-let serverStarting = false;
-
-/** Whether the server answered the last check of the menu bar icon. */
-let serverAnswers = false;
-
-/** Describes the state of the server for the menu bar icon. */
-const serverStatus = () => {
-  if (serverStarting) {
-    return "Starting…";
-  }
-
-  return serverAnswers ? "Running" : "Not running";
-};
-
-/** Builds the menu of the menu bar icon: the app version, the state of the server, and the way to quit. */
-const updateTrayMenu = () => {
-  tray?.setContextMenu(
-    Menu.buildFromTemplate([
-      { label: `Clots ${app.getVersion()}`, enabled: false },
-      { label: `Server: ${serverStatus()}`, enabled: false },
-      { type: "separator" },
-      { label: "Open Clots", click: () => revealWindow() },
-      { type: "separator" },
-      { label: "Quit Clots", accelerator: "CommandOrControl+Q", click: () => app.quit() },
-    ]),
-  );
-};
-
-/** Asks the server that the operator chose whether it answers, and updates the menu when that changes. */
-const checkServer = async () => {
-  const serverUrl = readConfig()?.serverUrl;
-
-  // The setup page shows before the operator chose a server.
-  if (serverUrl === undefined) {
-    return;
-  }
-
-  const answers = await net.fetch(serverUrl, { signal: AbortSignal.timeout(3000) }).then(
-    () => true,
-    () => false,
-  );
-
-  if (answers === serverAnswers) {
-    return;
-  }
-
-  serverAnswers = answers;
-  updateTrayMenu();
-};
+});
 
 ipcMain.handle("app:set-badge-count", (_event, count: number) => void app.setBadgeCount(count));
 
@@ -349,13 +279,6 @@ void app.whenReady().then(() => {
     { label: "Server", submenu: [{ label: "Change Server…", click: () => void showSetup() }] },
   ]);
   Menu.setApplicationMenu(menu);
-
-  // macOS tints a template image for a light or a dark menu bar.
-  tray = new Tray(nativeImage.createFromPath(appFile("resources/trayTemplate.png")));
-  tray.setToolTip("Clots");
-  updateTrayMenu();
-  void checkServer();
-  setInterval(() => void checkServer(), STATUS_INTERVAL_MS);
 
   createWindow();
   void startUpdates((state) => {

@@ -26,7 +26,7 @@ The app asks where clots runs:
 
 - **On this machine:** the app checks that Claude Code is installed and logged in with a subscription. Then it installs the `clots` command that ships inside the app, downloads a browser for the bots when the Mac has no Chrome, and starts the server. The server runs while the app runs, and it needs no Tailscale. When you quit the app, the server and its bots stop.
 
-  While the app runs, its icon in the menu bar shows the version of the app and the state of the server, and it has **Quit Clots**. To reach the server from your other devices, turn on **Expose over Tailscale** under **Preferences** in the account menu. See [remote access](./remote-access.md#turn-it-on-in-the-app).
+  To reach the server from your other devices, turn on **Expose over Tailscale** under **Preferences** in the account menu. See [remote access](./remote-access.md#turn-it-on-in-the-app).
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./assets/setup-local-dark.png" />
