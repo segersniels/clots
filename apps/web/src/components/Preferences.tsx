@@ -160,7 +160,7 @@ function RemoteAccessSetting({ open }: { open: boolean }) {
 
   return (
     <>
-      <label className="flex min-h-9 items-center justify-between gap-3">
+      <div className="flex min-h-9 items-center justify-between gap-3">
         <span className="flex flex-col">
           <span>Expose over Tailscale</span>
           {/* A status line replaces the description, so a row never has more than one line below its label. */}
@@ -172,11 +172,12 @@ function RemoteAccessSetting({ open }: { open: boolean }) {
           </span>
         </span>
         <Switch
+          aria-label="Expose over Tailscale"
           checked={enabled}
           disabled={access === null || access.state === "unavailable" || viaTailnet}
           onCheckedChange={change}
         />
-      </label>
+      </div>
       <Collapse open={enabled}>
         <RemoteAccessStep access={access} />
       </Collapse>
