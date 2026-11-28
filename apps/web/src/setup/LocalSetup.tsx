@@ -238,7 +238,7 @@ export function LocalSetup({ onBack }: { onBack: () => void }) {
 
   return (
     <Screen onBack={onBack}>
-      <ScreenTitle>Set up clots on this Mac</ScreenTitle>
+      <ScreenTitle>Set up clots on this machine</ScreenTitle>
       <ScreenDescription>
         Each check runs on its own. Fix what is missing, and it checks again.
       </ScreenDescription>
@@ -352,7 +352,7 @@ export function LocalSetup({ onBack }: { onBack: () => void }) {
           <OpenLocalSoon />
           <Character shape="tumble" color="green" mood="waiting" size={40} />
           <div>
-            <p className="text-[0.9375rem] font-medium">clots runs on this Mac</p>
+            <p className="text-[0.9375rem] font-medium">clots runs on this machine</p>
             <p className="text-sm text-muted-foreground">
               Your bots keep working when you close this window.
             </p>

@@ -55,7 +55,7 @@ export function RemoteSetup({ onBack }: { onBack: () => void }) {
     <Screen onBack={onBack}>
       <ScreenTitle>Connect to your clots server</ScreenTitle>
       <ScreenDescription>
-        Enter the address of the clots server on your tailnet. This Mac must be signed in to the
+        Enter the address of the clots server on your tailnet. This machine must be signed in to the
         same Tailscale network.
       </ScreenDescription>
 
@@ -102,7 +102,7 @@ export function RemoteSetup({ onBack }: { onBack: () => void }) {
           <div className="min-w-0">
             <p className="font-medium text-destructive">Could not reach {connection.host}</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Check that the clots server runs, and that this Mac is signed in to Tailscale.
+              Check that the clots server runs, and that this machine is signed in to Tailscale.
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <Button variant="secondary" size="sm" onClick={() => void connect()}>

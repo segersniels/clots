@@ -45,7 +45,7 @@ function Choice({
   );
 }
 
-/** Asks where the clots server runs: on this Mac, or on another machine. */
+/** Asks where the clots server runs: on this machine, or on another machine. */
 export function ChooseScreen({ onChoose }: { onChoose: (where: "local" | "remote") => void }) {
   return (
     <Screen className="justify-center pb-16">
@@ -61,7 +61,7 @@ export function ChooseScreen({ onChoose }: { onChoose: (where: "local" | "remote
       <ItemGroup className="mt-8 gap-2">
         <Choice
           icon={<LaptopIcon className="size-5" />}
-          title="On this Mac"
+          title="On this machine"
           description="Runs in the background, also when the window is closed."
           onSelect={() => onChoose("local")}
         />
