@@ -18,6 +18,8 @@ import {
 import { useEffectEvent, useState, type ReactNode } from "react";
 
 import { client, useStore } from "@/client.ts";
+
+import { version as CLIENT_VERSION } from "../../../../package.json";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ProgressIndicator, ProgressTrack } from "@/components/ui/progress";
@@ -83,6 +85,26 @@ function useAppUpdate() {
   return state;
 }
 
+/** The storage key of the server version that this window last reloaded for, so a page that stays old does not reload in a loop. */
+const RELOADED_FOR_KEY = "clots.reloaded-for";
+
+/**
+ * Loads the page again when the server runs another version than this client, such as after an
+ * update. An open window otherwise keeps the old client until the operator reloads it. The text of
+ * a draft survives the reload, but its attached files do not. It reloads once per server version.
+ */
+const reloadForNewServer = (serverVersion: string) => {
+  if (
+    serverVersion === CLIENT_VERSION ||
+    sessionStorage.getItem(RELOADED_FOR_KEY) === serverVersion
+  ) {
+    return;
+  }
+
+  sessionStorage.setItem(RELOADED_FOR_KEY, serverVersion);
+  window.location.reload();
+};
+
 type UpdatePhase =
   | { readonly name: "idle" }
   | { readonly name: "checking" }
@@ -109,15 +131,20 @@ export function useUpdates() {
 
   // The restart ends when the client is connected to the new version again.
   const endRestart = useEffectEvent((serverVersion: string) => {
+    // Another device or the server's machine updated the server, so no pill of this window tells the story first.
     if (
       phase.name !== "restarting" ||
       serverVersion !== phase.target ||
       client.connection.get() !== "connected"
     ) {
+      reloadForNewServer(serverVersion);
+
       return;
     }
 
+    // The operator sees that the update is done before the new client loads.
     showFor({ name: "done", target: phase.target }, DONE_MS);
+    setTimeout(() => reloadForNewServer(serverVersion), DONE_MS);
   });
 
   // A new connection can mean a new server version, so the client asks again on each one.
