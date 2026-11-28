@@ -83,8 +83,12 @@ let quitting = false;
 const showSetup = (query: Record<string, string> = {}) =>
   window?.loadFile(appFile("resources/setup/setup.html"), { query });
 
-/** Shows the web client that the clots server serves. The app holds no copy of the client. */
-const showServer = (serverUrl: string) => window?.loadURL(serverUrl);
+/**
+ * Shows the web client that the clots server serves. The app holds no copy of the client. The page
+ * skips the cache, because a server from before clots sent a cache rule can leave an old page in it.
+ */
+const showServer = (serverUrl: string) =>
+  window?.loadURL(serverUrl, { extraHeaders: "pragma: no-cache\n" });
 
 const createWindow = () => {
   window = new BrowserWindow({
