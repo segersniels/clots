@@ -28,6 +28,20 @@ In the [Clots app](./desktop.md), choose **On another machine** and enter the ad
   <img src="./assets/setup-remote-light.png" alt="The Clots app connects to a clots server on another machine: the server address field with Connect, and the steps for a new server" width="70%" />
 </picture>
 
+## Turn it on in the app
+
+The server that the Clots app sets up with **On this machine** stays off the tailnet. To reach it from another device, use the app on that machine:
+
+1. Open the account menu at the bottom of the sidebar and choose **Preferences**.
+2. Turn on **Expose over Tailscale**.
+3. Scan the QR code or open the link, and approve the node `clots`.
+
+The dialog then shows the address of the server with a QR code. The server keeps the choice in `~/.clots/remote-access`, so it also applies after a restart or an update.
+
+The address works while the app runs. When you quit the app, the server stops.
+
+You can turn remote access off only on the machine that runs clots. A device that connects over the tailnet would cut its own connection.
+
 ## Who can connect
 
 The default admission mode is `tailscale_owner`: only the Tailscale user who logged the `clots` node in can connect. Tagged devices and other users of the tailnet get a 403 response.

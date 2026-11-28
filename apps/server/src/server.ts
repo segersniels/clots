@@ -18,7 +18,7 @@ import { ProjectRepository } from "./projects/ProjectRepository.ts";
 import { HandlersLayer } from "./rpc/Handlers.ts";
 import { ScheduleRepository } from "./schedules/ScheduleRepository.ts";
 import { SchedulerLayer } from "./schedules/Scheduler.ts";
-import { SidecarLayer } from "./sidecar/Sidecar.ts";
+import { Sidecar } from "./sidecar/Sidecar.ts";
 
 const SqlLayer = Layer.unwrap(
   Effect.gen(function* () {
@@ -31,7 +31,8 @@ const SqlLayer = Layer.unwrap(
   }),
 );
 
-const ServicesLayer = Layer.mergeAll(SchedulerLayer, SidecarLayer, HandlersLayer).pipe(
+const ServicesLayer = Layer.mergeAll(SchedulerLayer, HandlersLayer).pipe(
+  Layer.provideMerge(Sidecar.layer),
   Layer.provideMerge(BotSessions.layer),
   Layer.provideMerge(
     Layer.mergeAll(BotRepository.layer, ScheduleRepository.layer, ProjectRepository.layer),

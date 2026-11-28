@@ -1,7 +1,7 @@
 import type { InstallResult, InstallStep, SetupCheck, SetupChecks } from "@clots/contracts";
 import { app } from "electron";
 import { execFile, spawn, spawnSync, type ChildProcess } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { delimiter, join } from "node:path";
 import { promisify } from "node:util";
@@ -17,6 +17,12 @@ const BROWSER_TIMEOUT_MS = 10 * 60_000;
 
 /** How long the health check waits for the new server to answer. */
 const HEALTH_TIMEOUT_MS = 20_000;
+
+/** How long the app waits for its server to stop before it kills it. */
+const STOP_TIMEOUT_MS = 10_000;
+
+/** How long the app waits before it starts its server again after a crash. The background service waits as long. */
+const RESTART_DELAY_MS = 3000;
 
 const execFileAsync = promisify(execFile);
 
@@ -99,6 +105,148 @@ const serverAnswers = () =>
     () => false,
   );
 
+/** Waits until the server answers, or throws when it does not answer in time. */
+const untilServerAnswers = async () => {
+  const deadline = Date.now() + HEALTH_TIMEOUT_MS;
+
+  while (!(await serverAnswers())) {
+    // The app's server exits at once when it cannot start, so the app does not wait for the deadline.
+    if (ownedServer !== undefined && ownedServer.exitCode !== null) {
+      throw new Error("The server stopped right after it started.");
+    }
+
+    if (Date.now() > deadline) {
+      throw new Error(`The server did not answer at ${LOCAL_SERVER_URL}.`);
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+};
+
+/**
+ * Waits until no server answers. A server that shuts down still holds the port for a moment, and
+ * the next server could not start, while the old one would pass the health check.
+ */
+const untilPortIsFree = async () => {
+  const deadline = Date.now() + HEALTH_TIMEOUT_MS;
+
+  while (await serverAnswers()) {
+    if (Date.now() > deadline) {
+      throw new Error(`Another server still answers at ${LOCAL_SERVER_URL}.`);
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+};
+
+/** The server that the app runs. It stops when the app quits. */
+let ownedServer: ChildProcess | undefined;
+
+/** Set when the app quits, so a move or a restart that still runs starts no server that nothing would stop. */
+let quitting = false;
+
+/** Keeps the process id of the app's server, so the next start can stop a server that a crash left behind. */
+const ownedServerPidFile = () => join(app.getPath("userData"), "server.pid");
+
+/** Starts the installed server as a process of the app, so it stops when the app quits. */
+const spawnOwnedServer = () => {
+  if (quitting) {
+    return;
+  }
+
+  // The variable keeps the server off the tailnet until the operator turns remote access on.
+  const server = spawn(INSTALLED_CLOTS, ["serve"], {
+    env: { ...environment(), CLOTS_TAILNET: "off" },
+    stdio: "ignore",
+  });
+  ownedServer = server;
+  writeFileSync(ownedServerPidFile(), String(server.pid));
+
+  // A server that does not start shows in the health check, which reports it.
+  server.once("error", () => undefined);
+
+  // The background service starts a crashed server again, so the app does the same for its own server.
+  server.once("exit", () => {
+    setTimeout(() => {
+      if (ownedServer === server) {
+        spawnOwnedServer();
+      }
+    }, RESTART_DELAY_MS);
+  });
+};
+
+/** Checks whether a process still runs. */
+const isRunning = (pid: number) => {
+  try {
+    process.kill(pid, 0);
+
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Stops the app's server, also one that an earlier start left behind after a crash, and waits
+ * until it exits. A server that does not stop in time gets killed.
+ */
+export const stopOwnedServer = async () => {
+  ownedServer = undefined;
+  const pid = Number(
+    existsSync(ownedServerPidFile()) ? readFileSync(ownedServerPidFile(), "utf8") : Number.NaN,
+  );
+  rmSync(ownedServerPidFile(), { force: true });
+
+  if (!Number.isInteger(pid)) {
+    return;
+  }
+
+  // The operating system reuses process ids, so check that this one is still the server.
+  const command = spawnSync("ps", ["-p", String(pid), "-o", "command="], { encoding: "utf8" });
+  if (!command.stdout.trim().startsWith(`${INSTALLED_CLOTS} serve`)) {
+    return;
+  }
+
+  process.kill(pid, "SIGTERM");
+  const deadline = Date.now() + STOP_TIMEOUT_MS;
+
+  while (isRunning(pid)) {
+    if (Date.now() > deadline) {
+      process.kill(pid, "SIGKILL");
+
+      return;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+};
+
+/** Stops the app's server for good when the app quits. The server shuts down on its own, so the quit does not wait for it. */
+export const quitServer = () => {
+  quitting = true;
+  void stopOwnedServer();
+};
+
+/**
+ * Starts the server as a process of the app. A version from before removes its background
+ * service first, which would keep the server running after a quit and hold the port.
+ */
+const startServer = async () => {
+  await run(INSTALLED_CLOTS, ["stop", "--force"]);
+  await stopOwnedServer();
+  await untilPortIsFree();
+  spawnOwnedServer();
+};
+
+/** Starts the server and waits until it answers. A window that opens again keeps the server that runs. */
+export const runServer = async () => {
+  if (ownedServer === undefined || ownedServer.exitCode !== null) {
+    await startServer();
+  }
+
+  await untilServerAnswers();
+};
+
 /** Runs every check that a local clots server needs. */
 export const runChecks = async (): Promise<SetupChecks> => {
   const claude = which("claude");
@@ -149,8 +297,8 @@ const bundledClots = () =>
     : join(app.getAppPath(), "../../dist", `clots-${process.platform}-${process.arch}`, "clots");
 
 /**
- * Installs the bundled `clots` and starts it as a background service without Tailscale, then
- * waits until the server answers. The log keeps each command's output for the error details.
+ * Installs the bundled `clots` and starts it as a process of the app, without Tailscale,
+ * then waits until the server answers. The log keeps each command's output for the error details.
  */
 export const installServer = async (
   onStep: (step: InstallStep) => void,
@@ -170,18 +318,12 @@ export const installServer = async (
     onStep("browser");
     await runLogged(INSTALLED_CLOTS, ["browser"], BROWSER_TIMEOUT_MS);
 
+    // A server from an earlier install still runs the old version, and it holds the port.
     onStep("start");
-    await runLogged(INSTALLED_CLOTS, ["up", "--local"]);
+    await startServer();
 
     onStep("health");
-    const deadline = Date.now() + HEALTH_TIMEOUT_MS;
-    while (!(await serverAnswers())) {
-      if (Date.now() > deadline) {
-        throw new Error(`The server did not answer at ${LOCAL_SERVER_URL}.`);
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, 500));
-    }
+    await untilServerAnswers();
 
     return { ok: true };
   } catch (error) {

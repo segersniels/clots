@@ -3,7 +3,7 @@
 clots runs on the machine where your bots work: a home server, a Mac that stays on, or a VPS. It runs on Linux and macOS.
 
 > [!TIP]
-> To run clots on your own Mac, build the [Clots app](./desktop.md) instead. It installs the `clots` command and the background service for you. This page is for a server, or for the command by itself.
+> To run clots on your own Mac, build the [Clots app](./desktop.md) instead. It installs the `clots` command and runs the server for you. This page is for a server, or for the command by itself.
 
 ## Requirements
 
@@ -82,7 +82,7 @@ clots up
 
 On Linux it also runs `loginctl enable-linger`, so that the service keeps running after you log out.
 
-For a server that only this machine uses, run `clots up --local`. It skips steps 4 and 5: the server stays off the tailnet and needs no Tailscale login.
+For a server that only this machine uses, run `clots up --local`. It skips steps 4 and 5: the server stays off the tailnet and needs no Tailscale login. It also turns off remote access that was on before. You can put the server on the tailnet later in the app, see [Remote access](./remote-access.md#turn-it-on-in-the-app).
 
 Check the state at any time:
 

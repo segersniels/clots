@@ -22,6 +22,7 @@ import { closeBrowser, navigateBrowser } from "../browser/BrowserEnvironment.ts"
 import { ProjectRepository } from "../projects/ProjectRepository.ts";
 import { ScheduleRepository } from "../schedules/ScheduleRepository.ts";
 import { availableServerUpdate, installRelease, updateInfo } from "../service/Update.ts";
+import { Sidecar } from "../sidecar/Sidecar.ts";
 
 /** The longest status line. The sidebar and the bot picker truncate it to their width, so this only caps what goes over the wire. */
 const STATUS_LINE_LENGTH = 300;
@@ -37,6 +38,7 @@ export const HandlersLayer = ClotsRpcs.toLayer(
     const schedules = yield* ScheduleRepository;
     const projects = yield* ProjectRepository;
     const config = yield* ClotsConfig;
+    const sidecar = yield* Sidecar;
 
     const requireBot = (botId: BotId) =>
       bots
@@ -376,6 +378,15 @@ export const HandlersLayer = ClotsRpcs.toLayer(
       GetUpdateInfo: () => Effect.promise(() => updateInfo()),
 
       GetAccount: () => Effect.promise(() => readAccount(config.claudePath, config.home)),
+
+      // The sidecar reports its state in a file, so the server reads it again each second.
+      WatchRemoteAccess: () =>
+        Stream.tick("1 second").pipe(
+          Stream.mapEffect(() => sidecar.status),
+          Stream.changes,
+        ),
+
+      SetRemoteAccess: ({ enabled }) => sidecar.setEnabled(enabled),
 
       SearchMessages: ({ query, limit }) => bots.searchMessages(query, limit),
 

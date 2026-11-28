@@ -23,7 +23,7 @@ export class ClotsConfig extends Context.Service<
      * so a device on the tailnet gets the client with hot reload. Vite forwards the API to this server.
      */
     readonly webDevPort: number | undefined;
-    /** Whether the sidecar puts the server on the tailnet. `clots up --local` turns it off. */
+    /** Whether the sidecar puts the server on the tailnet while the operator has not chosen in the app. `clots up --local` turns it off. */
     readonly tailnet: boolean;
   }
 >()("clots/config/ClotsConfig") {

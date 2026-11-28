@@ -7,6 +7,7 @@ import {
   GaugeIcon,
   MonitorIcon,
   MoonIcon,
+  SettingsIcon,
   SunIcon,
   type LucideIcon,
 } from "lucide-react";
@@ -18,6 +19,11 @@ import { useMountEffect } from "@/hooks/use-mount-effect";
 import { currentTheme, setTheme, type Theme } from "@/lib/color-scheme.ts";
 import { formatReset } from "@/time.ts";
 import { Collapse } from "./Collapse.tsx";
+import { PreferencesDialog } from "./Preferences.tsx";
+
+/** The look of a row in the account menu: the plan row and Preferences. */
+const MENU_ROW =
+  "flex min-h-9 items-center gap-2.5 rounded-[10px] px-2.5 text-left outline-none transition-[background-color,box-shadow] duration-150 focus-visible:bg-muted focus-visible:ring-1 focus-visible:ring-ring/40";
 
 /** How often the client asks for the usage. The server asks Claude Code at most once a minute. */
 const CHECK_INTERVAL_MS = 60_000;
@@ -259,7 +265,7 @@ function UsageRow({ account }: { account: Account | undefined }) {
         aria-expanded={open}
         disabled={highest === undefined}
         onClick={() => setOpen(!open)}
-        className="flex min-h-9 items-center gap-2.5 rounded-[10px] px-2.5 text-left outline-none transition-[background-color,box-shadow] duration-150 enabled:hover:bg-muted focus-visible:bg-muted focus-visible:ring-1 focus-visible:ring-ring/40"
+        className={cn(MENU_ROW, "enabled:hover:bg-muted")}
       >
         <GaugeIcon className="size-4 shrink-0 text-muted-foreground" />
         {account === undefined ? (
@@ -310,7 +316,14 @@ export function AccountMenu({
   onOpenChange: (open: boolean) => void;
 }) {
   const [account, setAccount] = useState<Account>();
+  const [preferencesOpen, setPreferencesOpen] = useState(false);
+  const [runsOnThisMachine, setRunsOnThisMachine] = useState(false);
   const highest = highestOf(account?.usage);
+
+  // The preferences set how this machine runs its server. A browser and an app that connects to another machine have none.
+  useMountEffect(() => {
+    void window.clotsApp?.serverMode?.().then((mode) => setRunsOnThisMachine(mode === "local"));
+  });
 
   return (
     <div className="flex min-w-0 items-center gap-2">
@@ -366,8 +379,23 @@ export function AccountMenu({
               <ThemeToggle />
             </span>
           </div>
+          {runsOnThisMachine && (
+            <button
+              type="button"
+              onClick={() => {
+                onOpenChange(false);
+                setPreferencesOpen(true);
+              }}
+              className={cn(MENU_ROW, "hover:bg-muted")}
+            >
+              <SettingsIcon className="size-4 shrink-0 text-muted-foreground" />
+              <span>Preferences</span>
+              <ChevronRightIcon className="-mr-1 ml-auto size-4 shrink-0 text-muted-foreground" />
+            </button>
+          )}
         </PopoverContent>
       </Popover>
+      <PreferencesDialog open={preferencesOpen} onOpenChange={setPreferencesOpen} />
       {connecting && <span className="truncate text-xs text-muted-foreground">Connecting…</span>}
     </div>
   );

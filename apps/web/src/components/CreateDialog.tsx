@@ -101,7 +101,7 @@ function gazeAtCaret(event: SyntheticEvent<HTMLInputElement>): Gaze {
 
 /**
  * Shows a compact dialog that creates a bot or a project. Its parts below keep both dialogs alike,
- * and the skill editor uses them too. Without a `title`, the children render the header themselves,
+ * and the skill editor and Preferences use them too. Without a `title`, the children render the header themselves,
  * such as the views of New bot.
  */
 export function CreateDialog({

@@ -68,4 +68,6 @@ export interface DesktopAppBridge {
   installUpdate?(): Promise<void>;
   /** Shows the number of unread bots on the app icon. Zero removes the badge. An older app has no badge. */
   setBadgeCount?(count: number): Promise<void>;
+  /** Reads where the operator chose to run clots at the first start: on this machine, or on another machine. An older app has no answer. */
+  serverMode?(): Promise<"local" | "remote" | undefined>;
 }

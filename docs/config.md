@@ -10,7 +10,7 @@ clots needs no configuration file. A few environment variables change where it k
 | `CLOTS_PORT` | `4587` | The loopback port of the server |
 | `CLAUDE_CONFIG_DIR` | `~/.claude` | The Claude Code account that the bots use |
 | `AGENT_BROWSER_EXECUTABLE_PATH` | the system Chromium or Chrome, else the Chrome for Testing in `~/.clots/tools` | The browser that the bots start |
-| `CLOTS_TAILNET` | `on` | `off` keeps the server off the tailnet. `clots up --local` sets it |
+| `CLOTS_TAILNET` | `on` | `off` keeps the server off the tailnet. `clots up --local` sets it. A choice in **Preferences** in the app replaces it |
 
 `clots up` copies `PATH` and these variables from your shell into the background service. Run `clots up` again after you change one.
 

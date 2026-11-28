@@ -18,6 +18,7 @@ import {
   type Account,
   type MessageHit,
   type BotSkill,
+  type RemoteAccess,
 } from "@clots/contracts";
 import {
   Cause,
@@ -104,6 +105,10 @@ export interface ClotsClient {
   deleteSchedule(id: string): Promise<void>;
   getUpdateInfo(): Promise<UpdateInfo>;
   getAccount(): Promise<Account>;
+  /** Follows how other devices reach the server over Tailscale. It holds `null` until the first state arrives. */
+  readonly remoteAccess: Store<RemoteAccess | null>;
+  /** Puts the server on the tailnet or takes it off. The server keeps the choice. */
+  setRemoteAccess(enabled: boolean): Promise<void>;
   searchMessages(query: string, limit: number): Promise<ReadonlyArray<MessageHit>>;
   /** Starts every open server stream again from where it is. A stream can stop without an error, for example after the computer sleeps. */
   resubscribe(): void;
@@ -206,6 +211,12 @@ export const makeClotsClient = (origin: string): ClotsClient => {
     [],
     (rpc) => rpc.WatchProjects(),
     (_, list) => list,
+  );
+
+  const remoteAccess = makeStreamStore<RemoteAccess | null, RemoteAccess>(
+    null,
+    (rpc) => rpc.WatchRemoteAccess(),
+    (_, state) => state,
   );
 
   const threads = new Map<BotId, Store<ThreadState>>();
@@ -340,6 +351,12 @@ export const makeClotsClient = (origin: string): ClotsClient => {
     deleteSchedule: (id) => call((rpc) => rpc.DeleteSchedule({ id })),
     getUpdateInfo: () => call((rpc) => rpc.GetUpdateInfo()),
     getAccount: () => call((rpc) => rpc.GetAccount()),
+    remoteAccess,
+    // The answer holds the new state, so the store shows it before the next report of the stream.
+    setRemoteAccess: (enabled) =>
+      call((rpc) => rpc.SetRemoteAccess({ enabled })).then((state) =>
+        remoteAccess.set(() => state),
+      ),
     searchMessages: (query, limit) => call((rpc) => rpc.SearchMessages({ query, limit })),
     resubscribe: () => {
       for (const restart of openStreams) {

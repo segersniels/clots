@@ -70,6 +70,19 @@ export const UpdateInfo = Schema.Struct({
 });
 export type UpdateInfo = typeof UpdateInfo.Type;
 
+/**
+ * How other devices reach the server over Tailscale. `unavailable` means that this build has no
+ * sidecar, and `starting` that the sidecar has not reported yet.
+ */
+export const RemoteAccess = Schema.Struct({
+  state: Schema.Literals(["unavailable", "off", "starting", "needs_login", "needs_https", "ready"]),
+  /** The Tailscale login link of `needs_login`. It appears a moment after the sidecar starts. */
+  authUrl: Schema.optional(Schema.String),
+  /** The address of the server on the tailnet, for `ready`. */
+  url: Schema.optional(Schema.String),
+});
+export type RemoteAccess = typeof RemoteAccess.Type;
+
 /** One usage limit of the Claude plan: the 5-hour session, the week, or the week of one model. */
 export const UsageWindow = Schema.Struct({
   kind: Schema.Literals(["session", "weekly", "model"]),
@@ -311,6 +324,10 @@ export class ClotsRpcs extends RpcGroup.make(
   Rpc.make("DeleteSchedule", { payload: { id: Schema.String } }),
   Rpc.make("GetUpdateInfo", { success: UpdateInfo }),
   Rpc.make("GetAccount", { success: Account }),
+  /** Follows how other devices reach the server over Tailscale. It sends a new state each time it changes. */
+  Rpc.make("WatchRemoteAccess", { success: RemoteAccess, stream: true }),
+  /** Puts the server on the tailnet or takes it off, and keeps the choice for the next start. Returns the new state. */
+  Rpc.make("SetRemoteAccess", { payload: { enabled: Schema.Boolean }, success: RemoteAccess }),
   /** Finds the messages of every thread that hold all words of the query, as words or word starts, best match first. */
   Rpc.make("SearchMessages", {
     payload: { query: Schema.String, limit: Schema.Number },

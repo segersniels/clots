@@ -22,7 +22,7 @@ import {
 } from "./service/Service.ts";
 import { availableServerUpdate, installRelease } from "./service/Update.ts";
 import { CLOTS_VERSION } from "./version.ts";
-import { readSidecarStatus, sidecarIsBuilt } from "./sidecar/Sidecar.ts";
+import { readSidecarStatus, sidecarIsBuilt, writeRemoteAccessChoice } from "./sidecar/Sidecar.ts";
 
 const HOME = process.env.CLOTS_HOME ?? join(homedir(), ".clots");
 const PORT = Number(process.env.CLOTS_PORT ?? 4587);
@@ -127,7 +127,10 @@ const setUpBrowser = async () => {
   }
 };
 
-/** Starts the background service. A local server stays off the tailnet, so it needs no Tailscale login. */
+/**
+ * Starts the background service. A local start needs no Tailscale login: the server stays off the
+ * tailnet until the operator turns remote access on in the app.
+ */
 const up = async (local: boolean) => {
   if (!ensureClaudeLogin()) {
     process.exit(1);
@@ -145,8 +148,14 @@ const up = async (local: boolean) => {
   // The service keeps this variable, and the server reads it when it starts.
   if (local) {
     process.env.CLOTS_TAILNET = "off";
+
+    // A choice from the app wins over the variable, so a local start replaces it.
+    writeRemoteAccessChoice(HOME, false);
   } else {
     delete process.env.CLOTS_TAILNET;
+
+    // A choice from the app wins over the variable, so a start with the tailnet replaces it.
+    writeRemoteAccessChoice(HOME, true);
   }
 
   installService();
