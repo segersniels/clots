@@ -1,7 +1,7 @@
 import { RPC_PATH, ClotsRpcs } from "@clots/contracts";
 import { BunHttpServer } from "@effect/platform-bun";
 import { SqliteClient } from "@effect/sql-sqlite-bun";
-import { Effect, Layer } from "effect";
+import { Duration, Effect, Layer } from "effect";
 import { HttpRouter, HttpStaticServer } from "effect/http";
 import { RpcSerialization, RpcServer } from "effect/rpc";
 import { mkdirSync } from "node:fs";
@@ -70,7 +70,14 @@ export const ServerLayer = Layer.unwrap(
       { disableLogger: true },
     ).pipe(
       Layer.provide(ServicesLayer),
-      Layer.provide(BunHttpServer.layer({ hostname: "127.0.0.1", port: config.port })),
+      Layer.provide(
+        BunHttpServer.layer({
+          hostname: "127.0.0.1",
+          port: config.port,
+          // An open client connection would keep the server up and answering for the default 20 seconds after a stop, such as when the app quits.
+          gracefulShutdownTimeout: Duration.seconds(1),
+        }),
+      ),
     );
   }),
 ).pipe(Layer.provide(ClotsConfig.layer));
