@@ -2233,6 +2233,8 @@ export class BotSessions extends Context.Service<
           const last = runtime.lastRequest;
           const returnsToLongThread =
             runtime.live.status === "idle" &&
+            // A typed /compact is the compaction already, and a second one would cost twice.
+            !/^\/compact(\s|$)/i.test(text.trim()) &&
             last !== null &&
             last.tokens >= RETURN_COMPACT_TOKENS &&
             Date.now() - last.at >= PROMPT_CACHE_MS;
