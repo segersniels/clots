@@ -34,9 +34,9 @@ The server that the Clots app sets up with **On this machine** stays off the tai
 
 1. Open the account menu at the bottom of the sidebar and choose **Preferences**.
 2. Turn on **Expose over Tailscale**.
-3. Scan the QR code or open the link, and approve the node `clots`.
+3. Choose **Sign in**, sign in to Tailscale in your browser, and approve the node `clots`. You sign in only the first time.
 
-The dialog then shows the address of the server with a QR code. The server keeps the choice in `~/.clots/remote-access`, so it also applies after a restart or an update.
+The dialog then shows the address of the server. The QR code button next to it shows the address as a QR code for your phone. The server keeps the choice in `~/.clots/remote-access`, so it also applies after a restart or an update.
 
 The address works while the app runs. When you quit the app, the server stops.
 

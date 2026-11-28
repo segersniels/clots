@@ -1,7 +1,7 @@
 import type { RemoteAccess } from "@clots/contracts";
 import { cn } from "cn";
-import { CheckIcon, CopyIcon, ExternalLinkIcon } from "lucide-react";
-import { useState } from "react";
+import { CheckIcon, CopyIcon, ExternalLinkIcon, QrCodeIcon } from "lucide-react";
+import { useId, useState } from "react";
 import { encode } from "uqr";
 
 import { client, useStore } from "@/client.ts";
@@ -15,32 +15,36 @@ import { CreateDialog } from "./CreateDialog.tsx";
 /** The Tailscale page where the operator enables HTTPS certificates for the tailnet. */
 const HTTPS_SETTINGS_URL = "https://login.tailscale.com/admin/dns";
 
-/** What the operator does next in one state: the text, and the link that the QR code holds. */
-interface Step {
-  readonly text: string;
-  readonly link?: string;
+/** A button that sends the operator to a Tailscale page in the browser. */
+interface StepAction {
+  readonly label: string;
+  readonly link: string;
 }
 
-/** Tells the operator's next step. A state without a link shows a spinner. */
+/** What the operator does next in one state: the text, a button to a Tailscale page, or the address of the server. */
+interface Step {
+  readonly text: string;
+  readonly action?: StepAction;
+  readonly address?: string;
+}
+
+/** Tells the operator's next step. A state without an action or an address shows a spinner. */
 const stepOf = (access: RemoteAccess | null): Step => {
   if (access?.state === "ready" && access.url !== undefined) {
-    return {
-      text: "Scan the code or open this address.",
-      link: access.url,
-    };
+    return { text: "clots is on your tailnet at this address.", address: access.url };
   }
 
   if (access?.state === "needs_login" && access.authUrl !== undefined) {
     return {
-      text: "Log in to Tailscale to add clots to your tailnet.",
-      link: access.authUrl,
+      text: "Sign in to Tailscale to add clots to your tailnet.",
+      action: { label: "Sign in", link: access.authUrl },
     };
   }
 
   if (access?.state === "needs_https") {
     return {
       text: "Turn on HTTPS certificates for your tailnet.",
-      link: HTTPS_SETTINGS_URL,
+      action: { label: "Turn on HTTPS", link: HTTPS_SETTINGS_URL },
     };
   }
 
@@ -67,13 +71,34 @@ function QrCode({ link }: { link: string }) {
   );
 }
 
-/** Shows a link with a button that copies it and a button that opens it. */
-function LinkRow({ link }: { link: string }) {
+/** Shows a link with buttons that show its QR code, copy it and open it. */
+function LinkRow({
+  link,
+  qrOpen,
+  qrId,
+  onToggleQr,
+}: {
+  link: string;
+  qrOpen: boolean;
+  /** The id of the area that holds the QR code. */
+  qrId: string;
+  onToggleQr: () => void;
+}) {
   const { copied, copy } = useCopy();
 
   return (
     <div className="flex h-9 items-center gap-0.5 rounded-xl bg-muted/60 pr-1 pl-2.5">
       <span className="mr-auto truncate text-[0.8125rem]">{link.replace(/^https:\/\//, "")}</span>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        aria-label="QR code"
+        aria-expanded={qrOpen}
+        aria-controls={qrId}
+        onClick={onToggleQr}
+      >
+        <QrCodeIcon />
+      </Button>
       <Button
         variant="ghost"
         size="icon-sm"
@@ -96,41 +121,64 @@ function LinkRow({ link }: { link: string }) {
 }
 
 /**
- * Shows the part below the switch: a QR code, the next step and the link. Each state fills the same
- * boxes, so a change of state moves nothing.
+ * Shows the part below the switch: the next step, a button to Tailscale until clots is on the
+ * tailnet, and then the address. The QR code of the address shows only on request, and the sign-in
+ * is a button, so the only code to scan is the one that opens clots.
  */
 function RemoteAccessStep({ access }: { access: RemoteAccess | null }) {
   const step = stepOf(access);
-  const [shownLink, setShownLink] = useState(step.link);
+  const qrId = useId();
+  const [qrOpen, setQrOpen] = useState(false);
+  const [shownAddress, setShownAddress] = useState(step.address);
 
-  // The last link stays in place while it fades out, so the QR code does not vanish at once.
-  if (step.link !== undefined && step.link !== shownLink) {
-    setShownLink(step.link);
+  // The last address stays in place while it collapses, so it does not vanish at once.
+  if (step.address !== undefined && step.address !== shownAddress) {
+    setShownAddress(step.address);
   }
 
-  const fade = "transition-opacity duration-200 ease-out motion-reduce:transition-none";
+  // The QR code closes when clots leaves the tailnet, so it does not open by itself when clots is back.
+  if (step.address === undefined && qrOpen) {
+    setQrOpen(false);
+  }
+
+  const starting = step.action === undefined && step.address === undefined;
 
   return (
-    <div className="flex flex-col gap-3 pt-4">
-      <div className="relative mx-auto size-44">
-        <Spinner
-          className={cn(
-            "absolute inset-0 m-auto size-5 text-muted-foreground",
-            fade,
-            step.link !== undefined && "opacity-0",
-          )}
-        />
-        <div className={cn("absolute inset-0", fade, step.link === undefined && "opacity-0")}>
-          {shownLink !== undefined && <QrCode link={shownLink} />}
+    <div className="flex flex-col pt-4">
+      <div className="flex items-center justify-between gap-3">
+        <p className="flex items-center gap-2 text-[0.8125rem] text-muted-foreground">
+          {starting && <Spinner className="size-3.5" />}
+          {step.text}
+        </p>
+        {step.action !== undefined && (
+          <Button
+            variant="secondary"
+            size="sm"
+            className="shrink-0"
+            nativeButton={false}
+            render={<a href={step.action.link} target="_blank" rel="noreferrer" />}
+          >
+            {step.action.label}
+          </Button>
+        )}
+      </div>
+      <Collapse open={step.address !== undefined}>
+        <div className="pt-3">
+          <LinkRow
+            link={shownAddress ?? ""}
+            qrOpen={qrOpen}
+            qrId={qrId}
+            onToggleQr={() => setQrOpen(!qrOpen)}
+          />
         </div>
-      </div>
-      <p className="text-center text-[0.8125rem] text-balance text-muted-foreground">{step.text}</p>
-      <div
-        inert={step.link === undefined}
-        className={cn(fade, step.link === undefined && "opacity-0")}
-      >
-        <LinkRow link={shownLink ?? ""} />
-      </div>
+      </Collapse>
+      <Collapse open={step.address !== undefined && qrOpen}>
+        <div id={qrId} className="pt-3">
+          <div className="mx-auto size-44">
+            {shownAddress !== undefined && <QrCode link={shownAddress} />}
+          </div>
+        </div>
+      </Collapse>
     </div>
   );
 }
