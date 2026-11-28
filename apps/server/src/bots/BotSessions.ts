@@ -134,8 +134,17 @@ const claudeIsRunning = (pid: number) => {
   return status !== "" && !status.startsWith("Z") && status.includes("stream-json");
 };
 
-/** The thread size, in tokens, at which a bot compacts its conversation. */
-const AUTO_COMPACT_WINDOW = 258_000;
+/** The thread size, in tokens, at which a bot compacts its conversation in the middle of its work. */
+const AUTO_COMPACT_WINDOW = 512_000;
+
+/**
+ * The thread size, in tokens, from which a bot compacts before the first prompt after an idle time.
+ * A smaller thread costs less to write again than to summarize.
+ */
+const RETURN_COMPACT_TOKENS = 227_000;
+
+/** How long Claude keeps the thread in its prompt cache. After that, the next request pays for the whole thread again. */
+const PROMPT_CACHE_MS = 60 * 60_000;
 
 /** The start of the id of the step that shows a compaction while it runs. */
 const COMPACT_STEP = "compact-";
@@ -284,6 +293,10 @@ interface BotRuntime {
   readonly stepImages: Map<string, Attachment>;
   /** Who sent the latest prompt: the operator, a routine or another bot. A clone may delete itself only after the operator's. */
   lastPromptFrom: MessageRole | null;
+  /** The size of the thread at the bot's last request to Claude, and when that was. A server restart forgets it. */
+  lastRequest: { readonly at: number; readonly tokens: number } | null;
+  /** Whether the bot compacts before a prompt that waits behind it. The end of that compaction does not end the turn for the operator. */
+  compactsBeforePrompt: boolean;
   /** A session from before a server restart that still runs, and the prompts that wait until it ends. */
   leftover: { readonly pid: number; readonly prompts: Array<SDKUserMessage> } | null;
   /** The prompts that wait while a session with an old system prompt finishes its work. */
@@ -495,6 +508,8 @@ export class BotSessions extends Context.Service<
           loginHints: new Set(),
           stepImages: new Map(),
           lastPromptFrom: null,
+          lastRequest: null,
+          compactsBeforePrompt: false,
           leftover: null,
           restart: null,
           viewers: 0,
@@ -1792,6 +1807,13 @@ export class BotSessions extends Context.Service<
             return;
           }
 
+          // The prompt that waited behind the compaction starts its turn now, so the bot stays at work.
+          if (message.type === "result" && runtime.compactsBeforePrompt) {
+            runtime.compactsBeforePrompt = false;
+
+            return;
+          }
+
           if (message.type === "result") {
             yield* recordTrace(runtime, botId, true);
 
@@ -1893,6 +1915,15 @@ export class BotSessions extends Context.Service<
 
             return;
           }
+
+          const { usage } = message.message;
+          runtime.lastRequest = {
+            at: Date.now(),
+            tokens:
+              usage.input_tokens +
+              (usage.cache_read_input_tokens ?? 0) +
+              (usage.cache_creation_input_tokens ?? 0),
+          };
 
           // The finished tool call carries its input, which says what the bot does.
           for (const block of message.message.content) {
@@ -2195,8 +2226,29 @@ export class BotSessions extends Context.Service<
             return;
           }
 
+          /**
+           * A long thread that left the prompt cache costs its full size on each later request.
+           * The bot summarizes it first, so the operator can talk on in one conversation for longer.
+           */
+          const last = runtime.lastRequest;
+          const returnsToLongThread =
+            runtime.live.status === "idle" &&
+            last !== null &&
+            last.tokens >= RETURN_COMPACT_TOKENS &&
+            Date.now() - last.at >= PROMPT_CACHE_MS;
+
           runtime.lastPromptFrom = role;
           setLive(runtime, { status: statusWhileRunning(runtime) });
+
+          if (returnsToLongThread) {
+            runtime.lastRequest = null;
+            runtime.compactsBeforePrompt = true;
+            yield* deliver(bot, runtime, {
+              type: "user",
+              message: { role: "user", content: "/compact" },
+              parent_tool_use_id: null,
+            } as SDKUserMessage);
+          }
 
           // The bot sees an image at once. For each file it also gets the path, so it can read or use the file.
           const images = saved
