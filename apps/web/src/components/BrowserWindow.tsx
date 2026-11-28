@@ -22,6 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
+import { useCopy } from "@/hooks/use-copy";
 
 import { ProgressLine } from "./UpdateControl.tsx";
 
@@ -41,9 +42,6 @@ const VIEWPORT_MARGIN = 10;
 
 /** The narrowest window, so the toolbar fits. A tall page then fits by its height, in the middle of the window. */
 const MIN_WINDOW_WIDTH = 520;
-
-/** How long the copy button shows its check after a copy. */
-const COPIED_MS = 1500;
 
 /** Marks an element that handles Escape itself, so Escape there does not give the screen back. */
 export const OWN_ESCAPE = { "data-own-escape": "" };
@@ -326,14 +324,8 @@ export function AddressBar({
   onOpen: (address: string) => void;
 }) {
   const [typed, setTyped] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopy();
   const { secure, host, rest } = splitAddress(address);
-
-  const copy = async () => {
-    await navigator.clipboard.writeText(address);
-    setCopied(true);
-    setTimeout(() => setCopied(false), COPIED_MS);
-  };
 
   const finish = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Enter" && typed !== null && typed.trim() !== "") {
@@ -374,7 +366,7 @@ export function AddressBar({
                 aria-label="Copy link"
                 title="Copy link"
                 className="size-[26px] rounded-full"
-                onClick={() => void copy()}
+                onClick={() => void copy(address)}
               >
                 {copied ? <CheckIcon className="text-attention" /> : <CopyIcon />}
               </Button>
