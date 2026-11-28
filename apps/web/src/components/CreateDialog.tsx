@@ -238,14 +238,22 @@ export function NoBots() {
 
   return (
     // The bot list arrives a moment after the page opens, so the empty state waits before it fades in.
-    <div className="flex flex-col items-center gap-3 transition-opacity delay-300 duration-200 ease-out starting:opacity-0">
-      <div className="flex items-end gap-1">
-        <ClotGroup />
+    <div className="flex flex-col items-center transition-opacity delay-300 duration-200 ease-out starting:opacity-0">
+      <div className="mb-3.5 flex items-end gap-1">
+        <Character shape="drop" color="blue" size={48} />
+        <Character shape="tumble" color="pink" size={68} />
+        <Character shape="bean" color="green" size={54} />
       </div>
-      <p className="text-muted-foreground">No bots yet</p>
-      <div className="flex flex-col items-center gap-1">
-        <Button onClick={() => setCreating("form")}>New bot</Button>
-        <Button variant="ghost" onClick={() => setCreating("templates")}>
+      <h2 className="mb-1 text-xl font-semibold tracking-[-0.01em]">No bots yet</h2>
+      <div className="mt-3.5 flex items-center gap-2">
+        <Button className="h-8 rounded-full px-3.5" onClick={() => setCreating("form")}>
+          New bot
+        </Button>
+        <Button
+          variant="secondary"
+          className="h-8 rounded-full px-3.5"
+          onClick={() => setCreating("templates")}
+        >
           Start from a template
         </Button>
       </div>
