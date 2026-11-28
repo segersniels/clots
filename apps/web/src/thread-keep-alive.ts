@@ -22,7 +22,11 @@ export const keepWorkingThreadsCurrent = () => {
 
       // The thread store changes on its own stream, so each change checks again whether the turn is over.
       const thread = client.thread(bot.id);
-      held.set(bot.id, { liveBefore: thread.get().live, release: thread.subscribe(update) });
+      const hold = { liveBefore: thread.get().live, release: () => {} };
+
+      // A new subscription changes the thread at once, which runs this update again. The hold must exist by then, or each run subscribes again.
+      held.set(bot.id, hold);
+      hold.release = thread.subscribe(update);
     }
 
     for (const [botId, { release, liveBefore }] of held) {
