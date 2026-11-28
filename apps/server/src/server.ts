@@ -53,7 +53,8 @@ const WebLayer = Layer.unwrap(
       return Layer.empty;
     }
 
-    return HttpStaticServer.layer({ root: webRoot, spa: true });
+    // Without this header, a browser decides alone how long the page stays fresh, and a client can run an old build for hours after an update.
+    return HttpStaticServer.layer({ root: webRoot, spa: true, cacheControl: "no-cache" });
   }),
 );
 
