@@ -19,6 +19,7 @@ import {
   type MessageHit,
   type BotSkill,
   type RemoteAccess,
+  type ClientDiagnostics,
 } from "@clots/contracts";
 import {
   Cause,
@@ -110,6 +111,10 @@ export interface ClotsClient {
   /** Puts the server on the tailnet or takes it off. The server keeps the choice. */
   setRemoteAccess(enabled: boolean): Promise<void>;
   searchMessages(query: string, limit: number): Promise<ReadonlyArray<MessageHit>>;
+  /** Reads the open server streams per kind, and the stream values that arrived since the last read. */
+  readStreamCounts(): Pick<ClientDiagnostics, "openStreams" | "streamValues">;
+  /** Adds one report to the diagnostics log of the server. */
+  reportDiagnostics(report: ClientDiagnostics): Promise<void>;
   /** Starts every open server stream again from where it is. A stream can stop without an error, for example after the computer sleeps. */
   resubscribe(): void;
   /** Installs the latest release on the server, which then restarts. */
@@ -153,6 +158,12 @@ export const makeClotsClient = (origin: string): ClotsClient => {
   const call = <A, E>(use: (rpc: RpcService) => Effect.Effect<A, E>) =>
     runtime.runPromise(Effect.flatMap(Effect.service(Rpc), use));
 
+  /** The open streams per kind, for the diagnostics log. */
+  const openStreamCounts: Record<string, number> = {};
+
+  /** The stream values per kind that arrived since the last diagnostics report. */
+  let streamValueCounts: Record<string, number> = {};
+
   /** Holds a restart for each stream that a view observes now. */
   const openStreams = new Set<() => void>();
 
@@ -161,6 +172,7 @@ export const makeClotsClient = (origin: string): ClotsClient => {
    * the stream, so the store subscribes again. `subscribe` reads the current value to resume.
    */
   const makeStreamStore = <T, A>(
+    kind: string,
     initial: T,
     subscribe: (rpc: RpcService, current: T) => Stream.Stream<A, unknown>,
     apply: (current: T, value: A) => T,
@@ -170,7 +182,10 @@ export const makeClotsClient = (origin: string): ClotsClient => {
         Effect.flatMap((rpc) =>
           Stream.suspend(() => subscribe(rpc, store.get())).pipe(
             Stream.runForEach((value) =>
-              Effect.sync(() => set((current) => apply(current, value))),
+              Effect.sync(() => {
+                streamValueCounts[kind] = (streamValueCounts[kind] ?? 0) + 1;
+                set((current) => apply(current, value));
+              }),
             ),
           ),
         ),
@@ -191,9 +206,11 @@ export const makeClotsClient = (origin: string): ClotsClient => {
         fiber = runtime.runFork(Fiber.interrupt(previous).pipe(Effect.andThen(follow)));
       };
       openStreams.add(restart);
+      openStreamCounts[kind] = (openStreamCounts[kind] ?? 0) + 1;
 
       return () => {
         openStreams.delete(restart);
+        openStreamCounts[kind] = (openStreamCounts[kind] ?? 1) - 1;
         void runtime.runFork(Fiber.interrupt(fiber));
       };
     });
@@ -202,18 +219,21 @@ export const makeClotsClient = (origin: string): ClotsClient => {
   };
 
   const bots = makeStreamStore<ReadonlyArray<BotSummary>, ReadonlyArray<BotSummary>>(
+    "bots",
     [],
     (rpc) => rpc.WatchBots(),
     (_, list) => list,
   );
 
   const projects = makeStreamStore<ReadonlyArray<Project>, ReadonlyArray<Project>>(
+    "projects",
     [],
     (rpc) => rpc.WatchProjects(),
     (_, list) => list,
   );
 
   const remoteAccess = makeStreamStore<RemoteAccess | null, RemoteAccess>(
+    "remoteAccess",
     null,
     (rpc) => rpc.WatchRemoteAccess(),
     (_, state) => state,
@@ -236,6 +256,7 @@ export const makeClotsClient = (origin: string): ClotsClient => {
       }
 
       const store = makeStreamStore(
+        "thread",
         emptyThread,
         (rpc, current) =>
           Stream.concat(
@@ -269,6 +290,7 @@ export const makeClotsClient = (origin: string): ClotsClient => {
       }
 
       const store = makeStreamStore<ReadonlyArray<Schedule>, ReadonlyArray<Schedule>>(
+        "schedules",
         [],
         (rpc) => rpc.WatchSchedules({ botId }),
         (_, list) => list,
@@ -285,6 +307,7 @@ export const makeClotsClient = (origin: string): ClotsClient => {
       }
 
       const store = makeStreamStore<ReadonlyArray<Skill>, ReadonlyArray<Skill>>(
+        "skills",
         [],
         (rpc) => rpc.WatchSkills({ botId }),
         (_, list) => list,
@@ -301,6 +324,7 @@ export const makeClotsClient = (origin: string): ClotsClient => {
       }
 
       const store = makeStreamStore<ReadonlyArray<BotSkill> | null, ReadonlyArray<BotSkill>>(
+        "botSkills",
         null,
         (rpc) => rpc.WatchBotSkills({ botId }),
         (_, list) => list,
@@ -363,6 +387,13 @@ export const makeClotsClient = (origin: string): ClotsClient => {
         restart();
       }
     },
+    readStreamCounts: () => {
+      const streamValues = streamValueCounts;
+      streamValueCounts = {};
+
+      return { openStreams: { ...openStreamCounts }, streamValues };
+    },
+    reportDiagnostics: (report) => call((rpc) => rpc.ReportDiagnostics({ report })),
     updateServer: () => call((rpc) => rpc.UpdateServer()),
     dispose: () => runtime.dispose(),
   };

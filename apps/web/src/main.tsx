@@ -3,6 +3,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import { client } from "./client.ts";
+import { startDiagnostics } from "./diagnostics.ts";
 import { followSystemColorScheme } from "./lib/color-scheme.ts";
 import { startBotNotifications } from "./notifications.ts";
 import { routeTree } from "./routeTree.gen.ts";
@@ -26,6 +27,7 @@ if (desktop !== null) {
 followSystemColorScheme();
 startBotNotifications((botId) => void router.navigate({ to: "/bots/$botId", params: { botId } }));
 keepWorkingThreadsCurrent();
+startDiagnostics();
 
 // A stream can stop without an error while the window is away, for example when the computer sleeps.
 document.addEventListener("visibilitychange", () => {

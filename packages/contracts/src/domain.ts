@@ -245,3 +245,23 @@ export const Schedule = Schema.Struct({
   nextRunAt: Schema.Number,
 });
 export type Schedule = typeof Schedule.Type;
+
+/** What one client measured in its last report period, so a slow app shows in a log and not only on the operator's screen. */
+export const ClientDiagnostics = Schema.Struct({
+  /** A random name of one page load, so the reports of two clients stay apart. */
+  client: Schema.String,
+  /** The desktop app, a browser, and their platform. */
+  userAgent: Schema.String,
+  /** A hidden window draws no frames. */
+  hidden: Schema.Boolean,
+  /** The open server streams per kind. More thread streams than working and open bots is a leak. */
+  openStreams: Schema.Record(Schema.String, Schema.Number),
+  /** The stream values that arrived in the period, per kind. */
+  streamValues: Schema.Record(Schema.String, Schema.Number),
+  /** The main-thread tasks in the period that took longer than 50 ms, and their total time. */
+  longTasks: Schema.Number,
+  longTaskMs: Schema.Number,
+  /** The frames in one second at the end of the period. It is `null` for a hidden window. */
+  framesPerSecond: Schema.NullOr(Schema.Number),
+});
+export type ClientDiagnostics = typeof ClientDiagnostics.Type;

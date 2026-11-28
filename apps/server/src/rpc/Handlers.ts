@@ -21,6 +21,7 @@ import { ClotsConfig } from "../config.ts";
 import { closeBrowser, navigateBrowser } from "../browser/BrowserEnvironment.ts";
 import { ProjectRepository } from "../projects/ProjectRepository.ts";
 import { ScheduleRepository } from "../schedules/ScheduleRepository.ts";
+import { appendDiagnostics } from "../service/DiagnosticsLog.ts";
 import { availableServerUpdate, installRelease, updateInfo } from "../service/Update.ts";
 import { Sidecar } from "../sidecar/Sidecar.ts";
 
@@ -378,6 +379,11 @@ export const HandlersLayer = ClotsRpcs.toLayer(
       GetUpdateInfo: () => Effect.promise(() => updateInfo()),
 
       GetAccount: () => Effect.promise(() => readAccount(config.claudePath, config.home)),
+
+      ReportDiagnostics: ({ report }) =>
+        Effect.sync(() =>
+          appendDiagnostics(config.home, { at: new Date().toISOString(), ...report }),
+        ),
 
       // The sidecar reports its state in a file, so the server reads it again each second.
       WatchRemoteAccess: () =>

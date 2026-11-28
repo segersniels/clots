@@ -17,6 +17,7 @@ import {
   Skill,
   ThreadEvent,
   Upload,
+  ClientDiagnostics,
 } from "./domain.ts";
 
 /** The path of the RPC WebSocket on the clots server. */
@@ -324,6 +325,8 @@ export class ClotsRpcs extends RpcGroup.make(
   Rpc.make("DeleteSchedule", { payload: { id: Schema.String } }),
   Rpc.make("GetUpdateInfo", { success: UpdateInfo }),
   Rpc.make("GetAccount", { success: Account }),
+  /** Adds one client report to the diagnostics log of the server. */
+  Rpc.make("ReportDiagnostics", { payload: { report: ClientDiagnostics } }),
   /** Follows how other devices reach the server over Tailscale. It sends a new state each time it changes. */
   Rpc.make("WatchRemoteAccess", { success: RemoteAccess, stream: true }),
   /** Puts the server on the tailnet or takes it off, and keeps the choice for the next start. Returns the new state. */
